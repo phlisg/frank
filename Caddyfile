@@ -1,0 +1,35 @@
+{
+    frankenphp
+    order php_server before file_server
+}
+
+:8000 {
+    root * /app/public
+    
+    # Enable FrankenPHP
+    php_server
+
+    # Handle Laravel's pretty URLs
+    try_files {path} {path}/ /index.php?{query}
+
+    # Security headers
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # Handle static assets
+    @static {
+        file
+        path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.svg *.woff *.woff2 *.ttf *.eot
+    }
+    header @static Cache-Control max-age=31536000
+
+    # Logging for development
+    log {
+        output stdout
+        format console
+    }
+}

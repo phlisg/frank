@@ -1,0 +1,48 @@
+services:
+  laravel-init:
+    image: composer:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+    user: ${UID:-1000}:${GID:-1000}
+    command: >
+      sh -c "
+        if [ ! -f 'artisan' ]; then
+          echo 'Creating new Laravel project...';
+          composer create-project --prefer-dist laravel/laravel temp-laravel;
+          cp -r temp-laravel/* .;
+          cp temp-laravel/.env.example . 2>/dev/null || true;
+          cp .env.example .env 2>/dev/null || true;
+          cp temp-laravel/.gitignore . 2>/dev/null || true;
+          rm -rf temp-laravel;
+          php artisan key:generate;
+          echo 'Laravel project created!';
+        else
+          echo 'Laravel project already exists, running composer install...';
+          composer install;
+        fi
+      "
+  app:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+      - "2019:2019" # Caddy admin API
+    volumes:
+      - .:/app
+      # - /app/vendor # Exclude vendor from host mount to avoid conflicts
+      # - /app/node_modules # Exclude node_modules if you use frontend tools
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - SERVER_NAME=:8000
+    working_dir: /app
+    depends_on:
+      laravel-init:
+        condition: service_completed_successfully
+    # Enable hot reloading for development
+    tty: true
+    user: "${UID:-1000}:${GID:-1000}"
+    stdin_open: true
+
+    
