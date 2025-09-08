@@ -1,7 +1,7 @@
-# 🐘 Frank
-### Or the LFDJ Stack? (Laravel + FrankenPHP + Docker + Just)
+## 🐘 Frank
+> Or the LFDJ Stack (Laravel + FrankenPHP + Docker + Just)
 
-A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, FrankenPHP, Composer, etc.
+A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, FrankenPHP, Composer, etc. Admittedly you still need Docker and Just installed, but I find those an acceptable minimum.
 
 ---
 
@@ -66,13 +66,7 @@ Visit: [http://localhost:8000](http://localhost:8000)
 
 ### ⚠️ `just reset`
 
-This command **deletes everything in the project directory**, except:
-
-* `.dockerignore`
-* `Caddyfile`
-* `docker-compose.yml`
-* `Dockerfile`
-* `justfile`
+This command **deletes everything in the project directory** and restores the project back to how it was mostly looking when initially pulled.
 
 You’ll be prompted to confirm before anything is deleted.
 
