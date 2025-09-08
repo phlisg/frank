@@ -8,6 +8,8 @@ A minimal setup for running a Laravel 12 application with [FrankenPHP](https://f
 ### 📋 Todo:
 
 - [ ] Install node dependencies the same way or similar
+- [ ] Set up database in `docker-compose.yml`
+- [ ] Add various other tools/Laravel plugins
 
 ---
 
