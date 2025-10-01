@@ -48,12 +48,12 @@ shell:
 	{{docker_compose}} exec app bash
 
 # Run artisan command: just artisan cmd='foo'
-artisan cmd:
-	{{docker_compose}} exec app php artisan {{cmd}}
+artisan *args:
+	{{docker_compose}} exec app php artisan {{args}}
 
-# Run composer command: just composer cmd='require vendor/package'
-composer cmd:
-	{{docker_compose}} exec app composer {{cmd}}
+# Run composer command: just composer args='require vendor/package'
+composer *args:
+	{{docker_compose}} exec app composer {{args}}
 
 # Clean environment
 clean:

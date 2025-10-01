@@ -7,10 +7,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     libpng-dev \
     libonig-dev \
+    libicu-dev \
     libxml2-dev \
+    libzip-dev \
     zip \
     unzip \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd \
+    && docker-php-ext-install intl pdo_mysql mbstring exif pcntl bcmath gd zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the Caddyfile
@@ -27,6 +29,9 @@ if [ -f "/app/.env.example" ] && [ ! -f "/app/.env" ]; then\n\
     php artisan key:generate --no-interaction 2>/dev/null || true\n\
 fi\n\
 exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Expose port 8000 for FrankenPHP
 EXPOSE 8000

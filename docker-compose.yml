@@ -22,6 +22,7 @@ services:
           composer install;
         fi
       "
+
   app:
     build:
       context: .

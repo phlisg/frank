@@ -72,14 +72,7 @@ This command **deletes everything in the project directory** and restores the pr
 
 You’ll be prompted to confirm before anything is deleted.
 
----
+> [!WARNING]
+> You will still need to revert changes to `.gitignore` and `README.md`
 
-### 🧪 Permissions
-
-Containers run using your host UID/GID via `.env.docker`, to ensure Laravel-generated files (e.g. `storage`, `vendor`) are not owned by root or system users like `tape`.
-
-If files are still created with wrong ownership, ensure:
-
-* `.env.docker` is created via `just setup`
-* `env_file: .env.docker` and `user: "${UID}:${GID}"` are correctly set in `docker-compose.yml`
 
