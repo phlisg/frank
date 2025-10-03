@@ -18,12 +18,13 @@ install: && up
 # Start development environment
 up:
 	@if [ ! -f artisan ]; then echo "❌ Please run 'just install' first"; exit 1; fi
-	{{docker_compose}} up -d
+	@echo "⏳ Starting Laravel development environment..."
+	@{{docker_compose}} up -d
 	@echo "🚀 Laravel is running at http://localhost:8000"
 
 # Stop containers
 down:
-	{{docker_compose}} down
+	@{{docker_compose}} down
 
 # Clean environment
 clean:

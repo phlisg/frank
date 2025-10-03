@@ -29,6 +29,8 @@ services:
     depends_on:
       laravel-init:
         condition: service_completed_successfully
+      db:
+        condition: service_healthy
     # Enable hot reloading for development
     tty: true
     user: "${UID:-1000}:${GID:-1000}"

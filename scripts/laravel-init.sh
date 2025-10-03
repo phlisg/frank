@@ -27,7 +27,7 @@ php artisan key:generate;
 folder_name=$(basename "$PWD")
 
 # Modify .env file for database configuration using postgres
-sed -i 's/DB_CONNECTION=mysql/DB_CONNECTION=pgsql/' .env
+sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=pgsql/' .env
 sed -i 's/# DB_HOST=127.0.0.1/DB_HOST=db/' .env
 sed -i 's/# DB_PORT=3306/DB_PORT=5432/' .env
 sed -i "s/# DB_DATABASE=laravel/DB_DATABASE=$folder_name/" .env
