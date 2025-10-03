@@ -48,11 +48,9 @@ You can now visit: [http://localhost:8000](http://localhost:8000)
 
 | Command                   | Description                                          |
 | ------------------------- | ---------------------------------------------------- |
-| `just up`                 | Start the development environment (runs setup first) |
+| `just install`            | Install Laravel                                      |
+| `just up`                 | Start the development environment                    |
 | `just down`               | Stop containers                                      |
-| `just build`              | Build/rebuild containers                             |
-| `just logs`               | Tail application logs                                |
-| `just shell`              | Open a shell inside the app container                |
 | `just clean`              | Stop containers and remove volumes                   |
 | `just reset`              | **Deletes all files** except core config files       |
 

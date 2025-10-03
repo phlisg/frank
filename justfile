@@ -11,7 +11,7 @@ docker_compose := "docker compose"
 
 # Default recipe (shows help)
 [doc]
-default:
+_default:
 	@just --list --unsorted
 
 
