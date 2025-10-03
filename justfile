@@ -24,14 +24,20 @@ setup:
 	@echo "UID=$(id -u)" > .env.docker
 	@echo "GID=$(id -g)" >> .env.docker
 	@echo "✅ Created .env.docker with UID=$(id -u) and GID=$(id -g)"
-	@echo "Now you can run: just up"
+	@echo "Now you can run: just install"
 
 # Build containers
 build:
 	{{docker_compose}} build
 
+# Install laravel. 
+# You should run this command just after creating the repository to avoid building containers 
+## The special "&& up" expression signifies the recipe will run after install, but setup will run before.
+install: setup && up
+
 # Start development environment
 up: setup
+	if ! -f artisan; then echo "Please run 'just install' first"; exit 1; fi
 	{{docker_compose}} up -d
 	@echo "🚀 Laravel is running at http://localhost:8000"
 
@@ -62,7 +68,7 @@ clean:
 
 # Reset project files (except key config files)
 reset: clean
-    @read -p "⚠️  This will delete all files except .dockerignore, Caddyfile, docker-compose.yml, Dockerfile, and justfile. Continue? (y/N): " confirm; \
+    @read -p "⚠️  This will delete all files except .dockerignore, Caddyfile, docker-compose.yml, Dockerfile, and justfile. It will also reset any git changes. Continue? (y/N): " confirm; \
     if [ "$confirm" != "y" ]; then \
         echo "❌ Reset aborted."; \
         exit 1; \
@@ -77,4 +83,5 @@ reset: clean
         ! -name 'README.md' \
         ! -name '.gitignore' \
         -exec rm -rf {} +
+	git reset --hard
     @echo "🧹 Project reset — all generated files removed."

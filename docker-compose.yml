@@ -8,6 +8,7 @@ services:
     command: >
       sh -c "
         if [ ! -f 'artisan' ]; then
+          mv README.md README.frank.md
           echo 'Creating new Laravel project...';
           composer create-project --prefer-dist laravel/laravel temp-laravel;
           cp -r temp-laravel/* .;
@@ -17,6 +18,7 @@ services:
           rm -rf temp-laravel;
           php artisan key:generate;
           echo 'Laravel project created!';
+        	mv README.frank.md README.md
         else
           echo 'Laravel project already exists, running composer install...';
           composer install;
@@ -37,6 +39,8 @@ services:
       - APP_ENV=local
       - APP_DEBUG=true
       - SERVER_NAME=:8000
+    env_file:
+      - .env
     working_dir: /app
     depends_on:
       laravel-init:
@@ -46,4 +50,29 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     stdin_open: true
 
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-laravel}
+      POSTGRES_USER: ${DB_USERNAME:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    user: "${UID:-1000}:${GID:-1000}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
     
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  db_data:

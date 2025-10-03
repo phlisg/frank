@@ -7,9 +7,9 @@ A minimal setup for running a Laravel 12 application with [FrankenPHP](https://f
 
 ### 📋 Todo:
 
-- [ ] Install node dependencies the same way or similar
-- [ ] Set up database in `docker-compose.yml`
-- [ ] Add various other tools/Laravel plugins
+- [ ] Install node dependencies the same way or similar?
+- [x] Set up database in `docker-compose.yml`
+- [ ] Add various other tools/Laravel plugins?
 
 ---
 
@@ -26,10 +26,12 @@ A minimal setup for running a Laravel 12 application with [FrankenPHP](https://f
 #### 1. Setup
 
 ```bash
-just setup
+just install
 ```
 
-This creates a `.env.docker` file with your user ID and group ID to ensure files created in Docker are owned by you.
+You should run this command right after creating this repository. This will first create laravel, then run it. 
+
+It is important you run this recipe first as to avoid creating a database with wrong credentials (for example).
 
 #### 2. Build Containers
 
