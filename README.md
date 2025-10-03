@@ -20,7 +20,7 @@ Comes with Mailjet & PostgreSQL 😎
 * Docker
 * [just](https://just.systems) (task runner)
 
-> This repo was mostly tested on a Fedora 42+ system.
+> This repo was solely tested on a Fedora 42+ system. I would recommend running this repo either in WSL or macOS.
 
 ---
 
