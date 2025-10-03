@@ -40,7 +40,7 @@ up: _build
 down:
 	@{{docker_compose}} down
 
-# Clean environment
+# Clean containers and remove volumes
 clean:
 	@{{docker_compose}} down -v
 	@{{docker_compose}} rm -f

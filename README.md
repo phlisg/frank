@@ -33,24 +33,16 @@ You should run this command right after creating this repository. This will firs
 
 It is important you run this recipe first as to avoid creating a database with wrong credentials (for example).
 
-#### 2. Build Containers
 
-```bash
-just build
-```
+#### 2. Start Development Environment
 
-#### 3. Start Development Environment
+Once the install has completed, you may start the development environment with:
 
 ```bash
 just up
 ```
 
-Visit: [http://localhost:8000](http://localhost:8000)
-
----
-
-> [!TIP]
-> You can just run `just up` directly instead too :)
+You can now visit: [http://localhost:8000](http://localhost:8000)
 
 ### 🛠 Common Commands
 
@@ -61,20 +53,16 @@ Visit: [http://localhost:8000](http://localhost:8000)
 | `just build`              | Build/rebuild containers                             |
 | `just logs`               | Tail application logs                                |
 | `just shell`              | Open a shell inside the app container                |
-| `just artisan cmd='...'`  | Run Laravel Artisan commands                         |
-| `just composer cmd='...'` | Run Composer commands inside the container           |
 | `just clean`              | Stop containers and remove volumes                   |
 | `just reset`              | **Deletes all files** except core config files       |
 
 ---
 
-### ⚠️ `just reset`
+### ⚠️ Project reset 
+
+You can reset the whole repository with `just reset`. This command is mostly useful is something went bad during install or during template development.
 
 This command **deletes everything in the project directory** and restores the project back to how it was mostly looking when initially pulled.
 
 You’ll be prompted to confirm before anything is deleted.
-
-> [!WARNING]
-> You will still need to revert changes to `.gitignore` and `README.md`
-
 
