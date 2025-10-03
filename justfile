@@ -6,22 +6,11 @@ docker_compose := "docker compose"
 default:
 	@just --list --unsorted
 
-# Show help
-[doc]
-help:
-	@echo "Laravel FrankenPHP Development Commands:"
-	@echo "  just up          - Start the development environment"
-	@echo "  just down        - Stop the development environment"
-	@echo "  just clean       - Stop containers and remove volumes"
-	@echo "  just reset       - Delete all generated files except project config files"
-
 # First-time setup
 _setup:
 	@echo "UID=$(id -u)" > .env.docker
 	@echo "GID=$(id -g)" >> .env.docker
 	@echo "✅ Created .env.docker with UID=$(id -u) and GID=$(id -g)"
-	@echo "Now you can run: just install"
-
 
 # You should run this command just after creating the repository to avoid building containers. The special "&& up" expression signifies the recipe will run after install, but setup will run before. 
 [doc('Install laravel')]
