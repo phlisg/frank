@@ -40,12 +40,13 @@ reset: clean
     find . -mindepth 1 -maxdepth 1 \
         ! -name '.dockerignore' \
         ! -name '.git' \
+        ! -name 'scripts' \
         ! -name 'Caddyfile' \
         ! -name 'docker-compose.yml' \
         ! -name 'Dockerfile' \
         ! -name 'justfile' \
         ! -name 'README.md' \
         ! -name '.gitignore' \
-        -exec rm -rf {} + \
-    git reset --hard \
+        -exec rm -rf {} + 
     @echo "🧹 Project reset — all generated files removed."
+    @echo "⚠️ You might need to manually reset the .gitignore file."
