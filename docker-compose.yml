@@ -4,7 +4,7 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    user: ${UID:-1000}:${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
     command: sh scripts/laravel-init.sh
 
   app:

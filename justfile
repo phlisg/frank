@@ -8,17 +8,21 @@ default:
 
 # First-time setup
 _setup:
-	@echo "UID=$(id -u)" > .env.docker
-	@echo "GID=$(id -g)" >> .env.docker
+	# @echo "UID=$(id -u)" > .env.docker
+	# @echo "GID=$(id -g)" >> .env.docker
 	@echo "✅ Created .env.docker with UID=$(id -u) and GID=$(id -g)"
 
 # You should run this command just after creating the repository to avoid building containers. The special "&& up" expression signifies the recipe will run after install, but setup will run before. 
 [doc('Install laravel')]
 install: _setup && up
+	@if [ -f artisan ]; then echo "❌ Laravel already installed. If you want to reinstall, please run 'just reset' first."; exit 1; fi
+	{{docker_compose}} up -d laravel-init
+	@echo "✅ Laravel installation complete."
+	
 
 # Start development environment
 up: _setup
-	if ! -f artisan; then echo "Please run 'just install' first"; exit 1; fi
+	@if [ ! -f artisan ]; then echo "❌ Please run 'just install' first"; exit 1; fi
 	{{docker_compose}} up -d
 	@echo "🚀 Laravel is running at http://localhost:8000"
 
