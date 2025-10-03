@@ -11,7 +11,7 @@ default:
 [doc('Install laravel')]
 install: && up
 	@if [ -f artisan ]; then echo "❌ Laravel already installed. If you want to reinstall, please run 'just reset' first."; exit 1; fi
-	{{docker_compose}} up -d laravel-init
+	@{{docker_compose}} up laravel-init
 	@echo "✅ Laravel installation complete."
 	
 
@@ -27,8 +27,8 @@ down:
 
 # Clean environment
 clean:
-	{{docker_compose}} down -v
-	{{docker_compose}} rm -f
+	@{{docker_compose}} down -v
+	@{{docker_compose}} rm -f
 
 # Reset project files (except key config files)
 reset: clean
@@ -49,4 +49,9 @@ reset: clean
         ! -name '.gitignore' \
         -exec rm -rf {} + 
     @echo "🧹 Project reset — all generated files removed."
-    @echo "⚠️ You might need to manually reset the .gitignore file."
+    @if ! git diff --quiet .gitignore; then \
+        git restore .gitignore; \
+        echo "🔄 .gitignore was modified and has been restored."; \
+    else \
+        echo "✅ .gitignore was not modified."; \
+    fi;
