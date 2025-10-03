@@ -5,25 +5,7 @@ services:
       - .:/app
     working_dir: /app
     user: ${UID:-1000}:${GID:-1000}
-    command: >
-      sh -c "
-        if [ ! -f 'artisan' ]; then
-          mv README.md README.frank.md
-          echo 'Creating new Laravel project...';
-          composer create-project --prefer-dist laravel/laravel temp-laravel;
-          cp -r temp-laravel/* .;
-          cp temp-laravel/.env.example . 2>/dev/null || true;
-          cp .env.example .env 2>/dev/null || true;
-          cp temp-laravel/.gitignore . 2>/dev/null || true;
-          rm -rf temp-laravel;
-          php artisan key:generate;
-          echo 'Laravel project created!';
-        	mv README.frank.md README.md
-        else
-          echo 'Laravel project already exists, running composer install...';
-          composer install;
-        fi
-      "
+    command: sh scripts/laravel-init.sh
 
   app:
     build:
@@ -31,6 +13,8 @@ services:
     ports:
       - "8000:8000"
       - "2019:2019" # Caddy admin API
+    networks:
+      - frank
     volumes:
       - .:/app
       # - /app/vendor # Exclude vendor from host mount to avoid conflicts
@@ -61,7 +45,7 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - backend
+      - frank
     user: "${UID:-1000}:${GID:-1000}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-user}"]
@@ -69,9 +53,16 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: 'axllent/mailpit:latest'
+    ports:
+      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - frank
     
 networks:
-  backend:
+  frank:
     driver: bridge
 
 volumes:
