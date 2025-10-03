@@ -4,6 +4,11 @@ if [  -f 'artisan' ]; then
     exit 0;
 fi
 
+# Use the current folder name as the application name, passed by the compose file
+folder_name=$1
+
+echo "Setting up Laravel with database name: $folder_name"
+
 # Backup existing files
 mv README.md README.frank.md
 mv .gitignore .gitignore.frank
@@ -23,24 +28,23 @@ rm -rf .temp-laravel;
 # Some laravel stuff
 php artisan key:generate;
 
-# Use the current folder name as the application name
-folder_name=$(basename "$PWD")
-
 # Modify .env file for database configuration using postgres
+echo "Configuring database settings..."
 sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=pgsql/' .env
-sed -i 's/# DB_HOST=127.0.0.1/DB_HOST=db/' .env
+sed -i 's/# DB_HOST=127\.0\.0\.1/DB_HOST=db/' .env
 sed -i 's/# DB_PORT=3306/DB_PORT=5432/' .env
-sed -i "s/# DB_DATABASE=laravel/DB_DATABASE=$folder_name/" .env
-sed -i "s/# DB_USERNAME=root/DB_USERNAME=root/" .env
-sed -i "s/# DB_PASSWORD=/DB_PASSWORD=root/" .env
+echo "Setting database name to: $folder_name"
+sed -i "s|# DB_DATABASE=laravel|DB_DATABASE=$folder_name|" .env
+sed -i 's/# DB_USERNAME=root/DB_USERNAME=root/' .env
+sed -i 's/# DB_PASSWORD=/DB_PASSWORD=root/' .env
 
 # Add DB_URL for PostgreSQL connection
-sed -i "/^DB_CONNECTION=/a DB_URL=postgresql://$folder_name:$folder_name@db:5432/$folder_name" .env
+sed -i '/^DB_PASSWORD=/a DB_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}' .env
 
 # Change URL
 sed -i "s|APP_URL=http://localhost|APP_URL=http://localhost:8000|" .env
 
-echo 'Laravel project created!';
+echo '🎈 Laravel project created!';
 
 # Restore existing README.md 
 mv README.frank.md README.md

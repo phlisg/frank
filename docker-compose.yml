@@ -5,7 +5,7 @@ services:
       - .:/app
     working_dir: /app
     user: "${UID:-1000}:${GID:-1000}"
-    command: sh scripts/laravel-init.sh
+    command: sh scripts/laravel-init.sh "${FOLDER_NAME:-frank}"
 
   app:
     build:
@@ -51,18 +51,18 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-user}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mailpit:
-    image: 'axllent/mailpit:latest'
+    image: "axllent/mailpit:latest"
     ports:
-      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
-      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
       - frank
-    
+
 networks:
   frank:
     driver: bridge
