@@ -3,6 +3,8 @@
 
 A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, FrankenPHP, Composer, etc. Admittedly you still need Docker and Just installed, but I find those an acceptable minimum.
 
+Comes with Mailjet & PostgreSQL 😎
+
 ---
 
 ### 📋 Todo:
@@ -17,7 +19,8 @@ A minimal setup for running a Laravel 12 application with [FrankenPHP](https://f
 
 * Docker
 * [just](https://just.systems) (task runner)
-* GNU/Linux system (e.g. Fedora 42) — tested on systems with strict user permissions
+
+> This repo was mostly tested on a Fedora 42+ system.
 
 ---
 
@@ -29,9 +32,9 @@ A minimal setup for running a Laravel 12 application with [FrankenPHP](https://f
 just install
 ```
 
-You should run this command right after creating this repository. This will first create laravel, then run it. 
+You should run this command right after creating this repository. This will create a full laravel initial installation. 
 
-It is important you run this recipe first as to avoid creating a database with wrong credentials (for example).
+> It is important you run this recipe first as to avoid creating a database with wrong credentials (among other things).
 
 
 #### 2. Start Development Environment
@@ -41,6 +44,8 @@ Once the install has completed, you may start the development environment with:
 ```bash
 just up
 ```
+
+This will create the other containers, and run migrations.
 
 You can now visit: [http://localhost:8000](http://localhost:8000)
 
