@@ -4,20 +4,21 @@ if [  -f 'artisan' ]; then
     exit 0;
 fi
 
-# Backup existing README.md 
+# Backup existing files
 mv README.md README.frank.md
+mv .gitignore .gitignore.frank
 
 echo 'Creating new Laravel project...';
-composer create-project --prefer-dist laravel/laravel temp-laravel;
+composer create-project --prefer-dist laravel/laravel .temp-laravel;
 
 # Copying files back to host
-cp -r temp-laravel/* .;
-cp temp-laravel/.env.example . 2>/dev/null || true;
+cp -r .temp-laravel/* .;
+cp .temp-laravel/.env.example . 2>/dev/null || true;
 cp .env.example .env 2>/dev/null || true;
-cp temp-laravel/.gitignore . 2>/dev/null || true;
+cp .temp-laravel/.gitignore . 2>/dev/null || true;
 
 # Remove temporary directory
-rm -rf temp-laravel;
+rm -rf .temp-laravel;
 
 # Some laravel stuff
 php artisan key:generate;
@@ -43,3 +44,5 @@ echo 'Laravel project created!';
 
 # Restore existing README.md 
 mv README.frank.md README.md
+cat .gitignore.frank >> .gitignore
+rm .gitignore.frank
