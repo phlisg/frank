@@ -11,6 +11,7 @@ Comes with Mailjet & PostgreSQL 😎
 
 - [ ] Install node dependencies the same way or similar?
 - [x] Set up database in `docker-compose.yml`
+- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `artisan` and `psql`)
 - [ ] Add various other tools/Laravel plugins?
 
 ---
@@ -36,12 +37,33 @@ You should run this command right after creating this repository. This will crea
 
 > It is important you run this recipe first as to avoid creating a database with wrong credentials (among other things).
 
+#### 2. Use shell aliases (convenience aliases)
 
-#### 2. Start Development Environment
+> [!WARNING]
+> Ignore this step if you already have the functions `up` and `down` in your terminal profile.
+
+To make development easier and add contextual aliases to your shell, you may run:
+
+```bash
+just shell-setup >> ~/.zshrc # or ~/.bashrc
+source ~/.zshrc # or ~/.bashrc
+```
+
+To add two functions `up` and `down`. 
+
+- `up` : starts the containers and sources aliases for composer, artisan and psql to the dockerized application
+- `down`: stops the containers and removes the aliases
+
+> [!TIP]
+> These convenient functions will save you a few keystrokes when interacting with your containers. `composer` here is `docker compose exec app composer` and `artisan` is `docker compose exec app php artisan`.
+
+#### 3. Start the Development Environment
 
 Once the install has completed, you may start the development environment with:
 
 ```bash
+up
+# or if you don't have the convenience aliases installed:
 just up
 ```
 

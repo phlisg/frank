@@ -22,7 +22,6 @@ install:
 	@FOLDER_NAME="$(basename "{{justfile_directory()}}")" {{docker_compose}} up --build laravel-init
 	@echo "✅ Laravel installation complete."
 	@echo "🎉 You can now start the development environment with 'just up'."
-	
 
 [doc]
 _build:
@@ -36,11 +35,10 @@ up: _build
 	@{{docker_compose}} up -d --build
 	@{{docker_compose}} exec -T app php artisan migrate --force 2>/dev/null
 	@echo "🚀 Laravel is running at http://localhost:8000"
-	@echo "💡 Run 'source <(just activate)' to set up shell aliases for composer and artisan"
 
 # Generate activation script for shell aliases (like Python venv)
-[doc('Generate shell activation script - use with: source <(just activate)')]
-activate:
+[doc('Generate shell activation script - use with: source <(just _activate)')]
+_activate:
 	@echo "# Laravel Docker Environment Activation"
 	@echo "# This script sets up aliases for Laravel development"
 	@echo ""
@@ -53,6 +51,7 @@ activate:
 	@echo "# Set up aliases"
 	@echo "alias composer='{{docker_compose}} exec app composer'"
 	@echo "alias artisan='{{docker_compose}} exec app php artisan'"
+	@echo "alias psql='{{docker_compose}} exec db psql -U root -d $DB_DATABASE'"
 	@echo ""
 	@echo "# Set up environment variable to indicate activation"
 	@echo "export LARAVEL_DOCKER_ENV_ACTIVE=1"
@@ -67,6 +66,7 @@ activate:
 	@echo "deactivate() {"
 	@echo "  unalias composer 2>/dev/null || true"
 	@echo "  unalias artisan 2>/dev/null || true"
+	@echo "  unalias psql 2>/dev/null || true"
 	@echo "  if [[ -n \"$$LARAVEL_DOCKER_ENV_ORIGINAL_PS1\" ]]; then"
 	@echo "    export PS1=\"$$LARAVEL_DOCKER_ENV_ORIGINAL_PS1\""
 	@echo "    unset LARAVEL_DOCKER_ENV_ORIGINAL_PS1"
@@ -76,8 +76,8 @@ activate:
 	@echo "  echo '📦 Laravel Docker environment deactivated'"
 	@echo "}"
 	@echo ""
-	@echo "echo '🚀 Laravel Docker environment activated!'"
-	@echo "echo '📦 Available commands: composer, artisan'"
+	@echo "echo ''; echo '🏕️ Laravel Docker environment activated!'"
+	@echo "echo '📦 Available commands: composer, artisan, psql'"
 	@echo "echo '🔧 To deactivate, run: deactivate'"
 
 alias stop := down
@@ -85,9 +85,6 @@ alias stop := down
 # Stop containers
 down:
 	@{{docker_compose}} down
-	@if [ -n "$$LARAVEL_DOCKER_ENV_ACTIVE" ]; then \
-		echo "💡 {{BG_YELLOW}}Don't forget to run '{{BOLD + BLUE}}deactivate{{NORMAL + BG_YELLOW + WHITE}}' to clean up your shell aliases{{NORMAL}}"; \
-	fi
 
 # Clean containers and remove volumes
 clean:
@@ -126,3 +123,21 @@ reset FORCE: clean
 	else \
 		echo "✅ .gitignore was not modified."; \
 	fi;
+
+# Generate shell function for automatic activation on up/down
+[doc('Generate shell functions for automatic aliases (up/down) - add to your shell config with just shell-setup >> ~/.zshrc or ~/.bashrc')]
+shell-setup:
+	@echo ""
+	@echo "# phlisg/frank shell helpers:"
+	@echo ""
+	@echo "up() {"
+	@echo "  just up && source <(just _activate)"
+	@echo "}"
+	@echo ""
+	@echo "down() {"
+	@echo "  just down"
+	@echo "  if [ -n \"\$LARAVEL_DOCKER_ENV_ACTIVE\" ]; then"
+	@echo "    deactivate"
+	@echo "  fi"
+	@echo "}"
+	@echo ""
