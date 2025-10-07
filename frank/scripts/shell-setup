@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo ""
+echo "# phlisg/frank shell helpers:"
+echo ""
+echo "up() {"
+echo "  just up && source <(just _activate)"
+echo "}"
+echo ""
+echo "down() {"
+echo "  just down"
+echo "  if [ -n \"\$LARAVEL_DOCKER_ENV_ACTIVE\" ]; then"
+echo "    deactivate"
+echo "  fi"
+echo "}"
+echo ""
