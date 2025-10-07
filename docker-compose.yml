@@ -11,6 +11,7 @@ services:
     build:
       context: .
     ports:
+      - "5173:5173" # Vite dev server
       - "8000:8000"
       - "2019:2019" # Caddy admin API
     networks:
@@ -38,17 +39,13 @@ services:
 
   node:
     image: node:latest
-    ports:
-      - "5173:5173" # Vite dev server
-    networks:
-      - frank
     volumes:
       - .:/app
     # - /app/node_modules # Exclude node_modules if you use frontend tools
     env_file:
       - .env
     working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install"
     user: "${UID:-1000}:${GID:-1000}"
     depends_on:
       laravel-init:
