@@ -36,6 +36,24 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     stdin_open: true
 
+  node:
+    image: node:latest
+    ports:
+      - "5173:5173" # Vite dev server
+    networks:
+      - frank
+    volumes:
+      - .:/app
+    # - /app/node_modules # Exclude node_modules if you use frontend tools
+    env_file:
+      - .env
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      laravel-init:
+        condition: service_completed_successfully
+
   db:
     image: postgres:latest
     environment:

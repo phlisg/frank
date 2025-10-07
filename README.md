@@ -9,10 +9,12 @@ Comes with Mailjet & PostgreSQL 😎
 
 ### 📋 Todo:
 
-- [ ] Install node dependencies the same way or similar?
+- [x] Install node dependencies the same way or similar
 - [x] Set up database in `docker-compose.yml`
-- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `artisan` and `psql`)
+- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `php`, `npm`, `artisan` and `psql`)
 - [ ] Add various other tools/Laravel plugins?
+    - [ ] Sail support (easier to manage php versions)
+    - [ ] Octane out of the box support? (might make dev a bit harder)
 
 ---
 
