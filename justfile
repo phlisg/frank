@@ -56,7 +56,7 @@ clean:
 alias rm := reset 
 
 # Reset project files (except key config files)
-reset FORCE: clean
+reset FORCE="n": clean
 	@if [ "{{FORCE}}" = "-f" ]; then \
 		confirm="y"; \
 	else \
