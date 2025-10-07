@@ -1,6 +1,6 @@
 #!/bin/bash
 
-aliases=("composer" "artisan" "php" "psql" "npm")
+aliases=("composer" "artisan" "php" "psql" "npm" "bun")
 
 echo "# Laravel Docker Environment Activation"
 echo "# This script sets up aliases for Laravel development"
@@ -17,6 +17,7 @@ echo "alias artisan='docker compose exec app php artisan'"
 echo "alias php='docker compose exec app php'"
 echo "alias psql='docker compose exec db psql -U root -d $DB_DATABASE'"
 echo "alias npm='docker compose exec app npm'"
+echo "alias bun='docker compose exec app bun'"
 echo ""
 echo "# Set up environment variable to indicate activation"
 echo "export LARAVEL_DOCKER_ENV_ACTIVE=1"

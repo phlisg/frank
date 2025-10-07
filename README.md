@@ -1,9 +1,17 @@
 ## 🐘 Frank
 > Or the LFDJ Stack (Laravel + FrankenPHP + Docker + Just)
 
-A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, FrankenPHP, Composer, etc. Admittedly you still need Docker and Just installed, but I find those an acceptable minimum.
+A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, Node, FrankenPHP, Composer, etc. Admittedly you still need Docker and Just installed, but I find those an acceptable minimum.
 
 Comes with Mailjet & PostgreSQL 😎
+
+### Dockerized Laravel development
+
+Every binary/cli tool you need is directly aliased in the current shell session, mimicking a real tool install. For instance, you may directly run `php artisan ...` (or `artisan ...`) commands as they are aliased to docker commands. You can now copy/paste commands directly from the web!
+
+You may even run `npm` (or `bun`) commands the way you would normally with locally installed binaries.
+
+To enable this, refer to [Use shell aliases](#2-use-shell-aliases).
 
 ---
 
@@ -11,7 +19,7 @@ Comes with Mailjet & PostgreSQL 😎
 
 - [x] Install node dependencies the same way or similar
 - [x] Set up database in `docker-compose.yml`
-- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `php`, `npm`, `artisan` and `psql`)
+- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `php`, `npm`, `bun`, `artisan` and `psql`)
 - [ ] Add various other tools/Laravel plugins?
     - [ ] Sail support (easier to manage php versions)
     - [ ] Octane out of the box support? (might make dev a bit harder)
@@ -39,7 +47,7 @@ You should run this command right after creating this repository. This will crea
 
 > It is important you run this recipe first as to avoid creating a database with wrong credentials (among other things).
 
-#### 2. Use shell aliases (convenience aliases)
+#### 2. Use shell aliases
 
 > [!WARNING]
 > Ignore this step if you already have the functions `up` and `down` in your terminal profile.
@@ -82,6 +90,29 @@ You can now visit: [http://localhost:8000](http://localhost:8000)
 | `just down`               | Stop containers                                      |
 | `just clean`              | Stop containers and remove volumes                   |
 | `just reset`              | **Deletes all files** except core config files       |
+
+### 🧰 Included aliases
+
+| Alias                     | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `up`                      | Start the development environment and source the aliases  |
+| `down`                    | Stop containers and unset the aliases                     |
+| `deactivate`              | Unset all aliases                                         |
+| `php`                     | Use the dockerized PHP CLI                                |
+| `artisan`                 | Use the dockerized Artisan CLI                            |
+| `composer`                | Use the dockerized Composer CLI                           |
+| `psql`                    | Use the dockerized postgres CLI                           |
+| `npm`                     | Use the dockerized npm CLI                                |
+| `bun`                     | Use the dockerized bun CLI                                |
+
+**Example usages**:
+
+- `php artisan migrate`
+- `artisan key:generate`
+- `composer require filament/filament:"^4.0"`
+- `bun install`
+- `npm run dev`
+- `psql`: connects you inside the postgres instance
 
 ---
 
