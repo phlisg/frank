@@ -44,9 +44,6 @@ sed -i '/^DB_PASSWORD=/a DB_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_
 # Change URL
 sed -i "s|APP_URL=http://localhost|APP_URL=http://localhost:8000|" .env
 
-# Sail stuff
-php artisan sail:install --with=pgsql,redis,meilisearch,mailhog
-
 # Update vite.config.js for HMR
 echo "Updating vite.config.js for HMR..."
 # Insert server config into vite.config.js inside defineConfig({...}), keeping existing config
