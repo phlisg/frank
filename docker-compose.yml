@@ -24,6 +24,8 @@ services:
       - APP_ENV=local
       - APP_DEBUG=true
       - SERVER_NAME=:8000
+      - PSYSH_CONFIG=/app/.psysh.php
+      - PSYSH_HOME=/app/storage/psysh
     env_file:
       - .env
     working_dir: /app

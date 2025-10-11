@@ -39,7 +39,7 @@ sed -i 's/# DB_USERNAME=root/DB_USERNAME=root/' .env
 sed -i 's/# DB_PASSWORD=/DB_PASSWORD=root/' .env
 
 # Add DB_URL for PostgreSQL connection
-sed -i '/^DB_PASSWORD=/a DB_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}' .env
+sed -i '/^DB_PASSWORD=/a DB_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_DATABASE}"' .env
 
 # Change URL
 sed -i "s|APP_URL=http://localhost|APP_URL=http://localhost:8000|" .env
@@ -50,6 +50,9 @@ echo "Updating vite.config.js for HMR..."
 if ! grep -q "server:" vite.config.js; then
     sed -i "/defineConfig({/a \    server: {\n        host: '0.0.0.0',\n        port: 5173,\n        hmr: {\n            host: 'localhost',\n        },\n    }," vite.config.js
 fi
+
+# Copy psysh config if it doesn't exist
+cp -n /frank/.psysh.php ./ 2>/dev/null || true;
 
 echo '🎈 Laravel project created!';
 

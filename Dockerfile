@@ -34,6 +34,10 @@ RUN echo '#!/bin/bash\n\
     cp /app/.env.example /app/.env\n\
     php artisan key:generate --no-interaction 2>/dev/null || true\n\
     fi\n\
+    if [ ! -d /app/storage/psysh ]; then\n\
+    mkdir -p /app/storage/psysh 2>/dev/null || true\n\
+    chmod 755 /app/storage/psysh 2>/dev/null || true\n\
+    fi\n\
     npm install --prefix /app 2>/dev/null || true\n\
     npm run build --prefix /app 2>/dev/null &\n\
     exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
