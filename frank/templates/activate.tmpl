@@ -16,7 +16,7 @@ alias npm='docker compose exec app npm'
 alias bun='docker compose exec app bun'
 
 # Service-specific aliases
-{{service_aliases}}
+%%service_aliases%%
 
 # Environment marker
 export FRANK_ENV_ACTIVE=1
@@ -30,7 +30,7 @@ export PS1="(frank) $FRANK_ORIGINAL_PS1"
 # Deactivate function
 deactivate() {
   unalias composer artisan php tinker npm bun 2>/dev/null || true
-  {{service_unaliases}}
+  %%service_unaliases%%
   if [[ -n "$FRANK_ORIGINAL_PS1" ]]; then
     export PS1="$FRANK_ORIGINAL_PS1"
     unset FRANK_ORIGINAL_PS1
@@ -42,5 +42,5 @@ deactivate() {
 
 echo ''
 echo '🏕️ Frank environment activated!'
-echo '📦 Available commands: composer artisan php tinker npm bun {{service_alias_names}}'
+echo '📦 Available commands: composer artisan php tinker npm bun %%service_alias_names%%'
 echo '🔧 To deactivate, run: deactivate'

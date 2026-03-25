@@ -1,5 +1,5 @@
 db:
-  image: "postgres:{{config.pgsql.version:-latest}}"
+  image: "postgres:%%config.pgsql.version:-latest%%"
   environment:
     POSTGRES_DB: "${DB_DATABASE}"
     POSTGRES_USER: "${DB_USERNAME}"
@@ -7,7 +7,7 @@ db:
   volumes:
     - db_data:/var/lib/postgresql/data
   ports:
-    - "{{config.pgsql.port:-5432}}:5432"
+    - "%%config.pgsql.port:-5432%%:5432"
   networks:
     - frank
   healthcheck:

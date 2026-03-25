@@ -92,5 +92,5 @@ shell-setup:
 
 # Generate a justfile for a target project
 generate-justfile TARGET_DIR:
-	@FRANK_HOME="{{justfile_directory()}}" sed "s|{{frank_home}}|{{justfile_directory()}}|g" frank/justfile.tmpl > {{TARGET_DIR}}/justfile
+	@FRANK_HOME="{{justfile_directory()}}" sed "s|%%frank_home%%|{{justfile_directory()}}|g" frank/justfile.tmpl > {{TARGET_DIR}}/justfile
 	@echo "✅ justfile generated at {{TARGET_DIR}}/justfile"
