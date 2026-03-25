@@ -288,16 +288,18 @@ Frank generates the project `.env` file from scratch — it does not merely patc
 
 | Service | `.env` values set |
 |---|---|
-| pgsql | `DB_CONNECTION=pgsql`, `DB_HOST=db`, `DB_PORT=5432`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password` |
-| mysql | `DB_CONNECTION=mysql`, `DB_HOST=db`, `DB_PORT=3306`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password` |
-| mariadb | `DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password` |
+| pgsql | `DB_CONNECTION=pgsql`, `DB_HOST=pgsql`, `DB_PORT=5432`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password`, `DB_SSLMODE=prefer`, `DB_URL=postgresql://...` |
+| mysql | `DB_CONNECTION=mysql`, `DB_HOST=mysql`, `DB_PORT=3306`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password` |
+| mariadb | `DB_CONNECTION=mariadb`, `DB_HOST=mariadb`, `DB_PORT=3306`, `DB_DATABASE=laravel`, `DB_USERNAME=sail`, `DB_PASSWORD=password` |
 | sqlite | `DB_CONNECTION=sqlite` (no host/port/credentials) |
 | redis | `REDIS_HOST=redis`, `CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis` |
 | memcached | `MEMCACHED_HOST=memcached`, `CACHE_STORE=memcached` |
 | meilisearch | `SCOUT_DRIVER=meilisearch`, `MEILISEARCH_HOST=http://meilisearch:7700`, `MEILISEARCH_NO_ANALYTICS=false` |
 | mailpit | `MAIL_MAILER=smtp`, `MAIL_HOST=mailpit`, `MAIL_PORT=1025`, `MAIL_FROM_ADDRESS=hello@example.com` |
 
-Host names match the Docker Compose service names. Credentials use Sail defaults for familiarity.
+The values above are baseline examples. The actual env variables for each service should be derived from Laravel's config files (`config/database.php`, `config/cache.php`, `config/mail.php`, `config/scout.php`, etc.) to stay in sync with what Laravel expects. During implementation, read the latest Laravel config to determine which env variables each driver references, including newer additions like `DB_SSLMODE` and `DB_URL`.
+
+Host names match the Docker Compose service names (Sail convention). Credentials use Sail defaults for familiarity.
 
 Frank also generates `.env.example` with the same structure but placeholder values, so new team members can see what's expected.
 
