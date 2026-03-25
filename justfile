@@ -89,3 +89,8 @@ reset FORCE="n": clean
 [doc('Generate shell functions for automatic aliases (up/down) - add to your shell config with just shell-setup >> ~/.zshrc or ~/.bashrc')]
 shell-setup:
 	./frank/scripts/shell-setup
+
+# Generate a justfile for a target project
+generate-justfile TARGET_DIR:
+	@FRANK_HOME="{{justfile_directory()}}" sed "s|{{frank_home}}|{{justfile_directory()}}|g" frank/justfile.tmpl > {{TARGET_DIR}}/justfile
+	@echo "✅ justfile generated at {{TARGET_DIR}}/justfile"
