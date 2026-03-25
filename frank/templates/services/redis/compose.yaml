@@ -1,0 +1,13 @@
+redis:
+  image: "redis:{{config.redis.version:-alpine}}"
+  ports:
+    - "{{config.redis.port:-6379}}:6379"
+  networks:
+    - frank
+  volumes:
+    - redis_data:/data
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 10

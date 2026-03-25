@@ -1,0 +1,7 @@
+name: PostgreSQL
+category: database
+default_port: 5432
+conflicts: [mysql, mariadb]
+env_prefix: DB_
+image: postgres
+container_name: db

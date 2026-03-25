@@ -1,0 +1,7 @@
+name: Redis
+category: cache
+default_port: 6379
+conflicts: []
+env_prefix: REDIS_
+image: redis
+container_name: redis

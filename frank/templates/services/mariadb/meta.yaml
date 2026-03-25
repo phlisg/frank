@@ -1,0 +1,7 @@
+name: MariaDB
+category: database
+default_port: 3306
+conflicts: [pgsql, mysql]
+env_prefix: DB_
+image: mariadb
+container_name: db

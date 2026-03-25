@@ -1,0 +1,7 @@
+name: Mailpit
+category: mail
+default_port: 1025
+conflicts: []
+env_prefix: MAIL_
+image: axllent/mailpit
+container_name: mailpit
