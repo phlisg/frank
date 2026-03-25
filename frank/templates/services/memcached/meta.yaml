@@ -1,0 +1,7 @@
+name: Memcached
+category: cache
+default_port: 11211
+conflicts: []
+env_prefix: MEMCACHED_
+image: memcached
+container_name: memcached
