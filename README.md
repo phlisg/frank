@@ -1,126 +1,173 @@
-## 🐘 Frank
-> Or the LFDJ Stack (Laravel + FrankenPHP + Docker + Just)
+## 🏕️ Frank
+> The LFDJ Stack — Laravel + FrankenPHP + Docker + Just
 
-A minimal setup for running a Laravel 12 application with [FrankenPHP](https://frankenphp.dev/), Docker, and [just](https://just.systems) for task automation, without you needing to install PHP, Node, FrankenPHP, Composer, etc. Admittedly you still need Docker and Just installed, but I find those an acceptable minimum.
-
-Comes with Mailjet & PostgreSQL 😎
-
-### Dockerized Laravel development
-
-Every binary/cli tool you need is directly aliased in the current shell session, mimicking a real tool install. For instance, you may directly run `php artisan ...` (or `artisan ...`) commands as they are aliased to docker commands. You can now copy/paste commands directly from the web!
-
-You may even run `npm` (or `bun`) commands the way you would normally with locally installed binaries.
-
-To enable this, refer to [Use shell aliases](#2-use-shell-aliases).
+A config-driven Docker environment for Laravel development. No local PHP, Composer, Node, or FrankenPHP required — just Docker and a couple of small tools.
 
 ---
 
-### 📋 Todo:
+### 📋 Requirements
 
-- [x] Install node dependencies the same way or similar
-- [x] Set up database in `docker-compose.yml`
-- [x] Added convenience aliases for QoL (`up`, `down`, `composer`, `php`, `npm`, `bun`, `artisan` and `psql`)
-- [ ] Add various other tools/Laravel plugins?
-    - [ ] Sail support (easier to manage php versions)
-    - [ ] Octane out of the box support? (might make dev a bit harder)
-
----
-
-### 📦 Requirements
-
-* Docker
-* [just](https://just.systems) (task runner)
-
-> This repo was solely tested on a Fedora 42+ system. I would recommend running this repo either in WSL or macOS.
+| Tool | Purpose |
+| ---- | ------- |
+| [Docker](https://docs.docker.com/get-docker/) | Container runtime |
+| [just](https://just.systems) | Task runner |
+| [yq](https://github.com/mikefarah/yq) | YAML processing (used by Frank scripts) |
 
 ---
 
 ### 🚀 Quick Start
 
-#### 1. Setup
-
 ```bash
-just install
+just init       # interactive wizard — creates frank.yaml and generates Docker files
+just install    # creates a fresh Laravel project inside the repo
+just up         # build images, start containers, run migrations
 ```
 
-You should run this command right after creating this repository. This will create a full laravel initial installation. 
-
-> It is important you run this recipe first as to avoid creating a database with wrong credentials (among other things).
-
-#### 2. Use shell aliases
-
-> [!WARNING]
-> Ignore this step if you already have the functions `up` and `down` in your terminal profile.
-
-To make development easier and add contextual aliases to your shell, you may run:
-
-```bash
-just shell-setup >> ~/.zshrc # or ~/.bashrc
-source ~/.zshrc # or ~/.bashrc
-```
-
-To add two functions `up` and `down`. 
-
-- `up` : starts the containers and sources aliases for composer, artisan and psql to the dockerized application
-- `down`: stops the containers and removes the aliases
-
-> [!TIP]
-> These convenient functions will save you a few keystrokes when interacting with your containers. `composer` here is `docker compose exec app composer` and `artisan` is `docker compose exec app php artisan`.
-
-#### 3. Start the Development Environment
-
-Once the install has completed, you may start the development environment with:
-
-```bash
-up
-# or if you don't have the convenience aliases installed:
-just up
-```
-
-This will create the other containers, and run migrations.
-
-You can now visit: [http://localhost:8000](http://localhost:8000)
-
-### 🛠 Common Commands
-
-| Command                   | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| `just install`            | Install Laravel                                      |
-| `just up`                 | Start the development environment                    |
-| `just down`               | Stop containers                                      |
-| `just clean`              | Stop containers and remove volumes                   |
-| `just reset`              | **Deletes all files** except core config files       |
-
-### 🧰 Included aliases
-
-| Alias                     | Description                                               |
-| ------------------------- | --------------------------------------------------------- |
-| `up`                      | Start the development environment and source the aliases  |
-| `down`                    | Stop containers and unset the aliases                     |
-| `deactivate`              | Unset all aliases                                         |
-| `php`                     | Use the dockerized PHP CLI                                |
-| `artisan`                 | Use the dockerized Artisan CLI                            |
-| `composer`                | Use the dockerized Composer CLI                           |
-| `psql`                    | Use the dockerized postgres CLI                           |
-| `npm`                     | Use the dockerized npm CLI                                |
-| `bun`                     | Use the dockerized bun CLI                                |
-
-**Example usages**:
-
-- `php artisan migrate`
-- `artisan key:generate`
-- `composer require filament/filament:"^4.0"`
-- `bun install`
-- `npm run dev`
-- `psql`: connects you inside the postgres instance
+Visit [http://localhost:8000](http://localhost:8000) once `just up` completes.
 
 ---
 
-### ⚠️ Project reset 
+### 📄 frank.yaml
 
-You can reset the whole repository with `just reset`. This command is mostly useful is something went bad during install or during template development.
+`frank.yaml` is the single source of truth for your environment. All Docker files are generated from it.
 
-This command **deletes everything in the project directory** and restores the project back to how it was mostly looking when initially pulled.
+**Default (generated by `just init`):**
 
-You’ll be prompted to confirm before anything is deleted.
+```yaml
+version: 1
 
+php:
+  version: "8.5"
+  runtime: "frankenphp"
+
+laravel:
+  version: "latest"
+
+services:
+  - pgsql
+  - mailpit
+```
+
+**All options:**
+
+| Key | Values | Default | Description |
+| --- | ------ | ------- | ----------- |
+| `php.version` | `8.2` `8.3` `8.4` `8.5` | `8.5` | PHP version |
+| `php.runtime` | `frankenphp` `fpm` | `frankenphp` | Web server runtime |
+| `laravel.version` | `latest` `lts` `11.*` … | `latest` | Laravel version constraint passed to Composer |
+| `services` | list — see table below | `[pgsql, mailpit]` | Services to include |
+| `config.<service>.port` | integer | service default | Override the host-side port mapping |
+
+After editing `frank.yaml`, run `just generate` to regenerate Docker files, or simply `just up` — it auto-regenerates if `frank.yaml` is newer than `compose.yaml`.
+
+---
+
+### 🗂 Supported Services
+
+| Service | Category | Default port |
+| ------- | -------- | ------------ |
+| `pgsql` | Database | 5432 |
+| `mysql` | Database | 3306 |
+| `mariadb` | Database | 3306 |
+| `sqlite` | Database | — (file-based) |
+| `redis` | Cache / Queue | 6379 |
+| `meilisearch` | Search | 7700 |
+| `memcached` | Cache | 11211 |
+| `mailpit` | Mail (local SMTP + UI) | 1025 / 8025 |
+
+---
+
+### ⚙️ PHP Runtimes
+
+| Runtime | Description |
+| ------- | ----------- |
+| `frankenphp` | Default. Single-container, built-in Caddy web server. Fastest setup. |
+| `fpm` | PHP-FPM + separate Nginx container. Matches shared hosting / traditional stack. |
+
+---
+
+### 🛠 CLI Commands
+
+| Command | Description |
+| ------- | ----------- |
+| `just init` | Interactive wizard — creates `frank.yaml` and generates Docker files |
+| `just generate` | Regenerate Docker files from `frank.yaml` without prompting |
+| `just install` | Install Laravel into the project directory |
+| `just add <service>` | Add a service to `frank.yaml` and regenerate |
+| `just remove <service>` | Remove a service from `frank.yaml` and regenerate |
+| `just up` | Build images, start containers, run migrations |
+| `just down` | Stop containers |
+| `just clean` | Stop containers and delete volumes |
+| `just reset` | Delete all project files except `frank.yaml` and `.git`, then regenerate |
+| `just export-sail` | Export a Sail-compatible `docker-compose.yml` |
+
+---
+
+### 🐚 Shell Aliases
+
+Frank uses a Python venv–inspired activation model. After running `just up`, activate contextual shell aliases with:
+
+```bash
+source <(just _activate)
+```
+
+This sets up the following aliases in your current shell session:
+
+| Alias | Runs |
+| ----- | ---- |
+| `composer` | `docker compose exec app composer` |
+| `artisan` | `docker compose exec app php artisan` |
+| `php` | `docker compose exec app php` |
+| `tinker` | `docker compose exec app php artisan tinker` |
+| `npm` | `docker compose exec app npm` |
+| `bun` | `docker compose exec app bun` |
+| `psql` | `docker compose exec db psql …` *(pgsql only)* |
+| `mysql` | `docker compose exec db mysql …` *(mysql/mariadb only)* |
+| `redis-cli` | `docker compose exec redis redis-cli` *(redis only)* |
+
+Your prompt prefix changes to `(frank)` while active.
+
+Run `deactivate` to remove all aliases and restore your prompt.
+
+**Automatic `up`/`down` helpers** — add them to your shell config once:
+
+```bash
+just shell-setup >> ~/.zshrc   # or ~/.bashrc
+source ~/.zshrc
+```
+
+This adds `up` and `down` functions that call `just up` / `just down` and automatically activate/deactivate the aliases.
+
+---
+
+### ⛵ Sail Interop
+
+**Import from an existing Sail project:**
+
+```bash
+just init --from-sail              # reads ./docker-compose.yml
+just init --from-sail -f path/to/docker-compose.yml
+```
+
+Frank detects your PHP version and services, writes `frank.yaml`, and generates Docker files.
+
+**Export back to Sail:**
+
+```bash
+just export-sail                   # writes ./docker-compose.yml
+just export-sail -f path/to/out.yml
+```
+
+This is a best-effort export — custom Sail Dockerfile changes are not preserved.
+
+---
+
+### ⚠️ Project Reset
+
+```bash
+just reset
+```
+
+Deletes everything in the project directory **except `frank.yaml` and `.git`**, then re-runs `just generate`. Useful when an install went wrong or you want a clean slate without losing your environment config.
+
+You will be prompted to confirm before anything is deleted. Skip the prompt with `just reset -f`.
