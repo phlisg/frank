@@ -1,6 +1,6 @@
 memcached:
-  image: "memcached:{{config.memcached.version:-alpine}}"
+  image: "memcached:%%config.memcached.version:-alpine%%"
   ports:
-    - "{{config.memcached.port:-11211}}:11211"
+    - "%%config.memcached.port:-11211%%:11211"
   networks:
     - frank

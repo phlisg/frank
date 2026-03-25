@@ -1,5 +1,5 @@
 db:
-  image: "mariadb:{{config.mariadb.version:-latest}}"
+  image: "mariadb:%%config.mariadb.version:-latest%%"
   environment:
     MARIADB_ROOT_PASSWORD: "${DB_PASSWORD}"
     MARIADB_DATABASE: "${DB_DATABASE}"
@@ -9,7 +9,7 @@ db:
   volumes:
     - db_data:/var/lib/mysql
   ports:
-    - "{{config.mariadb.port:-3306}}:3306"
+    - "%%config.mariadb.port:-3306%%:3306"
   networks:
     - frank
   healthcheck:
