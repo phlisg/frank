@@ -339,13 +339,15 @@ Frank also generates `.env.example` with the same structure but placeholder valu
 
 `frank add <service>`:
 - Fails if the service already exists in `frank.yaml`
-- Fails if adding a database when a different database is already configured (single-database constraint)
-- Validates the service name is in the supported list
+- Fails if adding a database when a different database is already configured — only one of `pgsql`, `mysql`, `mariadb`, `sqlite` is allowed at a time (Laravel supports a single `DB_CONNECTION`)
+- Validates the service name is in the supported list (pgsql, mysql, mariadb, sqlite, redis, memcached, meilisearch, mailpit)
 - Auto-runs `frank generate` after modifying `frank.yaml`
 
 `frank remove <service>`:
 - Fails if the service is not in `frank.yaml`
 - Auto-runs `frank generate` after modifying `frank.yaml`
+
+Non-database services (redis, memcached, meilisearch, mailpit) have no mutual conflicts and can coexist freely.
 
 ## Supported Services
 
