@@ -83,7 +83,7 @@ frank-cli/
 
 | Command | Description |
 |---|---|
-| `frank up` | `docker compose up -d --build`, then runs `php artisan migrate --force` |
+| `frank up` | `docker compose up -d --build`, then runs post-start tasks (see Up Behavior below) |
 | `frank down` | `docker compose down` |
 | `frank ps` | `docker compose ps` — container status |
 | `frank clean` | `docker compose down -v` — remove volumes |
@@ -266,6 +266,22 @@ Frank — Laravel Development Environment
 Commands:
   ...
 ```
+
+## Up Behavior
+
+`frank up` aims to get the developer to a working state in one command:
+
+1. `docker compose up -d --build` — start all containers
+2. `composer install` — ensure dependencies are in sync (handles post-`git pull` or branch switch)
+3. `php artisan migrate` — run pending migrations
+
+This covers the most common "forgot to run X" scenarios without being intrusive. Post-start tasks fail gracefully (logged but don't abort `frank up`) since the containers are already running.
+
+**`frank up --quick`** — skips post-start tasks, only boots containers.
+
+**Default ports:** 80 (HTTP) and 443 (HTTPS). FrankenPHP/Caddy serves directly on standard ports. Port 8000 is reserved for future Podman support where binding to privileged ports may require extra config.
+
+**Out of scope for v1:** Auto-detecting git branch changes to determine if `composer install` or migrations are needed. The unconditional run on `frank up` is simple and covers this case already.
 
 ## Reset Behavior
 
