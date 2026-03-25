@@ -1,5 +1,5 @@
 db:
-  image: "mysql:{{config.mysql.version:-latest}}"
+  image: "mysql:%%config.mysql.version:-latest%%"
   environment:
     MYSQL_ROOT_PASSWORD: "${DB_PASSWORD}"
     MYSQL_DATABASE: "${DB_DATABASE}"
@@ -9,7 +9,7 @@ db:
   volumes:
     - db_data:/var/lib/mysql
   ports:
-    - "{{config.mysql.port:-3306}}:3306"
+    - "%%config.mysql.port:-3306%%:3306"
   networks:
     - frank
   healthcheck:

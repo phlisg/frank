@@ -185,17 +185,17 @@ container_name: db            # always "db" for databases
 
 ```yaml
 # Key-value pairs to inject into .env
-# {{...}} is resolved by the generator at generation time
+# %%...%% is resolved by the generator at generation time ("Frankies")
 DB_CONNECTION: pgsql
 DB_HOST: db
-DB_PORT: "{{config.pgsql.port:-5432}}"
-DB_DATABASE: "{{project_name}}"
+DB_PORT: "%%config.pgsql.port:-5432%%"
+DB_DATABASE: "%%project_name%%"
 DB_USERNAME: root
 DB_PASSWORD: root
 ```
 
 **`env.yaml` rules:**
-- Simple key-value pairs. Values support `{{config.<service>.<key>:-default}}` interpolation from `frank.yaml` config overrides, and `{{project_name}}` (the directory name).
+- Simple key-value pairs. Values support `%%config.<service>.<key>:-default%%` interpolation from `frank.yaml` config overrides, and `%%project_name%%` (the directory name).
 - Entries are merged into `.env`. If `.env` doesn't exist, it's created from `.env.example` first.
 - Conflicting keys across services: last-listed service in `frank.yaml` wins. In practice, only one database is active, so DB_ keys don't conflict.
 
@@ -205,10 +205,10 @@ Two distinct syntaxes exist in templates, resolved at different times:
 
 | Syntax | Resolved by | When | Example |
 |---|---|---|---|
-| `{{variable}}` | Frank's generator | At generation time | `{{config.pgsql.port:-5432}}`, `{{project_name}}`, `{{php.version}}` |
+| `%%variable%%` | Frank's generator ("Frankies") | At generation time | `%%config.pgsql.port:-5432%%`, `%%project_name%%`, `%%php.version%%` |
 | `${VARIABLE}` | Docker Compose | At container runtime | `${DB_DATABASE}`, `${DB_USERNAME}` |
 
-**Rule:** `{{...}}` (double curly braces) are Frank template variables — the generator replaces them with concrete values when producing output files. `${...}` (dollar-brace) are standard Docker Compose / shell variable references that survive generation and are resolved at runtime from `.env`.
+**Rule:** `%%...%%` (double percent, aka "Frankies") are Frank template variables — the generator replaces them with concrete values when producing output files. `${...}` (dollar-brace) are standard Docker Compose / shell variable references that survive generation and are resolved at runtime from `.env`. This syntax was chosen to avoid conflicts with Just's `{{}}` interpolation and Caddy's `{path}` syntax.
 
 This means the generator never needs to distinguish "resolve now" vs. "leave for runtime" — the syntax makes it unambiguous.
 
@@ -216,9 +216,9 @@ This means the generator never needs to distinguish "resolve now" vs. "leave for
 
 ```yaml
 # This fragment is merged into the generated compose.yaml
-# {{...}} is resolved at generation time, ${...} is resolved by Docker Compose at runtime
+# %%...%% is resolved at generation time, ${...} is resolved by Docker Compose at runtime
 db:
-  image: "postgres:{{config.pgsql.version:-latest}}"
+  image: "postgres:%%config.pgsql.version:-latest%%"
   environment:
     POSTGRES_DB: "${DB_DATABASE}"
     POSTGRES_USER: "${DB_USERNAME}"
@@ -226,7 +226,7 @@ db:
   volumes:
     - db_data:/var/lib/postgresql/data
   ports:
-    - "{{config.pgsql.port:-5432}}:5432"
+    - "%%config.pgsql.port:-5432%%:5432"
   networks:
     - frank
   healthcheck:

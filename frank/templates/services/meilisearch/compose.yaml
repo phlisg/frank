@@ -1,7 +1,7 @@
 meilisearch:
-  image: "getmeili/meilisearch:{{config.meilisearch.version:-latest}}"
+  image: "getmeili/meilisearch:%%config.meilisearch.version:-latest%%"
   ports:
-    - "{{config.meilisearch.port:-7700}}:7700"
+    - "%%config.meilisearch.port:-7700%%:7700"
   networks:
     - frank
   volumes:

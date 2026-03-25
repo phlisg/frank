@@ -194,7 +194,7 @@ rm -f "$OUTPUT_DIR/.frank/env.generated.tmp"
 for service in $SERVICES; do
     env_file="$TEMPLATES_DIR/services/$service/env.yaml"
     if [ -f "$env_file" ]; then
-        # yq outputs key=value pairs, then interpolate {{...}} placeholders
+        # yq outputs key=value pairs, then interpolate %%...%% placeholders
         yq eval 'to_entries | .[] | .key + "=" + (.value | tostring)' "$env_file" \
             | frank_interpolate_string \
             >> "$OUTPUT_DIR/.frank/env.generated.tmp"
