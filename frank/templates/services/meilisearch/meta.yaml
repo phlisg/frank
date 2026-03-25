@@ -1,0 +1,7 @@
+name: Meilisearch
+category: search
+default_port: 7700
+conflicts: []
+env_prefix: MEILISEARCH_
+image: getmeili/meilisearch
+container_name: meilisearch

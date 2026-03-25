@@ -1,0 +1,15 @@
+meilisearch:
+  image: "getmeili/meilisearch:{{config.meilisearch.version:-latest}}"
+  ports:
+    - "{{config.meilisearch.port:-7700}}:7700"
+  networks:
+    - frank
+  volumes:
+    - meilisearch_data:/meili_data
+  environment:
+    MEILI_NO_ANALYTICS: "true"
+  healthcheck:
+    test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
