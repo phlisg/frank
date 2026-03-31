@@ -1,11 +1,63 @@
 ## 🏕️ Frank
 > The LFDJ Stack — Laravel + FrankenPHP + Docker + Just
 
-A config-driven Docker environment for Laravel development. No local PHP, Composer, Node, or FrankenPHP required — just Docker and a couple of small tools.
+A config-driven Docker environment for Laravel development. No local PHP, Composer, Node, or FrankenPHP required — just Docker.
 
 ---
 
-### 📋 Requirements
+### ⚡ frank binary (recommended)
+
+The `frank` CLI replaces the `just`-based workflow with a single portable binary.
+
+**Install:**
+
+```bash
+# go install
+go install github.com/phlisg/frank-cli@latest
+
+# or download a pre-built binary from GitHub Releases and place it in your PATH
+```
+
+**Quick start:**
+
+```bash
+frank init       # interactive wizard — creates frank.yaml and generates Docker files
+frank install    # install a fresh Laravel project inside the container
+frank up         # start containers, run composer install + migrate
+```
+
+**Shell auto-activation** — add once to `~/.zshrc` or `~/.bashrc`:
+
+```bash
+eval "$(frank shell-setup)"
+```
+
+This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that automatically
+activates project aliases (`artisan`, `composer`, `php`, `tinker`, `npm`, `bun`, …)
+whenever you `cd` into a directory containing `frank.yaml`.
+
+**All commands:**
+
+| Command | Description |
+| ------- | ----------- |
+| `frank init` | Interactive wizard — creates `frank.yaml` and generates Docker files |
+| `frank generate` | Regenerate Docker files from `frank.yaml` |
+| `frank install` | Install Laravel into the project via container |
+| `frank add <service>` | Add a service to `frank.yaml` and regenerate |
+| `frank remove <service>` | Remove a service from `frank.yaml` and regenerate |
+| `frank up [--quick]` | Start containers; `--quick` skips composer install + migrate |
+| `frank down` | Stop containers |
+| `frank ps` | Show running containers |
+| `frank clean` | Stop containers and delete volumes |
+| `frank reset [--force]` | Delete all project files except `frank.yaml` and `.git` |
+| `frank activate` | Output eval-able shell aliases for the current project |
+| `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation |
+| `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
+| `frank export [-o path]` | Export a Sail-compatible `docker-compose.yml` |
+
+---
+
+### 📋 Requirements (just-based workflow)
 
 | Tool | Purpose |
 | ---- | ------- |
