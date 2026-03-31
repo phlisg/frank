@@ -7,7 +7,7 @@ import (
 	"path"
 	texttemplate "text/template"
 
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 )
 
 // Data is the context passed to every template.

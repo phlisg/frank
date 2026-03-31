@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 )
 
 func TestGenerateEnv_BaseVars(t *testing.T) {

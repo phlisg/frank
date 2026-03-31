@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/phlisg/frank-cli/internal/config"
-	"github.com/phlisg/frank-cli/internal/shell"
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/shell"
 	"github.com/spf13/cobra"
 )
 
