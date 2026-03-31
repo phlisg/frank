@@ -1,7 +1,14 @@
 package main
 
-import "github.com/phlisg/frank-cli/cmd"
+import (
+	"embed"
+
+	"github.com/phlisg/frank-cli/cmd"
+)
+
+//go:embed templates
+var templateFS embed.FS
 
 func main() {
-	cmd.Execute()
+	cmd.Execute(templateFS)
 }
