@@ -37,11 +37,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: frank-cli/go.mod
-          cache-dependency-path: frank-cli/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Build
-        working-directory: frank-cli
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -52,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: frank-cli/${{ matrix.asset }}
+          path: ${{ matrix.asset }}
 
   release:
     name: Create release
