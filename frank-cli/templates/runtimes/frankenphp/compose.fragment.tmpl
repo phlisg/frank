@@ -1,0 +1,24 @@
+laravel.test:
+  build:
+    context: .
+  ports:
+    - "80:80"
+    - "443:443"
+    - "443:443/udp"
+    - "5173:5173"
+  networks:
+    - sail
+  volumes:
+    - .:/var/www/html
+  environment:
+    - APP_ENV=local
+    - APP_DEBUG=true
+    - SERVER_NAME=:80
+    - PSYSH_CONFIG=/var/www/html/.psysh.php
+    - PSYSH_HOME=/var/www/html/storage/psysh
+  env_file:
+    - .env
+  working_dir: /var/www/html
+  tty: true
+  user: "sail"
+  stdin_open: true

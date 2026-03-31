@@ -1,0 +1,19 @@
+mysql:
+  image: "mysql:{{.Version}}"
+  environment:
+    MYSQL_ROOT_PASSWORD: "${DB_PASSWORD}"
+    MYSQL_DATABASE: "${DB_DATABASE}"
+    MYSQL_USER: "${DB_USERNAME}"
+    MYSQL_PASSWORD: "${DB_PASSWORD}"
+    MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+  volumes:
+    - mysql_data:/var/lib/mysql
+  ports:
+    - "{{.Port}}:3306"
+  networks:
+    - sail
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+    interval: 5s
+    timeout: 3s
+    retries: 10

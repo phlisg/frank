@@ -1,0 +1,6 @@
+memcached:
+  image: "memcached:{{.Version}}"
+  ports:
+    - "{{.Port}}:11211"
+  networks:
+    - sail
