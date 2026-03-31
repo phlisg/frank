@@ -7,7 +7,7 @@ laravel.test:
     - "443:443/udp"
     - "5173:5173"
   networks:
-    - sail
+    - frank
   volumes:
     - .:/var/www/html
   environment:
@@ -20,5 +20,5 @@ laravel.test:
     - .env
   working_dir: /var/www/html
   tty: true
-  user: "sail"
+  user: "${UID:-1000}:${GID:-1000}"
   stdin_open: true

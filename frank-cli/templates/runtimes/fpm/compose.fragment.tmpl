@@ -3,7 +3,7 @@ laravel.test:
     context: .
     dockerfile: Dockerfile
   networks:
-    - sail
+    - frank
   volumes:
     - .:/var/www/html
   environment:
@@ -15,7 +15,7 @@ laravel.test:
     - .env
   working_dir: /var/www/html
   tty: true
-  user: "sail"
+  user: "${UID:-1000}:${GID:-1000}"
   stdin_open: true
 
 nginx:
@@ -27,7 +27,7 @@ nginx:
     - "443:443"
     - "5173:5173"
   networks:
-    - sail
+    - frank
   volumes:
     - .:/var/www/html
   depends_on:

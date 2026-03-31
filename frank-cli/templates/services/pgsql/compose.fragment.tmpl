@@ -9,7 +9,7 @@ pgsql:
   ports:
     - "{{.Port}}:5432"
   networks:
-    - sail
+    - frank
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-sail}"]
     interval: 5s

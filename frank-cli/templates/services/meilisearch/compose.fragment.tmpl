@@ -3,7 +3,7 @@ meilisearch:
   ports:
     - "{{.Port}}:7700"
   networks:
-    - sail
+    - frank
   volumes:
     - meilisearch_data:/meili_data
   environment:

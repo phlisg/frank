@@ -11,7 +11,7 @@ mariadb:
   ports:
     - "{{.Port}}:3306"
   networks:
-    - sail
+    - frank
   healthcheck:
     test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
     interval: 5s
