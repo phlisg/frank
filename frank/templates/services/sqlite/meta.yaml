@@ -1,7 +1,0 @@
-name: SQLite
-category: database
-default_port: null
-conflicts: []
-env_prefix: DB_
-image: null
-container_name: null

@@ -1,0 +1,7 @@
+mailpit:
+  image: "axllent/mailpit:{{.Version}}"
+  ports:
+    - "{{.Port}}:1025"
+    - "{{.DashboardPort}}:8025"
+  networks:
+    - frank

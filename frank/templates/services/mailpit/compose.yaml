@@ -1,7 +1,0 @@
-mailpit:
-  image: "axllent/mailpit:%%config.mailpit.version:-latest%%"
-  ports:
-    - "%%config.mailpit.port:-1025%%:1025"
-    - "%%config.mailpit.dashboard_port:-8025%%:8025"
-  networks:
-    - frank
