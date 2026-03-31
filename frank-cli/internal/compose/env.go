@@ -68,6 +68,9 @@ func baseEnvLines(projectName string) []envLine {
 		blank(),
 		comment("# Vite"),
 		kv("VITE_APP_NAME", "${APP_NAME}"),
+		blank(),
+		comment("# Development tools"),
+		kv("PSYSH_HOME", "/tmp"),
 	}
 }
 

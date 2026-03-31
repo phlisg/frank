@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,14 +129,23 @@ func patchViteConfig(dir string) error {
 	return nil
 }
 
-// copyPsysh copies .psysh.php from dir into the project if it exists.
-// (Frank ships a default .psysh.php alongside frank.yaml for nicer tinker sessions.)
+// copyPsysh writes a default .psysh.php into dir for nicer Tinker sessions.
+// Skips if the file already exists so custom configs are preserved.
 func copyPsysh(dir string) error {
-	src := filepath.Join(dir, ".psysh.php")
-	if _, err := os.Stat(src); os.IsNotExist(err) {
-		return nil // nothing to copy
+	dst := filepath.Join(dir, ".psysh.php")
+	if _, err := os.Stat(dst); err == nil {
+		return nil // already present — leave it alone
 	}
-	fmt.Println("  .psysh.php already in place")
+
+	content, err := fs.ReadFile(TemplateFS, "templates/psysh.php")
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(dst, content, 0644); err != nil {
+		return err
+	}
+	fmt.Println("  wrote  .psysh.php")
 	return nil
 }
 
