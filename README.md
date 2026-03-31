@@ -1,7 +1,17 @@
 ## 🏕️ Frank
 > A config-driven Docker environment for Laravel development
 
-Frank gives you a full Laravel development environment with zero local dependencies. No PHP, Composer, Node, or FrankenPHP installed on your machine — just Docker and the `frank` binary. Describe your environment in a single `frank.yaml` file and Frank handles everything else.
+Frank gives you a full Laravel development environment with zero local dependencies. No PHP, Composer, Node, or FrankenPHP installed on your machine — just Docker and the `frank` binary.
+
+Your entire environment is described in a single `frank.yaml` file: PHP version, runtime, services, port overrides. Frank generates all the Docker files from it, so onboarding a new team member is a `git clone` and a `frank up` away.
+
+Installing Laravel itself doesn't require a local PHP installation either — `frank install` bootstraps a fresh project inside the container, patches Vite for Docker HMR, and sets up a service-aware `.env` in one step.
+
+Day-to-day development is smooth too. Frank's shell alias system puts `artisan`, `composer`, `php`, and your database CLI one word away — no `docker compose exec` prefixes. With auto-activation enabled, aliases appear the moment you `cd` into a project and disappear when you leave.
+
+Already using Laravel Sail? Frank can import your existing `docker-compose.yml` and take over from there. And if you ever need to hand a project back to a Sail-based team, `frank export` has you covered.
+
+Frank is distributed as a single static binary. No Node, no Python, no package managers — just download and drop it in your `PATH`.
 
 ---
 
