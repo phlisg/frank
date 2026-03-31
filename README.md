@@ -34,7 +34,7 @@ frank install    # install a fresh Laravel project inside the container
 frank up         # start containers, run composer install + migrate
 ```
 
-Visit [http://localhost:8000](http://localhost:8000) once `frank up` completes.
+Visit [http://localhost](http://localhost) once `frank up` completes.
 
 That's it. No local PHP version juggling, no Homebrew conflicts, no "works on my machine" problems.
 
