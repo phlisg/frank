@@ -1,0 +1,26 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/frank"
+  cmd = "go build -o ./tmp/frank ."
+  delay = 1000
+  exclude_dir = ["tmp", "vendor"]
+  exclude_regex = ["_test\\.go"]
+  include_ext = ["go", "tmpl"]
+  log = "build-errors.log"
+  stop_on_error = false
+  send_interrupt = false
+
+[color]
+  build = "yellow"
+  main  = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  silent = false
+  time   = false
+
+[misc]
+  clean_on_exit = true

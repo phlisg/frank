@@ -1,0 +1,34 @@
+laravel.test:
+  build:
+    context: .
+    dockerfile: Dockerfile
+  networks:
+    - frank
+  volumes:
+    - .:/var/www/html
+  environment:
+    - APP_ENV=local
+    - APP_DEBUG=true
+    - PSYSH_CONFIG=/var/www/html/.psysh.php
+    - PSYSH_HOME=/var/www/html/storage/psysh
+  env_file:
+    - .env
+  working_dir: /var/www/html
+  tty: true
+  user: "${UID:-1000}:${GID:-1000}"
+  stdin_open: true
+
+nginx:
+  build:
+    context: .
+    dockerfile: nginx.Dockerfile
+  ports:
+    - "80:80"
+    - "443:443"
+    - "5173:5173"
+  networks:
+    - frank
+  volumes:
+    - .:/var/www/html
+  depends_on:
+    - laravel.test

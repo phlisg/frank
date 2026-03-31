@@ -1,6 +1,0 @@
-memcached:
-  image: "memcached:%%config.memcached.version:-alpine%%"
-  ports:
-    - "%%config.memcached.port:-11211%%:11211"
-  networks:
-    - frank

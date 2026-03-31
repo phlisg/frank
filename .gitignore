@@ -9,3 +9,7 @@
 .sidecar-start.sh
 .sidecar-base
 .td-root
+.claude
+docs/superpowers/
+tmp/
+frank

@@ -1,0 +1,19 @@
+mariadb:
+  image: "mariadb:{{.Version}}"
+  environment:
+    MARIADB_ROOT_PASSWORD: "${DB_PASSWORD}"
+    MARIADB_DATABASE: "${DB_DATABASE}"
+    MARIADB_USER: "${DB_USERNAME}"
+    MARIADB_PASSWORD: "${DB_PASSWORD}"
+    MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+  volumes:
+    - mariadb_data:/var/lib/mysql
+  ports:
+    - "{{.Port}}:3306"
+  networks:
+    - frank
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 5s
+    timeout: 3s
+    retries: 10

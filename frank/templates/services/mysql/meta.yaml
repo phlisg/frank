@@ -1,7 +1,0 @@
-name: MySQL
-category: database
-default_port: 3306
-conflicts: [pgsql, mariadb]
-env_prefix: DB_
-image: mysql
-container_name: db
