@@ -40,6 +40,30 @@ That's it. No local PHP version juggling, no Homebrew conflicts, no "works on my
 
 ---
 
+### 🗒 Example frank.yaml
+
+Not sure where to start? Here's a solid default you can drop straight into your project — Laravel 12 LTS, PHP-FPM, MariaDB, Memcached, and Mailpit for local mail:
+
+```yaml
+version: 1
+
+php:
+  version: "8.4"
+  runtime: "fpm"
+
+laravel:
+  version: "12.*"
+
+services:
+  - mariadb
+  - memcached
+  - mailpit
+```
+
+Save this as `frank.yaml` in your project root, then run `frank generate` to create all the Docker files. Adjust the PHP version, runtime, or services to taste — see the full reference below.
+
+---
+
 ### 📋 Requirements
 
 | Tool | Purpose |
