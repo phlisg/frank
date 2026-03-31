@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/phlisg/frank-cli/internal/docker"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 

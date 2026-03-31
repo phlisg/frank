@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 )
 
 // templatesDir points at the real templates directory relative to this test file.
@@ -16,7 +16,7 @@ func newTestEngine(t *testing.T) *Engine {
 	fsys := os.DirFS(templatesDir)
 	// Wrap in a sub-FS that mimics the "templates/" prefix the engine expects.
 	// Since the engine prepends "templates/", we need to provide an FS rooted
-	// one level above. Use os.DirFS at the frank-cli root instead.
+	// one level above. Use os.DirFS at the frank root instead.
 	_ = fsys
 	return New(os.DirFS("../.."))
 }

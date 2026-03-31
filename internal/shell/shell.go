@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 )
 
 // Activate returns eval-able shell aliases for the current project.

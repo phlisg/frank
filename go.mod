@@ -1,4 +1,4 @@
-module github.com/phlisg/frank-cli
+module github.com/phlisg/frank
 
 go 1.26
 

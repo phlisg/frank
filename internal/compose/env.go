@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 )
 
 // envLine is a single line in a .env file — either a KEY=VALUE pair or a comment/blank.

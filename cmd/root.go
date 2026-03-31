@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phlisg/frank-cli/internal/config"
-	"github.com/phlisg/frank-cli/internal/docker"
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:               "frank",
-	Short:             "Frank — Laravel Development Environment",
-	RunE:              runRoot,
-	SilenceUsage:      true,
-	SilenceErrors:     true,
+	Use:           "frank",
+	Short:         "Frank — Laravel Development Environment",
+	RunE:          runRoot,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 // Dir is the global --dir flag value (target project directory).
