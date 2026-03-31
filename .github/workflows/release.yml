@@ -27,9 +27,6 @@ jobs:
           - goos: darwin
             goarch: arm64
             asset: frank-darwin-arm64
-          - goos: windows
-            goarch: amd64
-            asset: frank-windows-amd64.exe
 
     steps:
       - uses: actions/checkout@v4
