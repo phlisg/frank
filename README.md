@@ -262,10 +262,10 @@ go build -o frank .
 ./frank
 ```
 
-For live reload during development ([air](https://github.com/air-verse/air) required):
+For live reload during development:
 
 ```bash
-air
+go tool air
 ```
 
 #### Running tests
