@@ -167,6 +167,7 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 | `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank export [-o path]` | Export a Sail-compatible `docker-compose.yml` |
+| `frank version` | Print the frank binary version |
 
 ---
 
@@ -249,3 +250,37 @@ You'll be prompted to confirm before anything is deleted. Skip the prompt with:
 ```bash
 frank reset --force
 ```
+
+---
+
+### 🧑‍💻 Developer Guide
+
+#### Running locally
+
+```bash
+go build -o frank .
+./frank
+```
+
+For live reload during development ([air](https://github.com/air-verse/air) required):
+
+```bash
+air
+```
+
+#### Running tests
+
+```bash
+go test ./...
+```
+
+#### Releasing a new version
+
+Frank uses tag-based releases. Pushing a tag triggers the GitHub Actions workflow, which builds binaries for all platforms and creates a GitHub release.
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The version is injected into the binary at build time — `frank version` will return the tag name.
