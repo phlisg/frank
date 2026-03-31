@@ -9,6 +9,8 @@ import (
 //go:embed templates
 var templateFS embed.FS
 
+var version = "dev"
+
 func main() {
-	cmd.Execute(templateFS)
+	cmd.Execute(templateFS, version)
 }

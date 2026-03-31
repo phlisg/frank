@@ -30,8 +30,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&Dir, "dir", "", "target directory (defaults to current working directory)")
 }
 
-func Execute(fsys fs.FS) {
+func Execute(fsys fs.FS, version string) {
 	TemplateFS = fsys
+	rootCmd.Version = version
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
