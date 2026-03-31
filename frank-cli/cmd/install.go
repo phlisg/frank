@@ -21,11 +21,12 @@ var installCmd = &cobra.Command{
 	Long: `Runs the Laravel installer inside the laravel.test container — no local PHP needed.
 
 Steps:
-  1. composer create-project laravel/laravel . <version>
-  2. Overwrite .env and .env.example with Frank-generated versions
-  3. Patch vite.config.js for Docker HMR (server.host = '0.0.0.0')
-  4. Copy .psysh.php if present
-  5. Restore your README.md and .gitignore`,
+  1. Back up README.md and .gitignore
+  2. composer create-project laravel/laravel . <version>
+  3. Restore README.md and .gitignore
+  4. Overwrite .env and .env.example with Frank-generated versions
+  5. Patch vite.config.js for Docker HMR (server.host = '0.0.0.0')
+  6. Copy .psysh.php if present`,
 	SilenceUsage: true,
 	RunE:         runInstall,
 }
@@ -40,7 +41,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	d := docker.New(dir)
 
-	// 1. composer create-project
+	// 1. Back up Frank's README.md and .gitignore before composer overwrites them.
+	restore, err := backupFiles(dir, "README.md", ".gitignore")
+	if err != nil {
+		return fmt.Errorf("backup files: %w", err)
+	}
+
+	// 2. composer create-project
 	laravelVersion := cfg.Laravel.Version
 	if laravelVersion == "latest" {
 		laravelVersion = ""
@@ -57,18 +64,23 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("composer create-project: %w", err)
 	}
 
-	// 2. Regenerate Docker files so .env/.env.example reflect Frank's service config.
+	// 3. Restore Frank's README.md and .gitignore.
+	if err := restore(); err != nil {
+		return fmt.Errorf("restore files: %w", err)
+	}
+
+	// 4. Regenerate Docker files so .env/.env.example reflect Frank's service config.
 	fmt.Println("Regenerating Docker files...")
 	if err := generate(cfg, dir); err != nil {
 		return err
 	}
 
-	// 3. Patch vite.config.js for Docker HMR.
+	// 5. Patch vite.config.js for Docker HMR.
 	if err := patchViteConfig(dir); err != nil {
 		fmt.Printf("warning: could not patch vite.config.js: %v\n", err)
 	}
 
-	// 4. Copy .psysh.php from project root if present.
+	// 6. Copy .psysh.php from project root if present.
 	if err := copyPsysh(dir); err != nil {
 		fmt.Printf("warning: could not copy .psysh.php: %v\n", err)
 	}
@@ -125,4 +137,47 @@ func copyPsysh(dir string) error {
 	}
 	fmt.Println("  .psysh.php already in place")
 	return nil
+}
+
+// backupFiles reads the named files from dir (if they exist) and returns a
+// restore func that writes them back. Files that did not exist before are
+// deleted on restore so composer's generated versions don't linger.
+func backupFiles(dir string, names ...string) (func() error, error) {
+	type snapshot struct {
+		path    string
+		content []byte // nil means the file did not exist
+	}
+
+	snaps := make([]snapshot, 0, len(names))
+	for _, name := range names {
+		p := filepath.Join(dir, name)
+		data, err := os.ReadFile(p)
+		if err != nil {
+			if os.IsNotExist(err) {
+				snaps = append(snaps, snapshot{path: p, content: nil})
+				continue
+			}
+			return nil, err
+		}
+		snaps = append(snaps, snapshot{path: p, content: data})
+	}
+
+	restore := func() error {
+		for _, s := range snaps {
+			if s.content == nil {
+				// File did not exist before — remove what composer created.
+				if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				continue
+			}
+			if err := os.WriteFile(s.path, s.content, 0644); err != nil {
+				return err
+			}
+			fmt.Printf("  restored %s\n", filepath.Base(s.path))
+		}
+		return nil
+	}
+
+	return restore, nil
 }
