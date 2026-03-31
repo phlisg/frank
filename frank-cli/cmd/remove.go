@@ -33,9 +33,9 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := cfg.Services[:0]
-	for _, s := range cfg.Services {
-		if s != service {
-			filtered = append(filtered, s)
+	for _, svc := range cfg.Services {
+		if svc != service {
+			filtered = append(filtered, svc)
 		}
 	}
 	cfg.Services = filtered

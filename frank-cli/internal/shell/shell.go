@@ -10,31 +10,31 @@ import (
 // Activate returns eval-able shell aliases for the current project.
 // Core aliases always present; service aliases added based on cfg.
 func Activate(cfg *config.Config) string {
-	var b strings.Builder
+	var sb strings.Builder
 
 	// Core aliases — always present regardless of service selection
-	alias(&b, "artisan", "docker compose exec laravel.test php artisan")
-	alias(&b, "composer", "docker compose exec laravel.test composer")
-	alias(&b, "php", "docker compose exec laravel.test php")
-	alias(&b, "tinker", "docker compose exec laravel.test php artisan tinker")
-	alias(&b, "npm", "docker compose exec laravel.test npm")
-	alias(&b, "bun", "docker compose exec laravel.test bun")
+	alias(&sb, "artisan", "docker compose exec laravel.test php artisan")
+	alias(&sb, "composer", "docker compose exec laravel.test composer")
+	alias(&sb, "php", "docker compose exec laravel.test php")
+	alias(&sb, "tinker", "docker compose exec laravel.test php artisan tinker")
+	alias(&sb, "npm", "docker compose exec laravel.test npm")
+	alias(&sb, "bun", "docker compose exec laravel.test bun")
 
 	// Service-conditional aliases
 	if cfg.HasService("pgsql") {
-		alias(&b, "psql", "docker compose exec pgsql psql -U sail")
+		alias(&sb, "psql", "docker compose exec pgsql psql -U sail")
 	}
 	if cfg.HasService("mysql") {
-		alias(&b, "mysql", "docker compose exec db mysql -u root -proot")
+		alias(&sb, "mysql", "docker compose exec db mysql -u root -proot")
 	}
 	if cfg.HasService("mariadb") {
-		alias(&b, "mariadb", "docker compose exec mariadb mariadb -u root -proot")
+		alias(&sb, "mariadb", "docker compose exec mariadb mariadb -u root -proot")
 	}
 	if cfg.HasService("redis") {
-		alias(&b, "redis-cli", "docker compose exec redis redis-cli")
+		alias(&sb, "redis-cli", "docker compose exec redis redis-cli")
 	}
 
-	return b.String()
+	return sb.String()
 }
 
 // ShellSetup returns eval-able shell hooks for auto-activating on directory change.
@@ -51,16 +51,16 @@ func ShellSetup(shell string) string {
 	}
 }
 
-func alias(b *strings.Builder, name, cmd string) {
-	b.WriteString("alias ")
-	b.WriteString(name)
-	b.WriteString("='")
-	b.WriteString(cmd)
-	b.WriteString("'\n")
+func alias(builder *strings.Builder, name, cmd string) {
+	builder.WriteString("alias ")
+	builder.WriteString(name)
+	builder.WriteString("='")
+	builder.WriteString(cmd)
+	builder.WriteString("'\n")
 }
 
 func detectShell() string {
-	if s := os.Getenv("SHELL"); strings.Contains(s, "zsh") {
+	if shellPath := os.Getenv("SHELL"); strings.Contains(shellPath, "zsh") {
 		return "zsh"
 	}
 	return "bash"

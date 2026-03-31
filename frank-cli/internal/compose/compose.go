@@ -127,8 +127,8 @@ func validatePorts(services map[string]interface{}) error {
 		if !ok {
 			continue
 		}
-		for _, p := range ports {
-			portStr, ok := p.(string)
+		for _, portEntry := range ports {
+			portStr, ok := portEntry.(string)
 			if !ok {
 				continue
 			}

@@ -108,10 +108,10 @@ func runImport(cmd *cobra.Command, args []string) error {
 func parseSailCompose(compose sailComposeFile) (phpVersion string, services []string) {
 	for name, svc := range compose.Services {
 		// Detect PHP version from the app service image or build context.
-		if m := phpFromSail.FindStringSubmatch(svc.Image); len(m) == 2 {
-			phpVersion = m[1]
-		} else if m := phpFromSail.FindStringSubmatch(svc.Build.Context); len(m) == 2 {
-			phpVersion = m[1]
+		if match := phpFromSail.FindStringSubmatch(svc.Image); len(match) == 2 {
+			phpVersion = match[1]
+		} else if match := phpFromSail.FindStringSubmatch(svc.Build.Context); len(match) == 2 {
+			phpVersion = match[1]
 		}
 
 		// Map service names.
@@ -125,13 +125,13 @@ func parseSailCompose(compose sailComposeFile) (phpVersion string, services []st
 	return
 }
 
-func dedup(ss []string) []string {
+func dedup(strs []string) []string {
 	seen := map[string]bool{}
-	out := ss[:0]
-	for _, s := range ss {
-		if !seen[s] {
-			seen[s] = true
-			out = append(out, s)
+	out := strs[:0]
+	for _, str := range strs {
+		if !seen[str] {
+			seen[str] = true
+			out = append(out, str)
 		}
 	}
 	return out

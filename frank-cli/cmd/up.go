@@ -23,9 +23,9 @@ var upCmd = &cobra.Command{
 
 func runUp(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
-	d := docker.New(dir)
+	client := docker.New(dir)
 
-	if err := d.Up(); err != nil {
+	if err := client.Up(); err != nil {
 		return err
 	}
 
@@ -34,11 +34,11 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	// Post-start tasks — failures are logged but don't abort.
-	if err := d.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
+	if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
 		fmt.Printf("warning: composer install failed: %v\n", err)
 	}
 
-	if err := d.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
+	if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
 		fmt.Printf("warning: artisan migrate failed: %v\n", err)
 	}
 

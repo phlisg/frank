@@ -148,8 +148,8 @@ func validate(cfg *Config) error {
 
 // HasService reports whether the named service is in cfg.Services.
 func (cfg *Config) HasService(name string) bool {
-	for _, s := range cfg.Services {
-		if s == name {
+	for _, svc := range cfg.Services {
+		if svc == name {
 			return true
 		}
 	}
@@ -168,9 +168,9 @@ func ValidService(name string) bool {
 
 // Database returns the configured database service name, or "" if none.
 func (cfg *Config) Database() string {
-	for _, s := range cfg.Services {
-		if databaseServices[s] {
-			return s
+	for _, svc := range cfg.Services {
+		if databaseServices[svc] {
+			return svc
 		}
 	}
 	return ""

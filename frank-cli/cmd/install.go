@@ -39,7 +39,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	d := docker.New(dir)
+	client := docker.New(dir)
 
 	// 1. Back up Frank's README.md and .gitignore before composer overwrites them.
 	restore, err := backupFiles(dir, "README.md", ".gitignore")
@@ -60,7 +60,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	createArgs = append(createArgs, "--no-interaction")
 
 	fmt.Println("Installing Laravel...")
-	if err := d.Exec("laravel.test", append([]string{"composer"}, createArgs...)...); err != nil {
+	if err := client.Exec("laravel.test", append([]string{"composer"}, createArgs...)...); err != nil {
 		return fmt.Errorf("composer create-project: %w", err)
 	}
 
@@ -150,31 +150,31 @@ func backupFiles(dir string, names ...string) (func() error, error) {
 
 	snaps := make([]snapshot, 0, len(names))
 	for _, name := range names {
-		p := filepath.Join(dir, name)
-		data, err := os.ReadFile(p)
+		path := filepath.Join(dir, name)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				snaps = append(snaps, snapshot{path: p, content: nil})
+				snaps = append(snaps, snapshot{path: path, content: nil})
 				continue
 			}
 			return nil, err
 		}
-		snaps = append(snaps, snapshot{path: p, content: data})
+		snaps = append(snaps, snapshot{path: path, content: data})
 	}
 
 	restore := func() error {
-		for _, s := range snaps {
-			if s.content == nil {
+		for _, snap := range snaps {
+			if snap.content == nil {
 				// File did not exist before — remove what composer created.
-				if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
+				if err := os.Remove(snap.path); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 				continue
 			}
-			if err := os.WriteFile(s.path, s.content, 0644); err != nil {
+			if err := os.WriteFile(snap.path, snap.content, 0644); err != nil {
 				return err
 			}
-			fmt.Printf("  restored %s\n", filepath.Base(s.path))
+			fmt.Printf("  restored %s\n", filepath.Base(snap.path))
 		}
 		return nil
 	}

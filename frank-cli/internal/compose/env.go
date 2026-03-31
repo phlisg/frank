@@ -156,8 +156,8 @@ var sensitiveKeys = map[string]bool{
 func redactSensitive(lines []envLine) []envLine {
 	out := make([]envLine, len(lines))
 	copy(out, lines)
-	for i, l := range out {
-		if !l.comment && sensitiveKeys[l.key] {
+	for i, line := range out {
+		if !line.comment && sensitiveKeys[line.key] {
 			out[i].value = ""
 		}
 	}
@@ -167,18 +167,18 @@ func redactSensitive(lines []envLine) []envLine {
 // marshalEnv serialises envLine values to a .env file string.
 func marshalEnv(lines []envLine) string {
 	var sb strings.Builder
-	for _, l := range lines {
-		if l.comment {
-			if l.value == "" {
+	for _, line := range lines {
+		if line.comment {
+			if line.value == "" {
 				sb.WriteByte('\n')
 			} else {
-				sb.WriteString(l.value)
+				sb.WriteString(line.value)
 				sb.WriteByte('\n')
 			}
 		} else {
-			sb.WriteString(l.key)
+			sb.WriteString(line.key)
 			sb.WriteByte('=')
-			sb.WriteString(l.value)
+			sb.WriteString(line.value)
 			sb.WriteByte('\n')
 		}
 	}
