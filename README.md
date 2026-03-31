@@ -17,12 +17,33 @@ Frank is distributed as a single static binary. No Node, no Python, no package m
 
 ### ⚡ Install
 
-```bash
-# go install
-go install github.com/phlisg/frank-cli@latest
+The preferred way to install Frank is via `go install`:
 
-# or download a pre-built binary from GitHub Releases and place it in your PATH
+```bash
+go install github.com/phlisg/frank-cli@latest
 ```
+
+**Linux** — alternatively, download a pre-built binary from [GitHub Releases](https://github.com/phlisg/frank-cli/releases):
+
+```bash
+curl -Lo frank https://github.com/phlisg/frank-cli/releases/latest/download/frank-linux-amd64
+chmod +x frank
+sudo mv frank /usr/local/bin/
+```
+
+**macOS** — `go install` is the only supported method. Pre-built binaries are unsigned and macOS Gatekeeper will quarantine them.
+
+> **Tip:** For better Docker volume mount performance, enable VirtioFS in Docker Desktop → Settings → General → "Use VirtioFS for file sharing".
+
+**WSL (Windows)** — the Linux binary works as-is; alternatively use `go install` as above.
+
+```bash
+curl -Lo frank https://github.com/phlisg/frank-cli/releases/latest/download/frank-linux-amd64
+chmod +x frank
+sudo mv frank /usr/local/bin/
+```
+
+> **Note:** Make sure Docker Desktop has the **WSL 2 backend** enabled (Settings → Resources → WSL Integration).
 
 ---
 
