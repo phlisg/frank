@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phlisg/frank-cli/internal/config"
-	"github.com/phlisg/frank-cli/internal/docker"
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 

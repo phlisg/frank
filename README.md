@@ -20,13 +20,13 @@ Frank is distributed as a single static binary. No Node, no Python, no package m
 The preferred way to install Frank is via `go install`:
 
 ```bash
-go install github.com/phlisg/frank-cli@latest
+go install github.com/phlisg/frank@latest
 ```
 
-**Linux** — alternatively, download a pre-built binary from [GitHub Releases](https://github.com/phlisg/frank-cli/releases):
+**Linux** — alternatively, download a pre-built binary from [GitHub Releases](https://github.com/phlisg/frank/releases):
 
 ```bash
-curl -Lo frank https://github.com/phlisg/frank-cli/releases/latest/download/frank-linux-amd64
+curl -Lo frank https://github.com/phlisg/frank/releases/latest/download/frank-linux-amd64
 chmod +x frank
 sudo mv frank /usr/local/bin/
 ```
@@ -38,7 +38,7 @@ sudo mv frank /usr/local/bin/
 **WSL (Windows)** — the Linux binary works as-is; alternatively use `go install` as above.
 
 ```bash
-curl -Lo frank https://github.com/phlisg/frank-cli/releases/latest/download/frank-linux-amd64
+curl -Lo frank https://github.com/phlisg/frank/releases/latest/download/frank-linux-amd64
 chmod +x frank
 sudo mv frank /usr/local/bin/
 ```

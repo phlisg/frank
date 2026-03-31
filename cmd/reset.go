@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/phlisg/frank-cli/internal/docker"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -19,11 +19,11 @@ func init() {
 
 // preservedFiles are kept during reset; everything else is deleted.
 var preservedFiles = map[string]bool{
-	".git":         true,
-	"frank.yaml":   true,
+	".git":          true,
+	"frank.yaml":    true,
 	".dockerignore": true,
-	".gitignore":   true,
-	"README.md":    true,
+	".gitignore":    true,
+	"README.md":     true,
 }
 
 var resetCmd = &cobra.Command{

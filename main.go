@@ -3,7 +3,7 @@ package main
 import (
 	"embed"
 
-	"github.com/phlisg/frank-cli/cmd"
+	"github.com/phlisg/frank/cmd"
 )
 
 //go:embed templates

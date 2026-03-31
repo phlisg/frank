@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/phlisg/frank-cli/internal/compose"
-	"github.com/phlisg/frank-cli/internal/config"
-	"github.com/phlisg/frank-cli/internal/template"
+	"github.com/phlisg/frank/internal/compose"
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/template"
 	"github.com/spf13/cobra"
 )
 

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phlisg/frank-cli/internal/config"
-	"github.com/phlisg/frank-cli/internal/template"
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/template"
 )
 
 func newTestGenerator(t *testing.T) *Generator {

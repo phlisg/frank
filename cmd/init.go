@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/phlisg/frank-cli/internal/config"
+	"github.com/phlisg/frank/internal/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -158,10 +158,10 @@ func marshalConfig(cfg *config.Config) (string, error) {
 
 	// Build a clean ordered map so the YAML field order is predictable.
 	type configOutput struct {
-		Version  int                      `yaml:"version"`
-		PHP      config.PHP               `yaml:"php"`
-		Laravel  config.Laravel           `yaml:"laravel"`
-		Services []string                 `yaml:"services"`
+		Version  int                             `yaml:"version"`
+		PHP      config.PHP                      `yaml:"php"`
+		Laravel  config.Laravel                  `yaml:"laravel"`
+		Services []string                        `yaml:"services"`
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
 	}
 
