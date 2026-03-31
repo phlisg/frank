@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/phlisg/frank-cli/internal/docker"
@@ -70,6 +71,19 @@ func runReset(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Restore .gitignore from git if it was modified.
+	restoreGitignore(dir)
+
 	fmt.Println("Reset complete.")
 	return nil
+}
+
+// restoreGitignore restores .gitignore to the git-tracked version if it has
+// been modified. Fails silently — not all projects are git repos.
+func restoreGitignore(dir string) {
+	cmd := exec.Command("git", "checkout", "--", ".gitignore")
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		fmt.Println("  restored .gitignore from git")
+	}
 }
