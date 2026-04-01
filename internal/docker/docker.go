@@ -87,9 +87,10 @@ func (c *Client) ExecQuiet(service string, command ...string) (string, error) {
 	return c.RunQuiet(args...)
 }
 
-// Up runs `docker compose up -d --build`.
-func (c *Client) Up() error {
-	return c.Run("up", "-d", "--build")
+// Up runs `docker compose up` with optional extra args (e.g. "-d", "--build").
+func (c *Client) Up(extraArgs ...string) error {
+	args := append([]string{"up"}, extraArgs...)
+	return c.Run(args...)
 }
 
 // Down runs `docker compose down`.
