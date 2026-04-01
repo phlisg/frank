@@ -2,44 +2,66 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 
-var quickMode bool
-
 func init() {
-	upCmd.Flags().BoolVar(&quickMode, "quick", false, "skip post-start tasks (composer install, artisan migrate)")
 	rootCmd.AddCommand(upCmd)
 }
 
 var upCmd = &cobra.Command{
-	Use:          "up",
-	Short:        "Start containers",
-	SilenceUsage: true,
-	RunE:         runUp,
+	Use:   "up [docker compose flags]",
+	Short: "Start containers (passes flags through to docker compose up)",
+	Long: `Start containers by passing all flags directly to docker compose up.
+
+Examples:
+  frank up              # foreground
+  frank up -d           # detached
+  frank up -d --build   # detached, force rebuild
+
+Frank-specific flag:
+  --quick   Skip post-start tasks (composer install + artisan migrate)`,
+	DisableFlagParsing: true,
+	SilenceUsage:       true,
+	RunE:               runUp,
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 	client := docker.New(dir)
 
-	if err := client.Up(); err != nil {
+	quick := false
+	var composeArgs []string
+	for _, a := range args {
+		if a == "--quick" {
+			quick = true
+		} else if a == "--help" || a == "-h" {
+			// help flags: pass through to compose but skip post-start tasks
+			quick = true
+			composeArgs = append(composeArgs, a)
+		} else {
+			composeArgs = append(composeArgs, a)
+		}
+	}
+
+	if err := client.Up(composeArgs...); err != nil {
 		return err
 	}
 
-	if quickMode {
+	if quick {
 		return nil
 	}
 
 	// Post-start tasks — failures are logged but don't abort.
 	if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-		fmt.Printf("warning: composer install failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
 	}
 
 	if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-		fmt.Printf("warning: artisan migrate failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
 	}
 
 	return nil

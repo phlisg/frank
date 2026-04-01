@@ -59,6 +59,41 @@ func TestRunCmd_Failure(t *testing.T) {
 	}
 }
 
+func TestUp_NoArgs(t *testing.T) {
+	c := New("/proj")
+	cmd := c.composeCmd(upArgs()...)
+	args := cmd.Args[1:]
+	want := []string{"compose", "up"}
+	if len(args) != len(want) {
+		t.Fatalf("args = %v, want %v", args, want)
+	}
+	for i, a := range args {
+		if a != want[i] {
+			t.Errorf("args[%d] = %q, want %q", i, a, want[i])
+		}
+	}
+}
+
+func TestUp_WithDetach(t *testing.T) {
+	c := New("/proj")
+	cmd := c.composeCmd(upArgs("-d")...)
+	args := cmd.Args[1:]
+	want := []string{"compose", "up", "-d"}
+	if len(args) != len(want) {
+		t.Fatalf("args = %v, want %v", args, want)
+	}
+	for i, a := range args {
+		if a != want[i] {
+			t.Errorf("args[%d] = %q, want %q", i, a, want[i])
+		}
+	}
+}
+
+// upArgs builds the args slice that Up() would pass to composeCmd.
+func upArgs(extra ...string) []string {
+	return append([]string{"up"}, extra...)
+}
+
 func TestContainerStatus_ParseRunning(t *testing.T) {
 	// Simulate the JSON output from docker compose ps --format json
 	cases := []struct {
