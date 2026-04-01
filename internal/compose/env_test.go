@@ -201,7 +201,7 @@ func TestGenerateEnvExample_NoSensitiveValues(t *testing.T) {
 		{"APP_KEY", "base64"},
 		{"DB_PASSWORD", "password"},
 		{"DB_URL", "postgresql://"},
-		{"REDIS_PASSWORD", "secret"},
+		{"REDIS_PASSWORD", "null"},
 	}
 	for _, c := range checks {
 		if !strings.Contains(out, c.key+"=") {
