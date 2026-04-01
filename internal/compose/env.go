@@ -82,9 +82,12 @@ func (g *Generator) buildEnv(cfg *config.Config, projectName string, isExample b
 // loadLaravelBaseEnv reads and parses the version-appropriate Laravel .env.example template,
 // prepending the Frank header and substituting APP_NAME with the project name.
 func (g *Generator) loadLaravelBaseEnv(version, projectName string) ([]envLine, error) {
-	templateVersion := "12.x" // covers latest, 12.x, 13.x (all identical)
-	if version == "11.x" {
+	templateVersion := "13.x" // default: latest
+	switch version {
+	case "11.x":
 		templateVersion = "11.x"
+	case "12.x":
+		templateVersion = "12.x"
 	}
 
 	raw, err := g.engine.ReadFile(fmt.Sprintf("templates/laravel/%s/.env.example", templateVersion))

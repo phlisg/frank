@@ -215,6 +215,63 @@ func TestWriteEnv_CreatesBothFiles(t *testing.T) {
 	}
 }
 
+func TestGenerateEnv_Laravel11(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:     config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel: config.Laravel{Version: "11.x"},
+	}
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+	if !strings.Contains(out, "PHP_CLI_SERVER_WORKERS=4") {
+		t.Error("expected PHP_CLI_SERVER_WORKERS=4 to be active for Laravel 11.x")
+	}
+	if strings.Contains(out, "#PHP_CLI_SERVER_WORKERS=4") {
+		t.Error("PHP_CLI_SERVER_WORKERS should not be disabled for Laravel 11.x")
+	}
+}
+
+func TestGenerateEnv_Laravel12(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:     config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel: config.Laravel{Version: "12.x"},
+	}
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+	// Must be present as a disabled key, not active
+	if !strings.Contains(out, "#PHP_CLI_SERVER_WORKERS=4") {
+		t.Error("expected #PHP_CLI_SERVER_WORKERS=4 (disabled) for Laravel 12.x")
+	}
+	if strings.Contains(out, "\nPHP_CLI_SERVER_WORKERS=4") {
+		t.Error("PHP_CLI_SERVER_WORKERS must not be active for Laravel 12.x")
+	}
+}
+
+func TestGenerateEnv_Laravel13(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:     config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel: config.Laravel{Version: "13.x"},
+	}
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+	// 13.x template is identical to 12.x — PHP_CLI_SERVER_WORKERS must not be active
+	if strings.Contains(out, "\nPHP_CLI_SERVER_WORKERS=4") {
+		t.Error("PHP_CLI_SERVER_WORKERS should not be active for Laravel 13.x")
+	}
+	// Verify it loaded (not a fallback error)
+	if !strings.Contains(out, "APP_NAME=myapp") {
+		t.Error("expected APP_NAME=myapp in output")
+	}
+}
+
 // extractKeys returns all non-comment KEY names from a .env string.
 func extractKeys(env string) []string {
 	var keys []string
