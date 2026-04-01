@@ -144,8 +144,23 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 	// .env and .env.example must expose the same set of keys
 	envKeys := extractTestKeys(env)
 	exampleKeys := extractTestKeys(example)
-	if len(envKeys) != len(exampleKeys) {
-		t.Errorf(".env has %d keys, .env.example has %d — they must match", len(envKeys), len(exampleKeys))
+	envKeySet := make(map[string]bool, len(envKeys))
+	for _, k := range envKeys {
+		envKeySet[k] = true
+	}
+	for _, k := range exampleKeys {
+		if !envKeySet[k] {
+			t.Errorf(".env.example has key %q not present in .env", k)
+		}
+	}
+	exKeySet := make(map[string]bool, len(exampleKeys))
+	for _, k := range exampleKeys {
+		exKeySet[k] = true
+	}
+	for _, k := range envKeys {
+		if !exKeySet[k] {
+			t.Errorf(".env has key %q not present in .env.example", k)
+		}
 	}
 
 	// Dockerfile must embed the configured PHP version
@@ -170,7 +185,7 @@ func readTestFile(t *testing.T, dir, name string) string {
 // the two packages cannot share test helpers in Go.
 func extractTestKeys(env string) []string {
 	var keys []string
-	for _, line := range strings.Split(env, "\n") {
+	for line := range strings.SplitSeq(env, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
