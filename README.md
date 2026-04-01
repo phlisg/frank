@@ -98,7 +98,7 @@ frank up -d
 
 Starts all services in the background, runs `composer install`, and runs `php artisan migrate`.
 
-Visit [http://localhost:8000](http://localhost:8000) — you should see the Laravel welcome page.
+Visit [http://localhost](http://localhost) — you should see the Laravel welcome page.
 
 #### 4. Set up shell aliases (once)
 
