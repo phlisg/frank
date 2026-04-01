@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"runtime/debug"
 
 	"github.com/phlisg/frank/cmd"
 )
@@ -9,8 +10,10 @@ import (
 //go:embed templates
 var templateFS embed.FS
 
-var version = "dev"
-
 func main() {
+	version := "dev"
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
 	cmd.Execute(templateFS, version)
 }
