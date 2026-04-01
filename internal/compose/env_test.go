@@ -59,6 +59,7 @@ func TestGenerateEnv_PgsqlOverridesDB(t *testing.T) {
 		"DB_USERNAME=sail",
 		"DB_PASSWORD=password",
 		"DB_SSLMODE=prefer",
+		"DB_URL=postgresql://sail:password@pgsql:5432/myapp",
 	}
 	for _, want := range checks {
 		if !strings.Contains(out, want) {
