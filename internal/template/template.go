@@ -90,6 +90,15 @@ func (e *Engine) RenderServiceCompose(service string, cfg config.ServiceConfig, 
 	return e.Render(path.Join("templates", "services", service, "compose.fragment.tmpl"), data)
 }
 
+// ReadFile reads raw file content from the engine's FS.
+func (e *Engine) ReadFile(filePath string) (string, error) {
+	data, err := fs.ReadFile(e.fs, filePath)
+	if err != nil {
+		return "", fmt.Errorf("read %q: %w", filePath, err)
+	}
+	return string(data), nil
+}
+
 // RenderServiceEnv renders the env.tmpl for a service.
 func (e *Engine) RenderServiceEnv(service string, cfg config.ServiceConfig, projectName string) (string, error) {
 	data := e.serviceData(service, cfg, projectName)
