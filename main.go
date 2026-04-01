@@ -7,7 +7,7 @@ import (
 	"github.com/phlisg/frank/cmd"
 )
 
-//go:embed templates
+//go:embed all:templates
 var templateFS embed.FS
 
 func main() {
