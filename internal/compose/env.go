@@ -9,17 +9,25 @@ import (
 	"github.com/phlisg/frank/internal/config"
 )
 
-// envLine is a single line in a .env file — either a KEY=VALUE pair or a comment/blank.
+// envLine is a single line in a .env file.
+// Exactly one of three states applies:
+//   - comment=true              → pure comment or blank line (never touched by merge)
+//   - comment=false, disabled=true  → commented-out key (#KEY=value) — can be enabled by merge
+//   - comment=false, disabled=false → active key=value pair
 type envLine struct {
-	comment bool
-	key     string
-	value   string
+	comment  bool
+	disabled bool
+	key      string
+	value    string
 }
 
 func comment(text string) envLine { return envLine{comment: true, value: text} }
 func blank() envLine              { return envLine{comment: true, value: ""} }
 func kv(key, value string) envLine {
 	return envLine{key: key, value: value}
+}
+func disabled(key, value string) envLine {
+	return envLine{disabled: true, key: key, value: value}
 }
 
 // envHeader is the standard generated-by comment.
@@ -211,6 +219,12 @@ func marshalEnv(lines []envLine) string {
 				sb.WriteString(line.value)
 				sb.WriteByte('\n')
 			}
+		} else if line.disabled {
+			sb.WriteByte('#')
+			sb.WriteString(line.key)
+			sb.WriteByte('=')
+			sb.WriteString(line.value)
+			sb.WriteByte('\n')
 		} else {
 			sb.WriteString(line.key)
 			sb.WriteByte('=')

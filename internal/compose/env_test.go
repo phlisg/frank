@@ -272,6 +272,24 @@ func TestGenerateEnv_Laravel13(t *testing.T) {
 	}
 }
 
+func TestMarshalEnv_DisabledLine(t *testing.T) {
+	lines := []envLine{
+		kv("ACTIVE", "value"),
+		{disabled: true, key: "DISABLED_KEY", value: "original"},
+		comment("# a comment"),
+	}
+	out := marshalEnv(lines)
+	if !strings.Contains(out, "ACTIVE=value\n") {
+		t.Error("expected ACTIVE=value")
+	}
+	if !strings.Contains(out, "#DISABLED_KEY=original\n") {
+		t.Error("expected #DISABLED_KEY=original (no space)")
+	}
+	if strings.Contains(out, "\nDISABLED_KEY=original\n") {
+		t.Error("disabled key must not appear as active KEY=value")
+	}
+}
+
 // extractKeys returns all non-comment KEY names from a .env string.
 func extractKeys(env string) []string {
 	var keys []string
