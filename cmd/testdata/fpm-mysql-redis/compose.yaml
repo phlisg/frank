@@ -6,6 +6,8 @@ networks:
 services:
     laravel.test:
         build:
+            args:
+                WWWGROUP: ${GID:-1000}
             context: .
             dockerfile: Dockerfile
         env_file:
@@ -15,11 +17,11 @@ services:
             - APP_DEBUG=true
             - PSYSH_CONFIG=/var/www/html/.psysh.php
             - PSYSH_HOME=/var/www/html/storage/psysh
+            - WWWUSER=${UID:-1000}
         networks:
             - frank
         stdin_open: true
         tty: true
-        user: ${UID:-1000}:${GID:-1000}
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html

@@ -6,6 +6,8 @@ networks:
 services:
     laravel.test:
         build:
+            args:
+                WWWGROUP: ${GID:-1000}
             context: .
         env_file:
             - .env
@@ -15,6 +17,7 @@ services:
             - SERVER_NAME=:80
             - PSYSH_CONFIG=/var/www/html/.psysh.php
             - PSYSH_HOME=/var/www/html/storage/psysh
+            - WWWUSER=${UID:-1000}
         networks:
             - frank
         ports:
@@ -24,7 +27,6 @@ services:
             - 5173:5173
         stdin_open: true
         tty: true
-        user: ${UID:-1000}:${GID:-1000}
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html

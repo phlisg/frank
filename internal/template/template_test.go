@@ -217,3 +217,37 @@ func TestNonSqliteServicesHaveComposeFragment(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderRuntimeCompose_FPM_SailUser(t *testing.T) {
+	e := newTestEngine(t)
+	out, err := e.RenderRuntime("fpm", "compose.fragment.tmpl", Data{PHPVersion: "8.4"})
+	if err != nil {
+		t.Fatalf("RenderRuntime error: %v", err)
+	}
+	if !strings.Contains(out, "WWWGROUP") {
+		t.Error("expected WWWGROUP build arg in fpm compose fragment")
+	}
+	if !strings.Contains(out, "WWWUSER") {
+		t.Error("expected WWWUSER env var in fpm compose fragment")
+	}
+	if strings.Contains(out, "user: ") {
+		t.Error("fpm compose fragment must not contain user: directive (gosu handles it)")
+	}
+}
+
+func TestRenderRuntimeCompose_FrankenPHP_SailUser(t *testing.T) {
+	e := newTestEngine(t)
+	out, err := e.RenderRuntime("frankenphp", "compose.fragment.tmpl", Data{PHPVersion: "8.4"})
+	if err != nil {
+		t.Fatalf("RenderRuntime error: %v", err)
+	}
+	if !strings.Contains(out, "WWWGROUP") {
+		t.Error("expected WWWGROUP build arg in frankenphp compose fragment")
+	}
+	if !strings.Contains(out, "WWWUSER") {
+		t.Error("expected WWWUSER env var in frankenphp compose fragment")
+	}
+	if strings.Contains(out, "user: ") {
+		t.Error("frankenphp compose fragment must not contain user: directive (gosu handles it)")
+	}
+}
