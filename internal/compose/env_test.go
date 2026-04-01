@@ -290,6 +290,86 @@ func TestMarshalEnv_DisabledLine(t *testing.T) {
 	}
 }
 
+func TestParseFullEnvFile_DisabledKey(t *testing.T) {
+	input := "ACTIVE=yes\n# DB_HOST=127.0.0.1\n#DB_PORT=3306\n# This is a comment\n"
+	lines := parseFullEnvFile(input)
+
+	var active, disabledHost, disabledPort, pureComment envLine
+	for _, l := range lines {
+		switch {
+		case !l.comment && !l.disabled && l.key == "ACTIVE":
+			active = l
+		case l.disabled && l.key == "DB_HOST":
+			disabledHost = l
+		case l.disabled && l.key == "DB_PORT":
+			disabledPort = l
+		case l.comment && l.value == "# This is a comment":
+			pureComment = l
+		}
+	}
+
+	if active.key != "ACTIVE" || active.value != "yes" {
+		t.Error("expected active ACTIVE=yes")
+	}
+	if disabledHost.key != "DB_HOST" || disabledHost.value != "127.0.0.1" {
+		t.Errorf("expected disabled DB_HOST=127.0.0.1, got key=%q value=%q", disabledHost.key, disabledHost.value)
+	}
+	if disabledPort.key != "DB_PORT" || disabledPort.value != "3306" {
+		t.Errorf("expected disabled DB_PORT=3306, got key=%q value=%q", disabledPort.key, disabledPort.value)
+	}
+	if pureComment.value != "# This is a comment" {
+		t.Error("expected pure comment line preserved")
+	}
+}
+
+func TestGenerateEnv_DisabledKeyEnabled(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql"},
+	}
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+	// These were commented-out in the base template — should now be active
+	for _, want := range []string{
+		"DB_HOST=pgsql",
+		"DB_PORT=5432",
+		"DB_DATABASE=myapp",
+		"DB_USERNAME=sail",
+		"DB_PASSWORD=password",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Errorf("expected active %q in output", want)
+		}
+		if strings.Contains(out, "#"+want) {
+			t.Errorf("%q must not appear as a disabled key", want)
+		}
+	}
+}
+
+func TestGenerateEnv_DisabledKeyUnchanged(t *testing.T) {
+	g := newTestGenerator(t)
+	// No database service — DB_HOST should remain disabled
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{},
+	}
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+	if !strings.Contains(out, "#DB_HOST=127.0.0.1") {
+		t.Error("expected #DB_HOST=127.0.0.1 (disabled) when no DB service configured")
+	}
+	if strings.Contains(out, "\nDB_HOST=") {
+		t.Error("DB_HOST must not be active when no DB service is configured")
+	}
+}
+
 // extractKeys returns all non-comment KEY names from a .env string.
 func extractKeys(env string) []string {
 	var keys []string

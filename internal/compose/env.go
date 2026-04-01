@@ -105,7 +105,7 @@ func (g *Generator) loadLaravelBaseEnv(version, projectName string) ([]envLine, 
 
 	lines := parseFullEnvFile(raw)
 	for i, line := range lines {
-		if !line.comment && line.key == "APP_NAME" {
+		if !line.comment && !line.disabled && line.key == "APP_NAME" {
 			lines[i].value = projectName
 			break
 		}
@@ -115,9 +115,10 @@ func (g *Generator) loadLaravelBaseEnv(version, projectName string) ([]envLine, 
 }
 
 // mergeEnvBlock merges a service env block into base lines.
-// Keys that already exist as active lines are replaced in-place.
-// Keys not found are appended as a labeled section.
+// Active and disabled keys are both indexed. Service vars replace active key values in-place,
+// and enable (uncomment) disabled keys. Keys not found in the template are appended as extras.
 func mergeEnvBlock(base []envLine, svc string, block []envLine) []envLine {
+	// Index both active and disabled lines (anything with comment=false).
 	keyIndex := map[string]int{}
 	for i, line := range base {
 		if !line.comment {
@@ -132,6 +133,7 @@ func mergeEnvBlock(base []envLine, svc string, block []envLine) []envLine {
 	for _, bline := range block {
 		if idx, exists := keyIndex[bline.key]; exists {
 			result[idx].value = bline.value
+			result[idx].disabled = false // enable commented-out keys in-place
 		} else {
 			newLines = append(newLines, bline)
 		}
@@ -145,7 +147,27 @@ func mergeEnvBlock(base []envLine, svc string, block []envLine) []envLine {
 	return result
 }
 
+// isEnvKey returns true if s is a valid env var name: starts with A-Z, followed by A-Z, 0-9, or _.
+func isEnvKey(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, c := range s {
+		if i == 0 && !(c >= 'A' && c <= 'Z') {
+			return false
+		}
+		if i > 0 && !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // parseFullEnvFile parses a .env file string into envLine values, preserving all lines.
+// Lines beginning with "#" are examined: if after stripping "#" and an optional space the
+// remainder matches KEY=value (KEY is [A-Z][A-Z0-9_]*), it becomes a disabled envLine.
+// Otherwise it is a pure comment. Parsing is liberal (accepts "# KEY=" and "#KEY=");
+// serialisation is canonical (#KEY=value, no space).
 func parseFullEnvFile(content string) []envLine {
 	var lines []envLine
 	for _, raw := range strings.Split(content, "\n") {
@@ -154,15 +176,23 @@ func parseFullEnvFile(content string) []envLine {
 			continue
 		}
 		if strings.HasPrefix(raw, "#") {
+			rest := raw[1:]
+			if len(rest) > 0 && rest[0] == ' ' {
+				rest = rest[1:]
+			}
+			if eqIdx := strings.IndexByte(rest, '='); eqIdx > 0 && isEnvKey(rest[:eqIdx]) {
+				lines = append(lines, disabled(rest[:eqIdx], rest[eqIdx+1:]))
+				continue
+			}
 			lines = append(lines, comment(raw))
 			continue
 		}
-		idx := strings.IndexByte(raw, '=')
-		if idx < 0 {
+		eqIdx := strings.IndexByte(raw, '=')
+		if eqIdx < 0 {
 			lines = append(lines, comment(raw))
 			continue
 		}
-		lines = append(lines, kv(raw[:idx], raw[idx+1:]))
+		lines = append(lines, kv(raw[:eqIdx], raw[eqIdx+1:]))
 	}
 	// trim trailing blank lines
 	for len(lines) > 0 && lines[len(lines)-1].comment && lines[len(lines)-1].value == "" {
