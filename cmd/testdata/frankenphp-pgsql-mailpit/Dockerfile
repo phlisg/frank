@@ -46,6 +46,9 @@ ARG POSTGRES_VERSION=17
 ARG MYSQL_CLIENT=mysql-client
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Runtime libs for compiled extensions + system tools
 # Runtime lib names are Debian trixie-specific (the FrankenPHP base OS as of 2026-04).

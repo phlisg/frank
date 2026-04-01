@@ -15,7 +15,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN mkdir -p /etc/apt/keyrings \
     && apt-get update && apt-get install -y --no-install-recommends \
         gnupg gosu curl ca-certificates zip unzip git supervisor \
-        sqlite3 libcap2-bin libpng-dev libgd3 python3 dnsutils \
+        sqlite3 libgd3 python3 dnsutils \
         librsvg2-bin fswatch ffmpeg nano \
     && rm -rf /usr/share/man /usr/share/doc \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -58,7 +58,7 @@ RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
 # Database clients
 RUN curl -sS https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         | gpg --dearmor | tee /etc/apt/keyrings/pgdg.gpg > /dev/null \
-    && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+    && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
