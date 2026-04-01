@@ -146,9 +146,9 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 			huh.NewSelect[string]().
 				Title("Laravel Version").
 				Options(
-					huh.NewOption("12.x (latest)", "12.*"),
-					huh.NewOption("11.x (LTS)", "11.*"),
-					huh.NewOption("10.x", "10.*"),
+					huh.NewOption("13.x (latest)", "13.*"),
+					huh.NewOption("12.x (LTS)", "12.*"),
+					huh.NewOption("11.x", "11.*"),
 				).
 				Value(&cfg.Laravel.Version),
 		),
