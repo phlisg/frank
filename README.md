@@ -63,7 +63,7 @@ That's it. No local PHP version juggling, no Homebrew conflicts, no "works on my
 
 ### 📖 Complete Example
 
-A full walkthrough from zero to a running Laravel app — no local PHP needed.
+A full walkthrough from zero to a running Laravel app using Docker.
 
 **Scenario:** New project with PostgreSQL, Redis (cache + queues), and Mailpit for local email.
 
