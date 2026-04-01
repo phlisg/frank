@@ -2,6 +2,7 @@ package compose
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -367,6 +368,45 @@ func TestGenerateEnv_DisabledKeyUnchanged(t *testing.T) {
 	}
 	if strings.Contains(out, "\nDB_HOST=") {
 		t.Error("DB_HOST must not be active when no DB service is configured")
+	}
+}
+
+func TestWriteEnv_AppKeyPreserved(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql"},
+	}
+	dir := t.TempDir()
+
+	// Simulate a .env already written by composer create-project with a generated key.
+	existing := "APP_KEY=base64:testkey==\nAPP_ENV=local\n"
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(existing), 0644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	if err := g.WriteEnv(cfg, "myapp", dir); err != nil {
+		t.Fatalf("WriteEnv error: %v", err)
+	}
+
+	env, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		t.Fatalf("read .env: %v", err)
+	}
+	example, err := os.ReadFile(filepath.Join(dir, ".env.example"))
+	if err != nil {
+		t.Fatalf("read .env.example: %v", err)
+	}
+
+	if !strings.Contains(string(env), "APP_KEY=base64:testkey==") {
+		t.Errorf(".env should contain preserved APP_KEY, got:\n%s", string(env))
+	}
+	if strings.Contains(string(example), "APP_KEY=base64") {
+		t.Error(".env.example must not contain real APP_KEY")
+	}
+	if !strings.Contains(string(example), "APP_KEY=") {
+		t.Error(".env.example must still contain APP_KEY= key")
 	}
 }
 
