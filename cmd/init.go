@@ -29,6 +29,29 @@ var initCmd = &cobra.Command{
 func runInit(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
+	// If --dir was explicitly set and the directory doesn't exist, offer to create it.
+	if Dir != "" {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			var create bool
+			prompt := huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title(fmt.Sprintf("Directory %q does not exist. Create it?", dir)).
+						Value(&create),
+				),
+			)
+			if err := prompt.Run(); err != nil {
+				return err
+			}
+			if !create {
+				return fmt.Errorf("directory %q does not exist", dir)
+			}
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("create directory: %w", err)
+			}
+		}
+	}
+
 	existingCompose := detectExistingCompose(dir)
 
 	cfg := config.New()
@@ -54,6 +77,16 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("8.2", "8.2"),
 				).
 				Value(&cfg.PHP.Version),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Laravel Version").
+				Options(
+					huh.NewOption("13.x (latest)", "13.*"),
+					huh.NewOption("12.x (LTS)", "12.*"),
+					huh.NewOption("11.x", "11.*"),
+				).
+				Value(&cfg.Laravel.Version),
 		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -108,6 +141,16 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("8.2", "8.2"),
 				).
 				Value(&cfg.PHP.Version),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Laravel Version").
+				Options(
+					huh.NewOption("13.x (latest)", "13.*"),
+					huh.NewOption("12.x (LTS)", "12.*"),
+					huh.NewOption("11.x", "11.*"),
+				).
+				Value(&cfg.Laravel.Version),
 		),
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
