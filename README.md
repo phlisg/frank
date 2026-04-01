@@ -61,6 +61,110 @@ That's it. No local PHP version juggling, no Homebrew conflicts, no "works on my
 
 ---
 
+### 📖 Complete Example
+
+A full walkthrough from zero to a running Laravel app using Docker.
+
+**Scenario:** New project with PostgreSQL, Redis (cache + queues), and Mailpit for local email.
+
+#### 1. Create the project directory and run the wizard
+
+```bash
+mkdir my-app && cd my-app
+frank init
+```
+
+The wizard will ask:
+- **PHP Version** → 8.4
+- **Laravel Version** → 12.x (latest)
+- **Runtime** → FrankenPHP (recommended)
+- **Services** → pgsql, redis, mailpit
+
+This writes `frank.yaml` and generates `compose.yaml`, `Dockerfile`, `Caddyfile`, `.env`, and `.env.example`.
+
+#### 2. Install Laravel
+
+```bash
+frank install
+```
+
+Spins up a disposable `composer:latest` container, creates a fresh Laravel project, moves the files into your directory, and patches Vite for Docker HMR. No local PHP required.
+
+#### 3. Start containers
+
+```bash
+frank up -d
+```
+
+Starts all services in the background, runs `composer install`, and runs `php artisan migrate`.
+
+Visit [http://localhost](http://localhost) — you should see the Laravel welcome page.
+
+#### 4. Set up shell aliases (once)
+
+```bash
+eval "$(frank shell-setup)" >> ~/.zshrc   # or ~/.bashrc
+source ~/.zshrc
+```
+
+From now on, aliases activate automatically when you `cd` into a Frank project. You now have:
+
+```bash
+artisan make:model Post -mcr    # runs inside the container
+composer require spatie/laravel-query-builder
+php -r "echo PHP_VERSION;"
+tinker                          # interactive REPL with full app context
+psql                            # drop into PostgreSQL
+```
+
+#### 5. Configure `.env` for Redis cache and queues
+
+The generated `.env` already has `REDIS_HOST=redis`. Just set the drivers:
+
+```dotenv
+CACHE_STORE=redis
+QUEUE_CONNECTION=redis
+```
+
+Then restart if needed:
+
+```bash
+frank down && frank up -d
+```
+
+#### 6. Day-to-day development
+
+```bash
+artisan make:controller Api/PostController --resource
+artisan migrate:fresh --seed
+artisan queue:work                  # runs in foreground inside container
+npm run dev                         # Vite HMR on http://localhost:5173
+```
+
+Visit [http://localhost:8025](http://localhost:8025) for the Mailpit inbox — any mail your app sends in local dev lands here.
+
+#### 7. Add a service later
+
+```bash
+frank add meilisearch
+```
+
+Updates `frank.yaml`, regenerates `compose.yaml` and `.env.example`. Run `frank up -d` again to start the new container.
+
+#### 8. Onboard a team member
+
+They only need:
+
+```bash
+git clone ...
+cd my-app
+frank up -d        # containers start, migrate runs
+```
+
+That's it — no local PHP, no Composer, no version conflicts.
+
+---
+
 ### 🗒 Example frank.yaml
 
 Not sure where to start? Here's a solid default you can drop straight into your project — Laravel 12 LTS, PHP-FPM, MariaDB, Memcached, and Mailpit for local mail:
@@ -179,7 +283,7 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
 | `frank remove <service>` | Remove a service from `frank.yaml` and regenerate |
-| `frank up [--quick]` | Start containers; `--quick` skips composer install + migrate |
+| `frank up [-d] [--quick] [flags…]` | Start containers; `-d` for detached, `--quick` skips composer install + migrate; all other flags pass through to `docker compose up` |
 | `frank down` | Stop containers |
 | `frank ps` | Show running containers |
 | `frank clean` | Stop containers and delete volumes |
