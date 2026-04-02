@@ -108,7 +108,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// patchViteConfig adds server.host = '0.0.0.0' to vite.config.js for Docker HMR.
+// patchViteConfig patches vite.config.js for Docker HMR: binds to all interfaces,
+// enables CORS, uses polling (inotify unreliable over volume mounts), and allows
+// serving files from the project root.
 func patchViteConfig(dir string) error {
 	path := filepath.Join(dir, "vite.config.js")
 	data, err := os.ReadFile(path)
@@ -121,16 +123,33 @@ func patchViteConfig(dir string) error {
 
 	content := string(data)
 
-	if strings.Contains(content, "server.host") || strings.Contains(content, "'0.0.0.0'") {
+	if strings.Contains(content, "'0.0.0.0'") {
 		return nil
 	}
 
-	patched := strings.Replace(
-		content,
-		"defineConfig({",
-		"defineConfig({\n    server: { host: '0.0.0.0' },",
-		1,
-	)
+	const dockerServer = `server: {
+        host: '0.0.0.0',
+        cors: true,
+        hmr: { host: 'localhost' },
+        watch: {
+            usePolling: true,`
+
+	var patched string
+	if strings.Contains(content, "server:") {
+		// Merge into existing server block instead of adding a duplicate key.
+		patched = strings.Replace(content, "server: {\n        watch: {", dockerServer, 1)
+		if patched == content {
+			// Fallback: server block has different indentation/shape — inject at open brace.
+			patched = strings.Replace(content, "server: {", "server: {\n        host: '0.0.0.0',\n        cors: true,", 1)
+		}
+	} else {
+		patched = strings.Replace(
+			content,
+			"defineConfig({",
+			"defineConfig({\n    server: { host: '0.0.0.0', cors: true, hmr: { host: 'localhost' }, watch: { usePolling: true }, fs: { allow: ['.'] } },",
+			1,
+		)
+	}
 
 	if patched == content {
 		return nil
@@ -139,7 +158,7 @@ func patchViteConfig(dir string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
-	fmt.Println("  patched  vite.config.js (server.host = '0.0.0.0')")
+	fmt.Println("  patched  vite.config.js (Docker HMR)")
 	return nil
 }
 
