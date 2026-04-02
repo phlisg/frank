@@ -1,6 +1,8 @@
 laravel.test:
   build:
     context: .
+    args:
+      WWWGROUP: ${GID:-1000}
   ports:
     - "80:80"
     - "443:443"
@@ -16,9 +18,9 @@ laravel.test:
     - SERVER_NAME=:80
     - PSYSH_CONFIG=/var/www/html/.psysh.php
     - PSYSH_HOME=/var/www/html/storage/psysh
+    - WWWUSER=${UID:-1000}
   env_file:
     - .env
   working_dir: /var/www/html
   tty: true
-  user: "${UID:-1000}:${GID:-1000}"
   stdin_open: true

@@ -56,12 +56,16 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	// Post-start tasks — failures are logged but don't abort.
-	if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
+	if _, err := os.Stat(dir + "/composer.json"); err == nil {
+		if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
+		}
 	}
 
-	if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
+	if _, err := os.Stat(dir + "/artisan"); err == nil {
+		if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
+		}
 	}
 
 	return nil
