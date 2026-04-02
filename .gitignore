@@ -10,7 +10,7 @@
 .sidecar-base
 .td-root
 .claude
-docs/superpowers/
+docs/superpowers
 tmp/
 frank
 .worktrees/
