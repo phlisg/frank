@@ -15,9 +15,10 @@ func init() {
 }
 
 var generateCmd = &cobra.Command{
-	Use:          "generate",
-	Short:        "Generate Docker files from frank.yaml",
-	SilenceUsage: true,
+	Use:               "generate",
+	Short:             "Generate Docker files from frank.yaml",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := resolveDir()
 		cfg, err := config.Load(dir)

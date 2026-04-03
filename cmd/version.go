@@ -11,9 +11,10 @@ func init() {
 }
 
 var versionCmd = &cobra.Command{
-	Use:          "version",
-	Short:        "Print the frank version",
-	SilenceUsage: true,
+	Use:               "version",
+	Short:             "Print the frank version",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(rootCmd.Version)
 	},

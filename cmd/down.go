@@ -10,9 +10,10 @@ func init() {
 }
 
 var downCmd = &cobra.Command{
-	Use:          "down",
-	Short:        "Stop containers",
-	SilenceUsage: true,
+	Use:               "down",
+	Short:             "Stop containers",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return docker.New(resolveDir()).Down()
 	},

@@ -13,9 +13,10 @@ func init() {
 }
 
 var activateCmd = &cobra.Command{
-	Use:          "activate",
-	Short:        "Output shell aliases for the current project (eval this)",
-	SilenceUsage: true,
+	Use:               "activate",
+	Short:             "Output shell aliases for the current project (eval this)",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := resolveDir()
 		cfg, err := config.Load(dir)

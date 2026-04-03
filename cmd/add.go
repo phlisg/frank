@@ -18,7 +18,13 @@ var addCmd = &cobra.Command{
 	Short:        "Add a service to frank.yaml and regenerate",
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
-	RunE:         runAdd,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return config.AllServices(), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: runAdd,
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {

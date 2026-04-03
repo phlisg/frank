@@ -19,9 +19,14 @@ Add this to your shell profile (or let frank shell-setup handle it automatically
   # bash
   eval "$(frank completion bash)"`,
 	DisableFlagParsing: false,
-	ValidArgs:          []string{"bash", "zsh", "fish", "powershell"},
 	Args:               cobra.ExactArgs(1),
 	SilenceUsage:       true,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"bash", "zsh", "fish", "powershell"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		switch args[0] {
 		case "bash":

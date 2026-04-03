@@ -16,7 +16,13 @@ var removeCmd = &cobra.Command{
 	Short:        "Remove a service from frank.yaml and regenerate",
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
-	RunE:         runRemove,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return config.AllServices(), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: runRemove,
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
