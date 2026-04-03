@@ -2,27 +2,25 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
+	"strings"
 
+	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
 
-var exportPath string
-
 func init() {
-	exportCmd.Flags().StringVarP(&exportPath, "output", "o", "", "output path for exported docker-compose.yml (defaults to ./docker-compose.yml)")
 	rootCmd.AddCommand(exportCmd)
 }
 
 var exportCmd = &cobra.Command{
 	Use:   "export",
-	Short: "Export Frank-generated files as a Sail-compatible docker-compose.yml",
-	Long: `Copies the Frank-generated compose.yaml to docker-compose.yml (or a custom path).
+	Short: "Install Laravel Sail into the running project containers",
+	Long: `Delegates to Laravel Sail's own installer (sail:install) running inside
+the laravel.test container. Sail will generate its own docker-compose.yml,
+docker/ folder, and related files.
 
-Frank uses Sail-compatible service naming natively, so no conversion is needed.
-This is a best-effort export — custom Dockerfile modifications are not preserved.`,
+Requires containers to be running — run frank up first.`,
 	SilenceUsage: true,
 	RunE:         runExport,
 }
@@ -30,39 +28,38 @@ This is a best-effort export — custom Dockerfile modifications are not preserv
 func runExport(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
-	src := filepath.Join(dir, "compose.yaml")
-	if _, err := os.Stat(src); os.IsNotExist(err) {
-		return fmt.Errorf("compose.yaml not found — run frank generate first")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
 	}
 
-	dst := exportPath
-	if dst == "" {
-		dst = filepath.Join(dir, "docker-compose.yml")
+	client := docker.New(dir)
+	state, _, _ := client.ContainerStatus()
+	if state != docker.StateRunning {
+		return fmt.Errorf("containers are not running — run frank up first")
 	}
 
-	if err := copyFile(src, dst); err != nil {
-		return fmt.Errorf("export failed: %w", err)
+	// Build --with list: map Frank services to Sail equivalents, dropping sqlite.
+	var sailServices []string
+	for _, svc := range cfg.Services {
+		if svc == "sqlite" {
+			continue
+		}
+		sailServices = append(sailServices, svc)
+	}
+	withList := strings.Join(sailServices, ",")
+
+	if err := client.Exec("laravel.test", "composer", "require", "laravel/sail", "--dev"); err != nil {
+		return fmt.Errorf("composer require laravel/sail failed: %w", err)
 	}
 
-	fmt.Printf("  exported  compose.yaml → %s\n", dst)
+	if err := client.Exec("laravel.test", "php", "artisan", "sail:install",
+		"--with="+withList,
+		"--php="+cfg.PHP.Version,
+	); err != nil {
+		return fmt.Errorf("sail:install failed: %w", err)
+	}
+
+	fmt.Println("  export complete  run vendor/bin/sail up to start containers")
 	return nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
 }
