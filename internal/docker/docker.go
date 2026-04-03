@@ -149,7 +149,8 @@ func parseContainerStatus(out string) (ContainerState, int, int) {
 
 // composeCmd builds an exec.Cmd for `docker compose <args>` in the project dir.
 func (c *Client) composeCmd(args ...string) *exec.Cmd {
-	cmdArgs := append([]string{"compose"}, args...)
+	prefix := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml"}
+	cmdArgs := append(prefix, args...)
 	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = c.dir
 	return cmd
