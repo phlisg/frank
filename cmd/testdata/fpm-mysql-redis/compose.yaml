@@ -9,7 +9,7 @@ services:
             args:
                 WWWGROUP: ${GID:-1000}
             context: .
-            dockerfile: Dockerfile
+            dockerfile: .frank/Dockerfile
         env_file:
             - .env
         environment:
@@ -53,7 +53,7 @@ services:
     nginx:
         build:
             context: .
-            dockerfile: nginx.Dockerfile
+            dockerfile: .frank/nginx.Dockerfile
         depends_on:
             - laravel.test
         networks:
