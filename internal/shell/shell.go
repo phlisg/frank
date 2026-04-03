@@ -37,6 +37,24 @@ func Activate(cfg *config.Config) string {
 	return sb.String()
 }
 
+// Deactivate returns unalias commands for all aliases frank can ever set.
+// Uses the full superset — no frank.yaml needed — since deactivate runs when
+// leaving a frank directory.
+func Deactivate() string {
+	var sb strings.Builder
+	for _, name := range []string{
+		// Core aliases
+		"artisan", "composer", "php", "tinker", "npm", "bun",
+		// Service-conditional aliases
+		"psql", "mysql", "mariadb", "redis-cli",
+	} {
+		sb.WriteString("unalias ")
+		sb.WriteString(name)
+		sb.WriteString(" 2>/dev/null || true\n")
+	}
+	return sb.String()
+}
+
 // ShellSetup returns eval-able shell hooks for auto-activating on directory change.
 // If shell is empty, it is detected from $SHELL.
 func ShellSetup(shell string) string {
@@ -71,7 +89,7 @@ func zshHook() string {
   if [[ -f frank.yaml ]]; then
     eval "$(frank activate)"
   else
-    unalias artisan composer php tinker npm bun psql mysql mariadb redis-cli 2>/dev/null || true
+    eval "$(frank deactivate)"
   fi
 }
 chpwd_functions+=(frank_chpwd)
@@ -84,7 +102,7 @@ func bashHook() string {
   if [[ -f frank.yaml ]]; then
     eval "$(frank activate)"
   else
-    unalias artisan composer php tinker npm bun psql mysql mariadb redis-cli 2>/dev/null || true
+    eval "$(frank deactivate)"
   fi
 }
 alias cd=frank_cd
