@@ -7,49 +7,49 @@ import (
 	"github.com/phlisg/frank/internal/config"
 )
 
+const execSail = "docker compose exec --user sail laravel.test"
+
+// aliasTable defines all aliases managed by frank activate/deactivate.
+// service is empty for core aliases; non-empty entries are only activated
+// when cfg.HasService(service) is true.
+var aliasTable = []struct {
+	name    string
+	cmd     string
+	service string
+}{
+	// Core aliases — always present regardless of service selection
+	{"artisan", execSail + " php artisan", ""},
+	{"composer", execSail + " composer", ""},
+	{"php", execSail + " php", ""},
+	{"tinker", execSail + " php artisan tinker", ""},
+	{"npm", execSail + " npm", ""},
+	{"bun", execSail + " bun", ""},
+	// Service-conditional aliases
+	{"psql", "docker compose exec pgsql psql -U sail", "pgsql"},
+	{"mysql", "docker compose exec db mysql -u root -proot", "mysql"},
+	{"mariadb", "docker compose exec mariadb mariadb -u root -proot", "mariadb"},
+	{"redis-cli", "docker compose exec redis redis-cli", "redis"},
+}
+
 // Activate returns eval-able shell aliases for the current project.
 // Core aliases always present; service aliases added based on cfg.
 func Activate(cfg *config.Config) string {
 	var sb strings.Builder
-
-	// Core aliases — always present regardless of service selection
-	alias(&sb, "artisan", "docker compose exec --user sail laravel.test php artisan")
-	alias(&sb, "composer", "docker compose exec --user sail laravel.test composer")
-	alias(&sb, "php", "docker compose exec --user sail laravel.test php")
-	alias(&sb, "tinker", "docker compose exec --user sail laravel.test php artisan tinker")
-	alias(&sb, "npm", "docker compose exec --user sail laravel.test npm")
-	alias(&sb, "bun", "docker compose exec --user sail laravel.test bun")
-
-	// Service-conditional aliases
-	if cfg.HasService("pgsql") {
-		alias(&sb, "psql", "docker compose exec pgsql psql -U sail")
+	for _, a := range aliasTable {
+		if a.service != "" && !cfg.HasService(a.service) {
+			continue
+		}
+		alias(&sb, a.name, a.cmd)
 	}
-	if cfg.HasService("mysql") {
-		alias(&sb, "mysql", "docker compose exec db mysql -u root -proot")
-	}
-	if cfg.HasService("mariadb") {
-		alias(&sb, "mariadb", "docker compose exec mariadb mariadb -u root -proot")
-	}
-	if cfg.HasService("redis") {
-		alias(&sb, "redis-cli", "docker compose exec redis redis-cli")
-	}
-
 	return sb.String()
 }
 
 // Deactivate returns unalias commands for all aliases frank can ever set.
-// Uses the full superset — no frank.yaml needed — since deactivate runs when
-// leaving a frank directory.
 func Deactivate() string {
 	var sb strings.Builder
-	for _, name := range []string{
-		// Core aliases
-		"artisan", "composer", "php", "tinker", "npm", "bun",
-		// Service-conditional aliases
-		"psql", "mysql", "mariadb", "redis-cli",
-	} {
+	for _, a := range aliasTable {
 		sb.WriteString("unalias ")
-		sb.WriteString(name)
+		sb.WriteString(a.name)
 		sb.WriteString(" 2>/dev/null || true\n")
 	}
 	return sb.String()
