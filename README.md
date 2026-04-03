@@ -289,7 +289,9 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 | `frank clean` | Stop containers and delete volumes |
 | `frank reset [--force]` | Delete all project files except `frank.yaml` and `.git` |
 | `frank activate` | Output eval-able shell aliases for the current project |
-| `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation |
+| `frank deactivate` | Output eval-able shell commands to remove all frank aliases |
+| `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
+| `frank completion [bash\|zsh\|fish\|powershell]` | Output shell completion script for the given shell |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank export [-o path]` | Export a Sail-compatible `docker-compose.yml` |
 | `frank version` | Print the frank binary version |
@@ -333,6 +335,12 @@ eval "$(frank shell-setup)"   # add once to ~/.zshrc or ~/.bashrc
 ```
 
 This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that watches for `frank.yaml` as you navigate directories. Step into a Frank project and aliases activate automatically. Step out and they're gone. No manual `eval` needed, no aliases leaking between projects.
+
+Shell completion is wired up at the same time — `frank <tab>`, `frank init --dir <tab>`, and subcommand completion all work out of the box once `shell-setup` is in your profile. If you want completion without the auto-activation hook, you can add it separately:
+
+```bash
+eval "$(frank completion zsh)"   # or bash / fish / powershell
+```
 
 ---
 
