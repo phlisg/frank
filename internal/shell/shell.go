@@ -13,12 +13,12 @@ func Activate(cfg *config.Config) string {
 	var sb strings.Builder
 
 	// Core aliases — always present regardless of service selection
-	alias(&sb, "artisan", "docker compose exec laravel.test php artisan")
-	alias(&sb, "composer", "docker compose exec laravel.test composer")
-	alias(&sb, "php", "docker compose exec laravel.test php")
-	alias(&sb, "tinker", "docker compose exec laravel.test php artisan tinker")
-	alias(&sb, "npm", "docker compose exec laravel.test npm")
-	alias(&sb, "bun", "docker compose exec laravel.test bun")
+	alias(&sb, "artisan", "docker compose exec --user sail laravel.test php artisan")
+	alias(&sb, "composer", "docker compose exec --user sail laravel.test composer")
+	alias(&sb, "php", "docker compose exec --user sail laravel.test php")
+	alias(&sb, "tinker", "docker compose exec --user sail laravel.test php artisan tinker")
+	alias(&sb, "npm", "docker compose exec --user sail laravel.test npm")
+	alias(&sb, "bun", "docker compose exec --user sail laravel.test bun")
 
 	// Service-conditional aliases
 	if cfg.HasService("pgsql") {
