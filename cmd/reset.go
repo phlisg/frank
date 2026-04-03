@@ -33,8 +33,9 @@ var resetCmd = &cobra.Command{
   .git/  frank.yaml  .dockerignore  .gitignore  README.md
 
 Use --force to skip the confirmation prompt.`,
-	SilenceUsage: true,
-	RunE:         runReset,
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
+	RunE:              runReset,
 }
 
 func runReset(cmd *cobra.Command, args []string) error {

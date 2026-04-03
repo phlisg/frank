@@ -10,9 +10,10 @@ func init() {
 }
 
 var cleanCmd = &cobra.Command{
-	Use:          "clean",
-	Short:        "Stop containers and remove volumes",
-	SilenceUsage: true,
+	Use:               "clean",
+	Short:             "Stop containers and remove volumes",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return docker.New(resolveDir()).Clean()
 	},

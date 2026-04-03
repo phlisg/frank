@@ -24,6 +24,7 @@ Examples:
   frank compose --dir /tmp/frank-test build`,
 	DisableFlagParsing: true,
 	SilenceUsage:       true,
+	ValidArgsFunction:  cobra.NoFileCompletions,
 	RunE:               runCompose,
 }
 
