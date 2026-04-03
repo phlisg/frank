@@ -22,7 +22,7 @@ func TestComposeCmd_Args(t *testing.T) {
 	}
 	// Args[0] is the binary path; check the rest.
 	args := cmd.Args[1:] // skip binary name
-	want := []string{"compose", "up", "-d", "--build"}
+	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up", "-d", "--build"}
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
@@ -63,7 +63,7 @@ func TestUp_NoArgs(t *testing.T) {
 	c := New("/proj")
 	cmd := c.composeCmd(upArgs()...)
 	args := cmd.Args[1:]
-	want := []string{"compose", "up"}
+	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up"}
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
@@ -78,7 +78,7 @@ func TestUp_WithDetach(t *testing.T) {
 	c := New("/proj")
 	cmd := c.composeCmd(upArgs("-d")...)
 	args := cmd.Args[1:]
-	want := []string{"compose", "up", "-d"}
+	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up", "-d"}
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
