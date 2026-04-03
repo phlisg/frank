@@ -50,9 +50,10 @@ sudo mv frank /usr/local/bin/
 ### 🚀 Quick Start
 
 ```bash
-frank init       # interactive wizard — creates frank.yaml and generates Docker files
-frank install    # install a fresh Laravel project inside the container
-frank up         # start containers, run composer install + migrate
+frank init my-app   # interactive wizard — creates my-app/, writes frank.yaml, generates Docker files
+cd my-app
+frank install       # install a fresh Laravel project inside the container
+frank up            # start containers, run composer install + migrate
 ```
 
 Visit [http://localhost](http://localhost) once `frank up` completes.
@@ -70,8 +71,8 @@ A full walkthrough from zero to a running Laravel app using Docker.
 #### 1. Create the project directory and run the wizard
 
 ```bash
-mkdir my-app && cd my-app
-frank init
+frank init my-app
+cd my-app
 ```
 
 The wizard will ask:
@@ -278,7 +279,7 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 
 | Command | Description |
 | ------- | ----------- |
-| `frank init` | Interactive wizard — creates `frank.yaml` and generates Docker files |
+| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory |
 | `frank generate` | Regenerate Docker files from `frank.yaml` without prompting |
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |

@@ -20,17 +20,55 @@ func init() {
 }
 
 var initCmd = &cobra.Command{
-	Use:          "init",
+	Use:          "init [dirname]",
 	Short:        "Interactive wizard to create frank.yaml",
 	SilenceUsage: true,
 	RunE:         runInit,
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	// positionalArg tracks whether the user specified a directory via positional arg
+	// (as opposed to --dir). Used later to print a helpful completion message.
+	var positionalArg string
+
+	// --dir always wins. Only consider the positional arg when --dir is not set.
+	if Dir == "" && len(args) > 0 {
+		positionalArg = args[0]
+		target := args[0]
+		if !filepath.IsAbs(target) {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			target = filepath.Join(cwd, target)
+		}
+
+		// If the directory exists, it must be empty.
+		if info, err := os.Stat(target); err == nil && info.IsDir() {
+			entries, err := os.ReadDir(target)
+			if err != nil {
+				return fmt.Errorf("read directory: %w", err)
+			}
+			if len(entries) > 0 {
+				return fmt.Errorf("directory %q already exists and is not empty", args[0])
+			}
+		} else if os.IsNotExist(err) {
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("create directory: %w", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("stat directory: %w", err)
+		}
+
+		// Temporarily set Dir so resolveDir() returns the target path.
+		Dir = target
+		defer func() { Dir = "" }()
+	}
+
 	dir := resolveDir()
 
 	// If --dir was explicitly set and the directory doesn't exist, offer to create it.
-	if Dir != "" {
+	if Dir != "" && positionalArg == "" {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			var create bool
 			prompt := huh.NewForm(
@@ -56,11 +94,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	cfg := config.New()
 
+	var initErr error
 	if sailMode {
-		return runSailInit(cfg, dir, existingCompose)
+		initErr = runSailInit(cfg, dir, existingCompose)
+	} else {
+		initErr = runFrankInit(cfg, dir, existingCompose)
 	}
 
-	return runFrankInit(cfg, dir, existingCompose)
+	if initErr == nil && positionalArg != "" {
+		fmt.Printf("\nCreated %s — cd %s to get started\n", positionalArg, positionalArg)
+	}
+
+	return initErr
 }
 
 func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
