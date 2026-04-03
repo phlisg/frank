@@ -2,6 +2,7 @@ package compose
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -145,13 +146,18 @@ func TestWrite_CreatesFile(t *testing.T) {
 	cfg := config.New()
 	dir := t.TempDir()
 
+	// Write() expects .frank/ to already exist (created by generate()).
+	if err := os.MkdirAll(filepath.Join(dir, ".frank"), 0755); err != nil {
+		t.Fatalf("mkdir .frank: %v", err)
+	}
+
 	if err := g.Write(cfg, "myapp", dir); err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
 
-	data, err := os.ReadFile(dir + "/compose.yaml")
+	data, err := os.ReadFile(filepath.Join(dir, ".frank", "compose.yaml"))
 	if err != nil {
-		t.Fatalf("compose.yaml not created: %v", err)
+		t.Fatalf(".frank/compose.yaml not created: %v", err)
 	}
 	if !strings.Contains(string(data), "laravel.test:") {
 		t.Error("expected laravel.test in written compose.yaml")

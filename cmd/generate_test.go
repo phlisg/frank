@@ -34,7 +34,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "13.x"},
 			Services: []string{"pgsql", "mailpit"},
 		},
-		files: []string{"compose.yaml", ".env", ".env.example", "Dockerfile", "Caddyfile"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
 	},
 	{
 		name: "fpm-mysql-redis",
@@ -43,7 +43,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "12.x"},
 			Services: []string{"mysql", "redis"},
 		},
-		files: []string{"compose.yaml", ".env", ".env.example", "Dockerfile", "nginx.conf", "nginx.Dockerfile"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile"},
 	},
 	{
 		name: "frankenphp-sqlite",
@@ -52,7 +52,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "13.x"},
 			Services: []string{"sqlite"},
 		},
-		files: []string{"compose.yaml", ".env", ".env.example", "Dockerfile", "Caddyfile"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
 	},
 }
 
@@ -81,7 +81,7 @@ func TestGenerate_Integration(t *testing.T) {
 				goldenPath := filepath.Join(goldenDir, fname)
 
 				if *update {
-					if err := os.MkdirAll(goldenDir, 0755); err != nil {
+					if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
 						t.Fatalf("mkdir golden: %v", err)
 					}
 					if err := os.WriteFile(goldenPath, []byte(got), 0644); err != nil {
@@ -164,7 +164,7 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 	}
 
 	// Dockerfile must embed the configured PHP version
-	dockerfile := readTestFile(t, dir, "Dockerfile")
+	dockerfile := readTestFile(t, dir, ".frank/Dockerfile")
 	if !strings.Contains(dockerfile, fx.cfg.PHP.Version) {
 		t.Errorf("Dockerfile must reference PHP version %s", fx.cfg.PHP.Version)
 	}
