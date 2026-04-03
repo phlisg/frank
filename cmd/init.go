@@ -23,7 +23,13 @@ var initCmd = &cobra.Command{
 	Use:          "init [dirname]",
 	Short:        "Interactive wizard to create frank.yaml",
 	SilenceUsage: true,
-	RunE:         runInit,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return nil, cobra.ShellCompDirectiveFilterDirs
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: runInit,
 }
 
 func runInit(cmd *cobra.Command, args []string) error {

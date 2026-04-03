@@ -26,6 +26,7 @@ Frank-specific flag:
   --quick   Skip post-start tasks (composer install + artisan migrate)`,
 	DisableFlagParsing: true,
 	SilenceUsage:       true,
+	ValidArgsFunction:  cobra.NoFileCompletions,
 	RunE:               runUp,
 }
 

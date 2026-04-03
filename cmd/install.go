@@ -28,8 +28,9 @@ Steps:
   4. Overwrite .env and .env.example with Frank-generated versions
   5. Patch vite.config.js for Docker HMR (server.host = '0.0.0.0')
   6. Copy .psysh.php if not already present`,
-	SilenceUsage: true,
-	RunE:         runInstall,
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
+	RunE:              runInstall,
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {

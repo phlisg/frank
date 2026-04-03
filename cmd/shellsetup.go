@@ -22,7 +22,8 @@ automatically runs 'frank activate' when you enter a directory containing frank.
 
 Add this to your shell profile:
   eval "$(frank shell-setup)"`,
-	SilenceUsage: true,
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Print(shell.ShellSetup(shellName))
 		return nil

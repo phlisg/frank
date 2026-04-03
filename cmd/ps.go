@@ -10,9 +10,10 @@ func init() {
 }
 
 var psCmd = &cobra.Command{
-	Use:          "ps",
-	Short:        "Show running containers",
-	SilenceUsage: true,
+	Use:               "ps",
+	Short:             "Show running containers",
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return docker.New(resolveDir()).PS()
 	},

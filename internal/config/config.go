@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -164,6 +165,16 @@ func IsDatabase(name string) bool {
 // ValidService reports whether name is a supported service.
 func ValidService(name string) bool {
 	return validServices[name]
+}
+
+// AllServices returns a sorted list of all supported service names.
+func AllServices() []string {
+	names := make([]string, 0, len(validServices))
+	for name := range validServices {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // Database returns the configured database service name, or "" if none.
