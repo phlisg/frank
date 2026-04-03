@@ -85,28 +85,63 @@ func detectShell() string {
 }
 
 func zshHook() string {
-	return `frank_chpwd() {
+	return `_frank_setup() {
+  chpwd_functions+=(frank_chpwd)
+  eval "$(frank completion zsh)"
+  frank_chpwd
+}
+frank_chpwd() {
   if [[ -f frank.yaml ]]; then
     eval "$(frank activate)"
   else
     eval "$(frank deactivate)"
   fi
 }
-chpwd_functions+=(frank_chpwd)
-eval "$(frank completion zsh)"
+_frank_precmd_init() {
+  if command -v frank &>/dev/null; then
+    precmd_functions=("${precmd_functions[@]:#_frank_precmd_init}")
+    _frank_setup
+  fi
+}
+if command -v frank &>/dev/null; then
+  _frank_setup
+else
+  precmd_functions+=(_frank_precmd_init)
+fi
 `
 }
 
 func bashHook() string {
-	return `frank_cd() {
-  builtin cd "$@" || return
+	return `_frank_setup() {
+  if [[ -n "$PROMPT_COMMAND" ]]; then
+    PROMPT_COMMAND="frank_chpwd;${PROMPT_COMMAND}"
+  else
+    PROMPT_COMMAND="frank_chpwd"
+  fi
+  eval "$(frank completion bash)"
+  frank_chpwd
+}
+frank_chpwd() {
   if [[ -f frank.yaml ]]; then
     eval "$(frank activate)"
   else
     eval "$(frank deactivate)"
   fi
 }
-alias cd=frank_cd
-eval "$(frank completion bash)"
+_frank_prompt_init() {
+  if command -v frank &>/dev/null; then
+    PROMPT_COMMAND="${PROMPT_COMMAND//_frank_prompt_init;/}"
+    _frank_setup
+  fi
+}
+if command -v frank &>/dev/null; then
+  _frank_setup
+else
+  if [[ -n "$PROMPT_COMMAND" ]]; then
+    PROMPT_COMMAND="_frank_prompt_init;${PROMPT_COMMAND}"
+  else
+    PROMPT_COMMAND="_frank_prompt_init"
+  fi
+fi
 `
 }
