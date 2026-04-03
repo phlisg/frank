@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
@@ -88,6 +89,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("laravel-init container: %w", err)
 	}
 
+	// Patch composer.json to use the PHP version the user selected.
+	// composer create-project always writes Laravel's own default (e.g. ^8.3).
+	if err := patchComposerPHPVersion(dir, cfg.PHP.Version); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not patch composer.json: %v\n", err)
+	}
+
 	// Regenerate Docker files so .env/.env.example reflect Frank's service config.
 	fmt.Println("Regenerating Docker files...")
 	if err := generate(cfg, dir); err != nil {
@@ -106,6 +113,33 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Laravel installed successfully.")
 	fmt.Println("Run 'frank up -d' to start your project.")
+	return nil
+}
+
+// patchComposerPHPVersion updates the "php" constraint in composer.json to match
+// the PHP version selected during frank init. composer create-project always
+// writes Laravel's own default (e.g. ^8.3) regardless of the host PHP version.
+var composerPHPRe = regexp.MustCompile(`("php":\s*")[^"]*(")`)
+
+func patchComposerPHPVersion(dir, phpVersion string) error {
+	path := filepath.Join(dir, "composer.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	patched := composerPHPRe.ReplaceAllString(string(data), `${1}^`+phpVersion+`${2}`)
+	if patched == string(data) {
+		return nil
+	}
+
+	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
+		return err
+	}
+	fmt.Println("  patched  composer.json (php constraint)")
 	return nil
 }
 
