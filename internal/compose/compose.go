@@ -93,13 +93,17 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 	return header + string(out), nil
 }
 
-// Write generates compose.yaml and writes it to dir.
+// Write generates compose.yaml and writes it to .frank/ inside dir.
 func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
 	content, err := g.Generate(cfg, projectName)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(content), 0644)
+	frankDir := filepath.Join(dir, ".frank")
+	if err := os.MkdirAll(frankDir, 0755); err != nil {
+		return fmt.Errorf("create .frank directory: %w", err)
+	}
+	return os.WriteFile(filepath.Join(frankDir, "compose.yaml"), []byte(content), 0644)
 }
 
 // mergeFragment parses a YAML service fragment and merges it into services.
