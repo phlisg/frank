@@ -288,7 +288,6 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 | `frank down` | Stop containers |
 | `frank ps` | Show running containers |
 | `frank clean` | Stop containers and delete volumes |
-| `frank reset [--force]` | Delete all project files except `frank.yaml` and `.git` |
 | `frank activate` | Output eval-able shell aliases for the current project |
 | `frank deactivate` | Output eval-able shell commands to remove all frank aliases |
 | `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
@@ -366,24 +365,6 @@ frank export -o path/to/out.yml
 ```
 
 Useful for handing a project off to a team that uses Sail, or deploying to a platform that expects Sail's compose format. Note that this is a best-effort export — custom Sail Dockerfile modifications are not preserved.
-
----
-
-### ⚠️ Project Reset
-
-Sometimes a `frank install` goes wrong halfway through, or you want to wipe the Laravel app and start fresh without touching your environment config. That's what `frank reset` is for.
-
-```bash
-frank reset
-```
-
-This stops containers, removes volumes, and deletes everything in the project directory **except** `frank.yaml`, `.git/`, `.gitignore`, `.dockerignore`, and `README.md`. Your environment definition stays intact — run `frank install` again to get a clean Laravel project with the same config.
-
-You'll be prompted to confirm before anything is deleted. Skip the prompt with:
-
-```bash
-frank reset --force
-```
 
 ---
 
