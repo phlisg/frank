@@ -5,7 +5,7 @@
 }
 
 :80, :443 {
-    root * /app/public
+    root * /var/www/html/public
 
     php_server
 

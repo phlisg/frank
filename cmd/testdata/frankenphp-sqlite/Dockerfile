@@ -13,9 +13,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Bundled extensions (compiled into PHP, enabled here).
 # Note: imap is not installed — libc-client-dev was dropped from Debian trixie (the FrankenPHP
 # base OS) and the extension cannot be compiled. Use the fpm runtime if imap is required.
+# Note: pdo_sqlite, sqlite3, readline, and mbstring are already statically compiled into the
+# FrankenPHP binary — omitting them here avoids a mid-run source tree cleanup that breaks
+# subsequent extensions.
 RUN docker-php-ext-install \
-        soap ldap pdo_sqlite sqlite3 readline \
-        pdo_mysql pdo_pgsql pgsql mbstring exif pcntl bcmath gd intl zip
+        soap ldap \
+        pdo_mysql pdo_pgsql pgsql exif pcntl bcmath gd intl zip
 
 # PECL extensions — install igbinary/msgpack first as other extensions can link against them
 RUN pecl install igbinary \
@@ -41,9 +44,9 @@ COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 ARG WWWGROUP=1000
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 ARG POSTGRES_VERSION=17
-ARG MYSQL_CLIENT=mysql-client
+ARG MYSQL_CLIENT=default-mysql-client
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -55,7 +58,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN mkdir -p /etc/apt/keyrings \
     && apt-get update && apt-get install -y --no-install-recommends \
         libmagickwand-7.q16-10 libmemcached11t64 libldap2 libkrb5-3 \
-        libreadline8 libsqlite3-0 \
+        libreadline8 libsqlite3-0 libicu76 libzip5 \
         gosu supervisor sqlite3 python3 dnsutils librsvg2-bin \
         fswatch ffmpeg nano git curl ca-certificates gnupg zip unzip \
     && rm -rf /usr/share/man /usr/share/doc \
@@ -111,9 +114,11 @@ if [ ! -d /var/www/html/storage/psysh ]; then
     mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
     chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
 fi
+mkdir -p /config/caddy /data/caddy
+chown -R sail:sail /config/caddy /data/caddy
 if [ -f "/var/www/html/package.json" ]; then
-    npm install --prefix /var/www/html 2>/dev/null || true
-    npm run build --prefix /var/www/html 2>/dev/null &
+    gosu sail npm install --prefix /var/www/html 2>/dev/null || true
+    gosu sail npm run build --prefix /var/www/html 2>/dev/null &
 fi
 exec gosu sail "$@"
 SCRIPT
@@ -122,5 +127,6 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /var/www/html
 EXPOSE 80 443 5173
 
+USER root
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

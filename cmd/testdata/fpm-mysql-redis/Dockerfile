@@ -2,7 +2,7 @@
 FROM ubuntu:24.04
 
 ARG WWWGROUP=1000
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 ARG POSTGRES_VERSION=17
 ARG MYSQL_CLIENT=mysql-client
 
@@ -95,8 +95,8 @@ if [ ! -d /var/www/html/storage/psysh ]; then
     chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
 fi
 if [ -f "/var/www/html/package.json" ]; then
-    npm install --prefix /var/www/html 2>/dev/null || true
-    npm run build --prefix /var/www/html 2>/dev/null &
+    gosu sail npm install --prefix /var/www/html 2>/dev/null || true
+    gosu sail npm run build --prefix /var/www/html 2>/dev/null &
 fi
 exec gosu sail "$@"
 SCRIPT
@@ -105,5 +105,6 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /var/www/html
 EXPOSE 9000
 
+USER root
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["php-fpm8.4"]
