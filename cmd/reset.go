@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 )
@@ -41,6 +42,9 @@ Use --force to skip the confirmation prompt.`,
 func runReset(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
+	// Load config before deletion (frank.yaml is preserved so it survives reset).
+	cfg, cfgErr := config.Load(dir)
+
 	if !forceReset {
 		fmt.Printf("This will delete all files in %s except preserved files. Continue? [y/N] ", dir)
 		var answer string
@@ -74,6 +78,16 @@ func runReset(cmd *cobra.Command, args []string) error {
 
 	// Restore .gitignore from git if it was modified.
 	restoreGitignore(dir)
+
+	// Regenerate .frank/ Docker files from the preserved frank.yaml.
+	if cfgErr != nil {
+		fmt.Printf("warning: could not load frank.yaml, skipping generate: %v\n", cfgErr)
+	} else {
+		fmt.Println("Regenerating Docker files...")
+		if err := generate(cfg, dir); err != nil {
+			fmt.Printf("warning: generate failed: %v\n", err)
+		}
+	}
 
 	fmt.Println("Reset complete.")
 	return nil
