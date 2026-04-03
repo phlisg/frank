@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -177,7 +178,7 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 }
 
 func runSailInit(cfg *config.Config, dir, existingCompose string) error {
-	// Sail uses FPM under the hood
+	// Sail always uses FPM — no runtime prompt needed.
 	cfg.PHP.Runtime = "fpm"
 	selectedServices := []string{"pgsql", "mailpit"}
 
@@ -226,7 +227,46 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 
 	cfg.Services = selectedServices
 
-	return writeConfigAndGenerate(cfg, dir, existingCompose)
+	// Step 1: Write frank.yaml and generate .frank/
+	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
+		return err
+	}
+
+	// Step 2: Start containers (build images on first run).
+	fmt.Println("\nStarting containers...")
+	client := docker.New(dir)
+	if err := client.Up("-d", "--build"); err != nil {
+		return fmt.Errorf("frank up: %w", err)
+	}
+
+	// Step 3: Install Laravel via disposable composer container.
+	if err := runInstall(nil, nil); err != nil {
+		return fmt.Errorf("frank install: %w", err)
+	}
+
+	// Step 4: Bootstrap Sail inside the running laravel.test container.
+	fmt.Println("\nInstalling Sail...")
+	var sailServices []string
+	for _, svc := range cfg.Services {
+		if svc == "sqlite" {
+			continue
+		}
+		sailServices = append(sailServices, svc)
+	}
+	withList := strings.Join(sailServices, ",")
+
+	if err := client.Exec("laravel.test", "composer", "require", "laravel/sail", "--dev"); err != nil {
+		return fmt.Errorf("composer require laravel/sail: %w", err)
+	}
+	if err := client.Exec("laravel.test", "php", "artisan", "sail:install",
+		"--with="+withList,
+		"--php="+cfg.PHP.Version,
+	); err != nil {
+		return fmt.Errorf("sail:install: %w", err)
+	}
+
+	fmt.Println("\nSail project ready — run vendor/bin/sail up to start your project.")
+	return nil
 }
 
 func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) error {
