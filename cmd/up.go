@@ -39,9 +39,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		if a == "--quick" {
 			quick = true
 		} else if a == "--help" || a == "-h" {
-			// help flags: pass through to compose but skip post-start tasks
-			quick = true
-			composeArgs = append(composeArgs, a)
+			return cmd.Help()
 		} else {
 			composeArgs = append(composeArgs, a)
 		}
