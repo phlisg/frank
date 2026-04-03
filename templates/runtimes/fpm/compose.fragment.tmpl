@@ -1,7 +1,7 @@
 laravel.test:
   build:
     context: .
-    dockerfile: Dockerfile
+    dockerfile: .frank/Dockerfile
     args:
       WWWGROUP: ${GID:-1000}
   networks:
@@ -23,7 +23,7 @@ laravel.test:
 nginx:
   build:
     context: .
-    dockerfile: nginx.Dockerfile
+    dockerfile: .frank/nginx.Dockerfile
   ports:
     - "80:80"
     - "443:443"

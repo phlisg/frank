@@ -1,6 +1,7 @@
 laravel.test:
   build:
     context: .
+    dockerfile: .frank/Dockerfile
     args:
       WWWGROUP: ${GID:-1000}
   ports:
