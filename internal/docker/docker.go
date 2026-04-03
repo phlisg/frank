@@ -75,15 +75,17 @@ func (c *Client) RunQuiet(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// Exec runs `docker compose exec <service> <command...>` streaming I/O.
+// Exec runs `docker compose exec --user sail <service> <command...>` streaming I/O.
+// --user sail ensures files created inside the container are owned by sail (remapped
+// to the host user's UID via usermod in the entrypoint), not root.
 func (c *Client) Exec(service string, command ...string) error {
-	args := append([]string{"exec", service}, command...)
+	args := append([]string{"exec", "--user", "sail", service}, command...)
 	return c.Run(args...)
 }
 
-// ExecQuiet runs `docker compose exec <service> <command...>` and captures output.
+// ExecQuiet runs `docker compose exec --user sail <service> <command...>` and captures output.
 func (c *Client) ExecQuiet(service string, command ...string) (string, error) {
-	args := append([]string{"exec", service}, command...)
+	args := append([]string{"exec", "--user", "sail", service}, command...)
 	return c.RunQuiet(args...)
 }
 
