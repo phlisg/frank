@@ -93,6 +93,7 @@ func zshHook() string {
   fi
 }
 chpwd_functions+=(frank_chpwd)
+eval "$(frank completion zsh)"
 `
 }
 
@@ -106,5 +107,6 @@ func bashHook() string {
   fi
 }
 alias cd=frank_cd
+eval "$(frank completion bash)"
 `
 }

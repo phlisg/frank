@@ -28,6 +28,9 @@ var TemplateFS fs.FS
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&Dir, "dir", "", "target directory (defaults to current working directory)")
+	rootCmd.RegisterFlagCompletionFunc("dir", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	})
 }
 
 func Execute(fsys fs.FS, version string) {
