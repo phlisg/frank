@@ -117,6 +117,45 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// runSailInstall runs composer require laravel/sail and php artisan sail:install
+// inside a disposable composer:latest container. Running these commands via
+// docker compose exec (inside a live container) causes inception problems that
+// result in exit 137. sail:install only writes files so a disposable container
+// is sufficient and avoids starting any Frank containers at all.
+func runSailInstall(dir string, services []string, phpVersion string) error {
+	uid := os.Getuid()
+	gid := os.Getgid()
+
+	withList := strings.Join(services, ",")
+
+	script := `#!/bin/sh
+set -e
+composer require laravel/sail --dev --no-interaction
+php artisan sail:install --with="$1" --php="$2"
+`
+
+	dockerArgs := []string{
+		"run", "--rm", "-i",
+		"-u", fmt.Sprintf("%d:%d", uid, gid),
+		"-v", dir + ":/app",
+		"-w", "/app",
+		"composer:latest",
+		"sh", "-s", "--", withList, phpVersion,
+	}
+
+	fmt.Println("\nInstalling Sail...")
+
+	c := exec.Command("docker", dockerArgs...)
+	c.Stdin = strings.NewReader(script)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("sail-install container: %w", err)
+	}
+	return nil
+}
+
 // patchComposerPHPVersion updates the "php" version constraint in the require block
 // of composer.json to match the PHP version chosen during frank init.
 //
