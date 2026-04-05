@@ -130,7 +130,10 @@ func runSailInstall(dir string, services []string, phpVersion string) error {
 
 	script := `#!/bin/sh
 set -e
-composer require laravel/sail --dev --no-interaction
+# --ignore-platform-reqs: the container may run a different PHP than the project
+# targets (e.g. composer:latest ships 8.4 but the project declares ^8.5).
+# sail:install only writes files so the platform mismatch is harmless here.
+composer require laravel/sail --dev --no-interaction --ignore-platform-reqs
 php artisan sail:install --with="$1" --php="$2"
 `
 
