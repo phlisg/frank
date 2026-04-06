@@ -172,7 +172,6 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 				Options(
 					huh.NewOption("13.x (latest)", "13.*"),
 					huh.NewOption("12.x (LTS)", "12.*"),
-					huh.NewOption("11.x", "11.*"),
 				).
 				Value(&cfg.Laravel.Version),
 		))
@@ -255,7 +254,6 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 				Options(
 					huh.NewOption("13.x (latest)", "13.*"),
 					huh.NewOption("12.x (LTS)", "12.*"),
-					huh.NewOption("11.x", "11.*"),
 				).
 				Value(&cfg.Laravel.Version),
 		))
