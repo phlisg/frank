@@ -7,7 +7,10 @@ import (
 	"github.com/phlisg/frank/internal/config"
 )
 
-const execSail = "docker compose exec --user sail laravel.test"
+const (
+	dc       = "docker compose --project-directory . -f .frank/compose.yaml"
+	execSail = dc + " exec --user sail laravel.test"
+)
 
 // aliasTable defines all aliases managed by frank activate/deactivate.
 // service is empty for core aliases; non-empty entries are only activated
@@ -25,10 +28,10 @@ var aliasTable = []struct {
 	{"npm", execSail + " npm", ""},
 	{"bun", execSail + " bun", ""},
 	// Service-conditional aliases
-	{"psql", "docker compose exec pgsql psql -U sail", "pgsql"},
-	{"mysql", "docker compose exec db mysql -u root -proot", "mysql"},
-	{"mariadb", "docker compose exec mariadb mariadb -u root -proot", "mariadb"},
-	{"redis-cli", "docker compose exec redis redis-cli", "redis"},
+	{"psql", dc + " exec pgsql psql -U sail", "pgsql"},
+	{"mysql", dc + " exec db mysql -u root -proot", "mysql"},
+	{"mariadb", dc + " exec mariadb mariadb -u root -proot", "mariadb"},
+	{"redis-cli", dc + " exec redis redis-cli", "redis"},
 }
 
 // Activate returns eval-able shell aliases for the current project.
