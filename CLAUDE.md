@@ -47,9 +47,14 @@ Only one database allowed. Defaults: `pgsql` + `mailpit`.
 Healthchecks present (use `service_healthy`): pgsql, mysql, mariadb, redis, meilisearch, mailpit  
 No healthcheck (use `service_started`): memcached
 
+## FPM Runtime Notes
+
+The FPM Dockerfile uses `CMD ["php-fpmX.Y", "-F"]` to run in foreground (no-daemonize).  
+**Do not add `daemonize = no` to php-fpm.conf** — PHP 8.5 removed this as a valid global directive and FPM will refuse to start with `unknown entry 'daemonize'`.
+
 ## Testing
 
-Golden files live in `cmd/testdata/<fixture>/.frank/`. Regenerate after compose output changes:
+Golden files live in `cmd/testdata/<fixture>/.frank/`. Regenerate after **any** template change (compose fragments, Dockerfiles, Caddyfile, nginx config):
 
 ```
 go test ./cmd/ -update
