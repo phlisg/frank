@@ -23,6 +23,12 @@ var validPHPVersions = map[string]bool{
 	"8.5": true,
 }
 
+var validLaravelVersions = map[string]bool{
+	"12.*":   true,
+	"13.*":   true,
+	"latest": true,
+}
+
 var validRuntimes = map[string]bool{
 	"frankenphp": true,
 	"fpm":        true,
@@ -126,6 +132,9 @@ func applyDefaults(cfg *Config) {
 func validate(cfg *Config) error {
 	if !validPHPVersions[cfg.PHP.Version] {
 		return fmt.Errorf("unsupported PHP version %q — valid options: 8.2, 8.3, 8.4, 8.5", cfg.PHP.Version)
+	}
+	if !validLaravelVersions[cfg.Laravel.Version] {
+		return fmt.Errorf("unsupported Laravel version %q — valid options: 12.*, 13.*, latest", cfg.Laravel.Version)
 	}
 	if !validRuntimes[cfg.PHP.Runtime] {
 		return fmt.Errorf("unsupported runtime %q — valid options: frankenphp, fpm", cfg.PHP.Runtime)

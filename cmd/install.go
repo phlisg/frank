@@ -130,7 +130,7 @@ func runSailInstall(dir string, services []string, phpVersion string) error {
 
 	script := `#!/bin/sh
 set -e
-# Laravel 12+ ships Sail in the skeleton; 11.x and older do not.
+# Laravel 12+ ships Sail in the skeleton; earlier versions do not.
 # Check vendor presence rather than parsing version strings.
 if [ ! -d vendor/laravel/sail ]; then
     # --ignore-platform-reqs: container PHP may differ from the project's target
