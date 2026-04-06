@@ -227,7 +227,7 @@ services:
 | --- | ------ | ------- | ----------- |
 | `php.version` | `8.2` `8.3` `8.4` `8.5` | `8.5` | PHP version |
 | `php.runtime` | `frankenphp` `fpm` | `frankenphp` | Web server runtime |
-| `laravel.version` | `latest` `lts` `11.*` … | `latest` | Laravel version constraint passed to Composer |
+| `laravel.version` | `latest` `lts` `12.*` `13.*` … | `latest` | Laravel version constraint passed to Composer |
 | `services` | list — see table below | `[pgsql, mailpit]` | Services to include |
 | `config.<service>.port` | integer | service default | Override the host-side port mapping |
 
