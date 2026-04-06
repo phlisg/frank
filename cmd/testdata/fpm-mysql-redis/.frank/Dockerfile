@@ -94,10 +94,6 @@ if [ ! -d /var/www/html/storage/psysh ]; then
     mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
     chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
 fi
-if [ -f "/var/www/html/package.json" ]; then
-    gosu sail npm install --prefix /var/www/html 2>/dev/null || true
-    gosu sail npm run build --prefix /var/www/html 2>/dev/null &
-fi
 exec gosu sail "$@"
 SCRIPT
 RUN chmod +x /entrypoint.sh

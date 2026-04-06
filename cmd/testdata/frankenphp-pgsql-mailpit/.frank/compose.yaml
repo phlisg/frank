@@ -32,6 +32,16 @@ services:
             - .:/var/www/html
         working_dir: /var/www/html
     mailpit:
+        healthcheck:
+            interval: 5s
+            retries: 10
+            test:
+                - CMD
+                - wget
+                - --no-verbose
+                - --spider
+                - http://127.0.0.1:8025/api/v1/info
+            timeout: 3s
         image: axllent/mailpit:latest
         networks:
             - frank
