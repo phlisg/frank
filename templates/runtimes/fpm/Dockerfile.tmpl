@@ -39,14 +39,15 @@ RUN curl -sS 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xb8dc7e5394
     && rm -rf /usr/share/man /usr/share/doc \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure FPM: TCP port 9000 (nginx expects laravel.test:9000), log to stderr.
-# The ondrej pool file may indent the listen directive with a tab, so no ^ anchor.
+# Configure FPM: TCP port 9000, log to stderr, workers run as sail.
+# php-fpm master runs as root (required for PID file, worker management).
+# The pool handles the sail user drop — gosu is not used for php-fpm.
 # Note: `daemonize = no` was removed — PHP 8.5 dropped this global directive.
 #       Foreground mode is enforced via the -F flag in CMD instead.
-# Note: error_log redirected to /dev/stderr — sail lacks write access to the default
-#       /var/log/php-fpm.log, and stderr is idiomatic for containers.
 RUN sed -i 's|error_log = .*|error_log = /dev/stderr|' /etc/php/{{.PHPVersion}}/fpm/php-fpm.conf \
-    && sed -i 's|listen = .*|listen = 0.0.0.0:9000|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf
+    && sed -i 's|listen = .*|listen = 0.0.0.0:9000|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf \
+    && sed -i 's|^user = .*|user = sail|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf \
+    && sed -i 's|^group = .*|group = sail|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf
 
 # Node.js
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
@@ -98,8 +99,7 @@ if [ ! -d /var/www/html/storage/psysh ]; then
     mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
     chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
 fi
-chmod o+w /dev/stderr /dev/stdout 2>/dev/null || true
-exec gosu sail "$@"
+exec "$@"
 SCRIPT
 RUN chmod +x /entrypoint.sh
 
