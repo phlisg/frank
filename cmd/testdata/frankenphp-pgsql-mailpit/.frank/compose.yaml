@@ -10,6 +10,11 @@ services:
                 WWWGROUP: ${GID:-1000}
             context: .
             dockerfile: .frank/Dockerfile
+        depends_on:
+            mailpit:
+                condition: service_healthy
+            pgsql:
+                condition: service_healthy
         env_file:
             - .env
         environment:
