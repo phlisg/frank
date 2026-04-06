@@ -98,6 +98,7 @@ if [ ! -d /var/www/html/storage/psysh ]; then
     mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
     chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
 fi
+chmod o+w /dev/stderr /dev/stdout 2>/dev/null || true
 exec gosu sail "$@"
 SCRIPT
 RUN chmod +x /entrypoint.sh
