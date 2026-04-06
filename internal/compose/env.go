@@ -131,8 +131,6 @@ func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error 
 func (g *Generator) loadLaravelBaseEnv(version, projectName string) ([]envLine, error) {
 	templateVersion := "13.x" // default: latest
 	switch version {
-	case "11.x":
-		templateVersion = "11.x"
 	case "12.x":
 		templateVersion = "12.x"
 	}
