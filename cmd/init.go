@@ -13,10 +13,36 @@ import (
 )
 
 var sailMode bool
+var flagPHP string
+var flagLaravel string
+var flagWith string
 
 func init() {
 	initCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
+	initCmd.Flags().StringVar(&flagPHP, "php", "", "PHP version, skips prompt (e.g. 8.5)")
+	initCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version, skips prompt (e.g. 12 or 12.*)")
+	initCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services, skips prompt (e.g. "pgsql,redis,mailpit")`)
 	rootCmd.AddCommand(initCmd)
+}
+
+// normalizeLaravelVersion accepts "12", "12.x", or "12.*" and always returns "12.*".
+func normalizeLaravelVersion(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimSuffix(v, ".*")
+	v = strings.TrimSuffix(v, ".x")
+	return v + ".*"
+}
+
+// parseServices splits a comma-separated service list and trims whitespace.
+func parseServices(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 var initCmd = &cobra.Command{
@@ -117,8 +143,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 	selectedServices := []string{"pgsql", "mailpit"}
 
-	form := huh.NewForm(
-		huh.NewGroup(
+	var groups []*huh.Group
+
+	if flagPHP != "" {
+		cfg.PHP.Version = flagPHP
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("PHP Version").
 				Options(
@@ -128,8 +158,13 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("8.2", "8.2"),
 				).
 				Value(&cfg.PHP.Version),
-		),
-		huh.NewGroup(
+		))
+	}
+
+	if flagLaravel != "" {
+		cfg.Laravel.Version = normalizeLaravelVersion(flagLaravel)
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Laravel Version").
 				Options(
@@ -138,18 +173,25 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("11.x", "11.*"),
 				).
 				Value(&cfg.Laravel.Version),
-		),
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Runtime").
-				Description("FrankenPHP is an all-in-one server; FPM uses a separate Nginx container.").
-				Options(
-					huh.NewOption("FrankenPHP (recommended)", "frankenphp"),
-					huh.NewOption("PHP-FPM + Nginx", "fpm"),
-				).
-				Value(&cfg.PHP.Runtime),
-		),
-		huh.NewGroup(
+		))
+	}
+
+	// Runtime has no flag — always prompt.
+	groups = append(groups, huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Runtime").
+			Description("FrankenPHP is an all-in-one server; FPM uses a separate Nginx container.").
+			Options(
+				huh.NewOption("FrankenPHP (recommended)", "frankenphp"),
+				huh.NewOption("PHP-FPM + Nginx", "fpm"),
+			).
+			Value(&cfg.PHP.Runtime),
+	))
+
+	if flagWith != "" {
+		selectedServices = parseServices(flagWith)
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Services").
 				Description("Select the services your project needs. Only one database may be chosen.").
@@ -164,10 +206,10 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("Mailpit", "mailpit"),
 				).
 				Value(&selectedServices),
-		),
-	)
+		))
+	}
 
-	if err := form.Run(); err != nil {
+	if err := huh.NewForm(groups...).Run(); err != nil {
 		return err
 	}
 
@@ -181,8 +223,12 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 	cfg.PHP.Runtime = "fpm"
 	selectedServices := []string{"pgsql", "mailpit"}
 
-	form := huh.NewForm(
-		huh.NewGroup(
+	var groups []*huh.Group
+
+	if flagPHP != "" {
+		cfg.PHP.Version = flagPHP
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("PHP Version").
 				Options(
@@ -192,8 +238,13 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("8.2", "8.2"),
 				).
 				Value(&cfg.PHP.Version),
-		),
-		huh.NewGroup(
+		))
+	}
+
+	if flagLaravel != "" {
+		cfg.Laravel.Version = normalizeLaravelVersion(flagLaravel)
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Laravel Version").
 				Options(
@@ -202,8 +253,13 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("11.x", "11.*"),
 				).
 				Value(&cfg.Laravel.Version),
-		),
-		huh.NewGroup(
+		))
+	}
+
+	if flagWith != "" {
+		selectedServices = parseServices(flagWith)
+	} else {
+		groups = append(groups, huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Services").
 				Description("Which services would you like to install?").
@@ -217,11 +273,13 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 					huh.NewOption("mailpit", "mailpit"),
 				).
 				Value(&selectedServices),
-		),
-	)
+		))
+	}
 
-	if err := form.Run(); err != nil {
-		return err
+	if len(groups) > 0 {
+		if err := huh.NewForm(groups...).Run(); err != nil {
+			return err
+		}
 	}
 
 	cfg.Services = selectedServices
