@@ -39,10 +39,11 @@ RUN curl -sS 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xb8dc7e5394
     && rm -rf /usr/share/man /usr/share/doc \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure FPM: TCP port 9000 (nginx expects laravel.test:9000), no daemonize.
+# Configure FPM: TCP port 9000 (nginx expects laravel.test:9000).
 # The ondrej pool file may indent the listen directive with a tab, so no ^ anchor.
-RUN echo "daemonize = no" >> /etc/php/{{.PHPVersion}}/fpm/php-fpm.conf \
-    && sed -i 's|listen = .*|listen = 0.0.0.0:9000|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf
+# Note: `daemonize = no` was removed — PHP 8.5 dropped this global directive.
+#       Foreground mode is enforced via the -F flag in CMD instead.
+RUN sed -i 's|listen = .*|listen = 0.0.0.0:9000|' /etc/php/{{.PHPVersion}}/fpm/pool.d/www.conf
 
 # Node.js
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
@@ -103,4 +104,4 @@ EXPOSE 9000
 
 USER root
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["php-fpm{{.PHPVersion}}"]
+CMD ["php-fpm{{.PHPVersion}}", "-F"]
