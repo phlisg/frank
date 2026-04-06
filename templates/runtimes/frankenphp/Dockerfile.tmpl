@@ -116,10 +116,6 @@ if [ ! -d /var/www/html/storage/psysh ]; then
 fi
 mkdir -p /config/caddy /data/caddy
 chown -R sail:sail /config/caddy /data/caddy
-if [ -f "/var/www/html/package.json" ]; then
-    gosu sail npm install --prefix /var/www/html 2>/dev/null || true
-    gosu sail npm run build --prefix /var/www/html 2>/dev/null &
-fi
 exec gosu sail "$@"
 SCRIPT
 RUN chmod +x /entrypoint.sh
