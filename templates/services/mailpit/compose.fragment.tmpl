@@ -5,3 +5,8 @@ mailpit:
     - "{{.DashboardPort}}:8025"
   networks:
     - frank
+  healthcheck:
+    test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:8025/api/v1/info"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
