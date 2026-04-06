@@ -56,6 +56,12 @@ frank install       # install a fresh Laravel project inside the container
 frank up            # start containers, run composer install + migrate
 ```
 
+Or skip every prompt with inline flags:
+
+```bash
+frank init --php 8.5 --laravel 12 --runtime frankenphp --with="pgsql,mailpit" my-app
+```
+
 Visit [http://localhost](http://localhost) once `frank up` completes.
 
 That's it. No local PHP version juggling, no Homebrew conflicts, no "works on my machine" problems.
@@ -81,7 +87,13 @@ The wizard will ask:
 - **Runtime** → FrankenPHP (recommended)
 - **Services** → pgsql, redis, mailpit
 
-This writes `frank.yaml` and generates `compose.yaml`, `Dockerfile`, `Caddyfile`, `.env`, and `.env.example`.
+Prefer flags? Skip every prompt in one shot:
+
+```bash
+frank init --php 8.4 --laravel 12 --runtime frankenphp --with="pgsql,redis,mailpit" my-app
+```
+
+Either way, Frank writes `frank.yaml` and generates `compose.yaml`, `Dockerfile`, `Caddyfile`, `.env`, and `.env.example`.
 
 #### 2. Install Laravel
 
@@ -279,7 +291,7 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 
 | Command | Description |
 | ------- | ----------- |
-| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory |
+| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory. Flags `--php`, `--laravel`, `--runtime`, `--with` skip the corresponding prompts for non-interactive use |
 | `frank generate` | Regenerate Docker files from `frank.yaml` without prompting |
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
