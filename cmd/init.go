@@ -16,12 +16,14 @@ var sailMode bool
 var flagPHP string
 var flagLaravel string
 var flagWith string
+var flagRuntime string
 
 func init() {
 	initCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
 	initCmd.Flags().StringVar(&flagPHP, "php", "", "PHP version, skips prompt (e.g. 8.5)")
 	initCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version, skips prompt (e.g. 12 or 12.*)")
 	initCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services, skips prompt (e.g. "pgsql,redis,mailpit")`)
+	initCmd.Flags().StringVar(&flagRuntime, "runtime", "", "runtime, skips prompt: frankenphp or fpm (ignored with --sail)")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -176,17 +178,20 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 		))
 	}
 
-	// Runtime has no flag — always prompt.
-	groups = append(groups, huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("Runtime").
-			Description("FrankenPHP is an all-in-one server; FPM uses a separate Nginx container.").
-			Options(
-				huh.NewOption("FrankenPHP (recommended)", "frankenphp"),
-				huh.NewOption("PHP-FPM + Nginx", "fpm"),
-			).
-			Value(&cfg.PHP.Runtime),
-	))
+	if flagRuntime != "" {
+		cfg.PHP.Runtime = flagRuntime
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Runtime").
+				Description("FrankenPHP is an all-in-one server; FPM uses a separate Nginx container.").
+				Options(
+					huh.NewOption("FrankenPHP (recommended)", "frankenphp"),
+					huh.NewOption("PHP-FPM + Nginx", "fpm"),
+				).
+				Value(&cfg.PHP.Runtime),
+		))
+	}
 
 	if flagWith != "" {
 		selectedServices = parseServices(flagWith)
