@@ -50,7 +50,7 @@ php:
   version: "8.3"
   runtime: fpm
 laravel:
-  version: "11.*"
+  version: "12.*"
 services:
   - mysql
   - redis
@@ -67,7 +67,7 @@ services:
 	if cfg.PHP.Runtime != "fpm" {
 		t.Errorf("PHP.Runtime = %q", cfg.PHP.Runtime)
 	}
-	if cfg.Laravel.Version != "11.*" {
+	if cfg.Laravel.Version != "12.*" {
 		t.Errorf("Laravel.Version = %q", cfg.Laravel.Version)
 	}
 	if !cfg.HasService("redis") {
@@ -84,6 +84,15 @@ func TestValidationBadPHPVersion(t *testing.T) {
 	_, err := Load(dir)
 	if err == nil {
 		t.Error("expected error for unsupported PHP version")
+	}
+}
+
+func TestValidationBadLaravelVersion(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, "version: 1\nlaravel:\n  version: \"11.*\"\n")
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error for unsupported Laravel version")
 	}
 }
 
