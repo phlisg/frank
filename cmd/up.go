@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
@@ -78,14 +79,28 @@ func runUp(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Wait for laravel.test to be ready before running post-start tasks.
+	// Only meaningful in detached mode; in foreground mode Up() never returns here.
+	fmt.Println("Waiting for laravel.test to be ready...")
+	if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: %v — skipping post-start tasks\n", err)
+		return nil
+	}
+
 	// Post-start tasks — failures are logged but don't abort.
-	if _, err := os.Stat(dir + "/composer.json"); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+		if err := client.Exec("laravel.test", "npm", "install"); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: npm install failed: %v\n", err)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
 		if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
 		}
 	}
 
-	if _, err := os.Stat(dir + "/artisan"); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
 		if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
 		}

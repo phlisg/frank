@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // ContainerState represents the running state of a project's containers.
@@ -118,6 +119,20 @@ func (c *Client) ContainerStatus() (ContainerState, int, int) {
 		return StateStopped, 0, 0
 	}
 	return parseContainerStatus(out)
+}
+
+// WaitForContainer polls until the named service is exec-able (i.e. running and
+// accepting commands), or until timeout is exceeded.
+// Uses a zero-exit exec ("true") as a lightweight readiness probe.
+func (c *Client) WaitForContainer(service string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := c.ExecQuiet(service, "true"); err == nil {
+			return nil
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return fmt.Errorf("container %q did not become ready within %s", service, timeout)
 }
 
 // parseContainerStatus interprets the JSON output from `docker compose ps --format json`.
