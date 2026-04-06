@@ -88,12 +88,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	// Post-start tasks — failures are logged but don't abort.
-	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
-		if err := client.Exec("laravel.test", "npm", "install"); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: npm install failed: %v\n", err)
-		}
-	}
-
+	// Order matters: composer creates vendor/ first, then migrate, npm last (heaviest).
 	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
 		if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
@@ -103,6 +98,17 @@ func runUp(cmd *cobra.Command, args []string) error {
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
 		if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+		// Re-probe: npm is the heaviest task; bail early if the container crashed.
+		if err := client.WaitForContainer("laravel.test", 10*time.Second); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: laravel.test stopped before npm install — check: docker logs\n")
+			return nil
+		}
+		if err := client.Exec("laravel.test", "npm", "install"); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: npm install failed: %v\n", err)
 		}
 	}
 
