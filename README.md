@@ -9,7 +9,7 @@ Installing Laravel itself doesn't require a local PHP installation either — `f
 
 Day-to-day development is smooth too. Frank's shell alias system puts `artisan`, `composer`, `php`, and your database CLI one word away — no `docker compose exec` prefixes. With auto-activation enabled, aliases appear the moment you `cd` into a project and disappear when you leave.
 
-Already using Laravel Sail? Frank can import your existing `docker-compose.yml` and take over from there. And if you ever need to hand a project back to a Sail-based team, `frank export` has you covered.
+Already using Laravel Sail? Frank can import your existing `docker-compose.yml` and take over from there. And if you ever need to hand a project back to a Sail-based team, `frank eject` has you covered.
 
 Frank is distributed as a single static binary. No Node, no Python, no package managers — just download and drop it in your `PATH`.
 
@@ -305,7 +305,7 @@ Choose `fpm` if: your production environment uses Nginx + PHP-FPM, or you're mai
 | `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
 | `frank completion [bash\|zsh\|fish\|powershell]` | Output shell completion script for the given shell |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
-| `frank export [-o path]` | Export a Sail-compatible `docker-compose.yml` |
+| `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
 | `frank version` | Print the frank binary version |
 
 ---
@@ -369,14 +369,13 @@ frank import -f path/to/docker-compose.yml
 
 Frank inspects the Sail compose file, detects your PHP version and services, writes `frank.yaml`, and regenerates all Docker files. Your existing Sail compose file is not modified.
 
-**Exporting back to Sail:**
+**Ejecting to Sail:**
 
 ```bash
-frank export              # writes ./docker-compose.yml
-frank export -o path/to/out.yml
+frank eject
 ```
 
-Useful for handing a project off to a team that uses Sail, or deploying to a platform that expects Sail's compose format. Note that this is a best-effort export — custom Sail Dockerfile modifications are not preserved.
+Installs Laravel Sail into the running containers (`composer require laravel/sail` + `sail:install`) using the services from your `frank.yaml`. Useful for handing a project off to a team that prefers Sail. Requires containers to be running — run `frank up` first, then run `./vendor/bin/sail up` to continue with Sail.
 
 ---
 
