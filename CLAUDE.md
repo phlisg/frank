@@ -47,6 +47,12 @@ Only one database allowed. Defaults: `pgsql` + `mailpit`.
 Healthchecks present (use `service_healthy`): pgsql, mysql, mariadb, redis, meilisearch, mailpit  
 No healthcheck (use `service_started`): memcached
 
+## Sail Interop Notes
+
+`vendor/bin/sail` is a **bash script** (not PHP) — `./vendor/bin/sail <cmd>` works without a local PHP install. Keep this in mind when writing user-facing messages or docs that reference Sail commands.
+
+`frank eject` installs Sail using the services configured in `frank.yaml` (reads `cfg.Services`, passes as `--with` to `sail:install`).
+
 ## FPM Runtime Notes
 
 The FPM Dockerfile uses `CMD ["php-fpmX.Y", "-F"]` to run in foreground (no-daemonize).  
