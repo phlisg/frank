@@ -51,7 +51,7 @@ No healthcheck (use `service_started`): memcached
 
 `vendor/bin/sail` is a **bash script** (not PHP) — `./vendor/bin/sail <cmd>` works without a local PHP install. Keep this in mind when writing user-facing messages or docs that reference Sail commands.
 
-`frank export` installs Sail using the services configured in `frank.yaml` (reads `cfg.Services`, passes as `--with` to `sail:install`). It is a candidate for renaming to `frank eject` (td-79f7ce) to better communicate intent.
+`frank eject` installs Sail using the services configured in `frank.yaml` (reads `cfg.Services`, passes as `--with` to `sail:install`).
 
 ## FPM Runtime Notes
 

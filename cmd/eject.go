@@ -10,11 +10,11 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(exportCmd)
+	rootCmd.AddCommand(ejectCmd)
 }
 
-var exportCmd = &cobra.Command{
-	Use:   "export",
+var ejectCmd = &cobra.Command{
+	Use:   "eject",
 	Short: "Install Laravel Sail into the running project containers",
 	Long: `Delegates to Laravel Sail's own installer (sail:install) running inside
 the laravel.test container. Sail will generate its own docker-compose.yml,
@@ -22,10 +22,10 @@ docker/ folder, and related files.
 
 Requires containers to be running — run frank up first.`,
 	SilenceUsage: true,
-	RunE:         runExport,
+	RunE:         runEject,
 }
 
-func runExport(cmd *cobra.Command, args []string) error {
+func runEject(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
 	cfg, err := config.Load(dir)
@@ -60,6 +60,6 @@ func runExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("sail:install failed: %w", err)
 	}
 
-	fmt.Println("  export complete  run vendor/bin/sail up to start containers")
+	fmt.Println("  eject complete — run ./vendor/bin/sail up to start containers")
 	return nil
 }
