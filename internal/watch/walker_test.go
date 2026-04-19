@@ -366,6 +366,76 @@ func TestStartStop_LifecycleFiresTriggerOnPhpEdit(t *testing.T) {
 	}
 }
 
+// TestArmSuppression_DropsEventsDuringQuietWindow verifies that .php edits
+// inside the configured suppression window produce no dispatch, while edits
+// after the window fire normally. Covers the spec's "First-run suppression"
+// rule — entrypoint post-health churn must not trigger a queue:restart.
+func TestArmSuppression_DropsEventsDuringQuietWindow(t *testing.T) {
+	root := fakeLaravelProject(t)
+
+	fake := &fakeRunner{}
+	w, err := New(Config{
+		ProjectRoot:    root,
+		Runner:         fake,
+		DebounceBase:   20 * time.Millisecond,
+		DebounceMax:    80 * time.Millisecond,
+		ArmSuppression: 300 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- w.Start(ctx) }()
+
+	// Let Start arm watches and start the suppression window.
+	time.Sleep(50 * time.Millisecond)
+
+	// Edit DURING the suppression window — must be dropped.
+	target := filepath.Join(root, "app", "Http", "Controllers", "Foo.php")
+	if err := os.WriteFile(target, []byte("<?php // during"), 0o644); err != nil {
+		t.Fatalf("write during: %v", err)
+	}
+
+	// Wait past the debounce window but still under suppression.
+	time.Sleep(100 * time.Millisecond)
+	if n := atomic.LoadInt32(&fake.queueCalls); n != 0 {
+		t.Fatalf("dispatch fired inside suppression window: got %d calls", n)
+	}
+
+	// Wait out the suppression window.
+	time.Sleep(300 * time.Millisecond)
+
+	// Edit AFTER the suppression window — must fire.
+	if err := os.WriteFile(target, []byte("<?php // after"), 0o644); err != nil {
+		t.Fatalf("write after: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("no dispatch after suppression window elapsed")
+		default:
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	if err := w.Stop(); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Start did not return")
+	}
+}
+
 // TestStop_Idempotent confirms Stop can be called multiple times without
 // panicking (close-of-closed-channel would otherwise blow up).
 func TestStop_Idempotent(t *testing.T) {

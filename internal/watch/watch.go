@@ -68,7 +68,18 @@ type Config struct {
 	// DebounceMax caps backoff growth after repeated dispatch failures.
 	// Zero uses defaultDebounceMax (5s).
 	DebounceMax time.Duration
+
+	// ArmSuppression is the quiet period immediately after the watcher arms
+	// during which triggering events are dropped. Covers the entrypoint's
+	// post-health churn (cp .env.example .env, artisan key:generate) that
+	// straggles on slow WSL2 cold starts. Zero disables the window — prod
+	// callers should set DefaultArmSuppression; tests typically leave zero.
+	ArmSuppression time.Duration
 }
+
+// DefaultArmSuppression is the production default for Config.ArmSuppression.
+// Exported so cmd/ callers can opt-in without re-declaring the constant.
+const DefaultArmSuppression = 5 * time.Second
 
 // TriggerKind identifies which reload action a dispatch should perform.
 // Used by the future trigger dispatcher (td-a000b6).
@@ -86,11 +97,12 @@ const (
 // Watcher owns the lifecycle of the fsnotify watch set and the debounced
 // dispatch loop. Construct with New; drive with Start / Stop.
 type Watcher struct {
-	cfg    Config
-	fsw    *fsnotify.Watcher
-	events chan fsnotify.Event
-	done   chan struct{}
-	runner Runner
+	cfg      Config
+	fsw      *fsnotify.Watcher
+	events   chan fsnotify.Event
+	done     chan struct{}
+	runner   Runner
+	armedAt  time.Time // set by Start after armWatches; drives ArmSuppression
 
 	stopOnce sync.Once
 
@@ -163,6 +175,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 		// watches succeeded. Detailed logging lives in armWatches.
 		_ = werr
 	}
+	w.armedAt = time.Now()
 
 	debouncerDone := make(chan struct{})
 	go func() {
@@ -185,6 +198,13 @@ func (w *Watcher) Start(ctx context.Context) error {
 				return nil
 			}
 			if _, fire := w.classify(ev); !fire {
+				continue
+			}
+			// First-run suppression: drop triggering events that land
+			// inside the quiet window after arm (spec "First-run
+			// suppression" — covers container entrypoint's post-health
+			// writes like cp .env.example .env + artisan key:generate).
+			if w.cfg.ArmSuppression > 0 && time.Since(w.armedAt) < w.cfg.ArmSuppression {
 				continue
 			}
 			// Non-blocking send — if the debouncer is slow, we drop
