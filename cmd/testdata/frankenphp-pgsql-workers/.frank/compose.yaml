@@ -5,6 +5,11 @@ networks:
         driver: bridge
 services:
     laravel.queue.default.1:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
         command:
             - php
             - artisan
@@ -28,6 +33,11 @@ services:
             - .:/var/www/html
         working_dir: /var/www/html
     laravel.queue.default.2:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
         command:
             - php
             - artisan
@@ -51,6 +61,11 @@ services:
             - .:/var/www/html
         working_dir: /var/www/html
     laravel.schedule:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
         command:
             - php
             - artisan

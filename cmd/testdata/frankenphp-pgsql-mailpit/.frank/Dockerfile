@@ -93,8 +93,8 @@ RUN groupadd --force -g $WWWGROUP sail \
     && useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail \
     && git config --system --add safe.directory /var/www/html
 
-# Copy Caddyfile
-COPY Caddyfile /etc/caddy/Caddyfile
+# Copy Caddyfile (generated at .frank/Caddyfile; build context is project root)
+COPY .frank/Caddyfile /etc/caddy/Caddyfile
 
 # Entrypoint (heredoc — single-quoted delimiter suppresses $VAR expansion in body)
 RUN cat <<'SCRIPT' > /entrypoint.sh
