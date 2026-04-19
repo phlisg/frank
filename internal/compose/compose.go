@@ -152,6 +152,13 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 
 	isFPM := cfg.PHP.Runtime == "fpm"
 
+	// Copy laravel.test's build block into every declared worker so compose
+	// builds the image once (dedup by tag) and workers stop triggering a
+	// registry pull attempt when the image is not yet present. Using image:
+	// alone would have compose try to pull frank-<project>-laravel.test from
+	// docker.io and fail.
+	laravelBuild := laravelTestBuild(services)
+
 	if w.Schedule {
 		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{
 			ProjectName: projectName,
@@ -162,6 +169,7 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 		if err := mergeFragment(services, frag); err != nil {
 			return fmt.Errorf("merge schedule worker fragment: %w", err)
 		}
+		injectBuild(services, "laravel.schedule", laravelBuild)
 		if isFPM {
 			injectSailUser(services, "laravel.schedule")
 		}
@@ -188,6 +196,7 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 			if err := mergeFragment(services, frag); err != nil {
 				return fmt.Errorf("merge queue worker fragment %q: %w", name, err)
 			}
+			injectBuild(services, name, laravelBuild)
 			if isFPM {
 				injectSailUser(services, name)
 			}
@@ -195,6 +204,31 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 	}
 
 	return nil
+}
+
+// laravelTestBuild returns the build: block declared on the laravel.test
+// service, or nil if the service has no build (shouldn't happen for supported
+// runtimes). The returned value is safe to share across worker services —
+// compose does not mutate the build block at runtime.
+func laravelTestBuild(services map[string]interface{}) interface{} {
+	lt, ok := services["laravel.test"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return lt["build"]
+}
+
+// injectBuild copies the laravel.test build block onto the named worker
+// service. No-op when laravelBuild is nil or the service is absent.
+func injectBuild(services map[string]interface{}, name string, laravelBuild interface{}) {
+	if laravelBuild == nil {
+		return
+	}
+	svc, ok := services[name].(map[string]interface{})
+	if !ok {
+		return
+	}
+	svc["build"] = laravelBuild
 }
 
 // injectSailUser sets `user: sail` on the named service if it is a declared
