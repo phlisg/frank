@@ -26,6 +26,7 @@ var aliasTable = []struct {
 	{"php", execSail + " php", ""},
 	{"tinker", execSail + " php artisan tinker", ""},
 	{"npm", execSail + " npm", ""},
+	{"pnpm", execSail + " pnpm", ""},
 	{"bun", execSail + " bun", ""},
 	// Service-conditional aliases
 	{"psql", dc + " exec pgsql psql -U sail", "pgsql"},
