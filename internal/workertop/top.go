@@ -638,11 +638,22 @@ func (m *TopModel) recomputeBounds() {
 	}
 }
 
-// handleMouse implements click-to-zoom per the Controls extension.
-// Left-click on a pane: if not zoomed → zoom into it; if zoomed into the
-// same pane → unzoom; if zoomed into a different pane → switch zoom target.
-// Other buttons and motion events are ignored.
+// handleMouse implements click-to-zoom and wheel-to-scroll.
+// Left-click: zoom toggle (same pane unzooms, different pane switches target).
+// Wheel up/down: scroll the pane under the cursor (works in grid and zoom).
 func (m *TopModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		if p := m.paneAt(msg.X, msg.Y); p != nil {
+			p.ScrollUp(3)
+		}
+		return m, nil
+	case tea.MouseButtonWheelDown:
+		if p := m.paneAt(msg.X, msg.Y); p != nil {
+			p.ScrollDown(3)
+		}
+		return m, nil
+	}
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return m, nil
 	}
@@ -661,6 +672,16 @@ func (m *TopModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.broadcastFocus(), m.resizeAllCmd())
 	}
 	return m, nil
+}
+
+// paneAt hit-tests paneBounds and returns the pane under (x, y), or nil.
+func (m *TopModel) paneAt(x, y int) *Pane {
+	for paneID, r := range m.paneBounds {
+		if r.contains(x, y) {
+			return m.panesByID[paneID]
+		}
+	}
+	return nil
 }
 
 // resizeAllCmd dispatches a ResizeMsg to every pane based on the current

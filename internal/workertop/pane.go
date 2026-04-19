@@ -168,6 +168,12 @@ func (p *Pane) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return p, nil
 }
 
+// ScrollUp moves this pane's viewport up by n lines (no-op if already at top).
+func (p *Pane) ScrollUp(n int) { p.viewport.ScrollUp(n) }
+
+// ScrollDown moves this pane's viewport down by n lines (no-op if at bottom).
+func (p *Pane) ScrollDown(n int) { p.viewport.ScrollDown(n) }
+
 // View renders title bar + viewport wrapped in the state-colored
 // (or focus-colored) border.
 func (p *Pane) View() string {
