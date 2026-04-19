@@ -15,11 +15,16 @@ services:
             - artisan
             - queue:work
             - --queue=default
+        container_name: laravel.queue.default.1
         depends_on:
             laravel.test:
                 condition: service_started
         env_file:
             - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
         image: frank-frankenphp-pgsql-workers-laravel.test
         labels:
             frank.project: frankenphp-pgsql-workers
@@ -43,11 +48,16 @@ services:
             - artisan
             - queue:work
             - --queue=default
+        container_name: laravel.queue.default.2
         depends_on:
             laravel.test:
                 condition: service_started
         env_file:
             - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
         image: frank-frankenphp-pgsql-workers-laravel.test
         labels:
             frank.project: frankenphp-pgsql-workers
@@ -70,11 +80,16 @@ services:
             - php
             - artisan
             - schedule:work
+        container_name: laravel.schedule
         depends_on:
             laravel.test:
                 condition: service_started
         env_file:
             - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
         image: frank-frankenphp-pgsql-workers-laravel.test
         labels:
             frank.project: frankenphp-pgsql-workers

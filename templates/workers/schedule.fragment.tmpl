@@ -1,16 +1,21 @@
 laravel.schedule:
+  container_name: laravel.schedule
   image: "frank-{{.ProjectName}}-laravel.test"
   depends_on:
     laravel.test:
       condition: service_started
   volumes:
     - .:/var/www/html
+  environment:
+    - WWWUSER=${UID:-1000}
   env_file:
     - .env
   working_dir: /var/www/html
   restart: unless-stopped
   networks:
     - frank
+  healthcheck:
+    disable: true
   labels:
     frank.project: "{{.ProjectName}}"
     frank.worker: declared
