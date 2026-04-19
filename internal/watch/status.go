@@ -54,6 +54,10 @@ func ReadPidfile(path string) (int, error) {
 
 // pidAlive reports whether the given pid is running. Uses Signal(0) — a
 // no-op probe that returns ESRCH for missing pids and nil for live ones.
+// EPERM is treated as alive: the process exists, we just lack permission
+// to signal it (e.g. pid 1 from a non-root watcher). Without this the
+// already-running guard would happily overwrite a valid pidfile whose
+// owner happened to belong to a different uid.
 func pidAlive(pid int) bool {
 	if pid <= 0 {
 		return false
@@ -62,10 +66,11 @@ func pidAlive(pid int) bool {
 	if err != nil {
 		return false
 	}
-	if err := p.Signal(syscall.Signal(0)); err != nil {
-		return false
+	err = p.Signal(syscall.Signal(0))
+	if err == nil {
+		return true
 	}
-	return true
+	return errors.Is(err, syscall.EPERM)
 }
 
 // StatusState captures the cross-checked state of the host watcher.

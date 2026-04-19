@@ -75,6 +75,12 @@ type Config struct {
 	// straggles on slow WSL2 cold starts. Zero disables the window — prod
 	// callers should set DefaultArmSuppression; tests typically leave zero.
 	ArmSuppression time.Duration
+
+	// SkipPidfile disables pidfile acquisition and release inside Start.
+	// Tests that exercise Start but don't want to touch .frank/watch.pid
+	// set this true. Prod callers leave false so concurrent `frank watch`
+	// invocations detect each other via the already-running guard.
+	SkipPidfile bool
 }
 
 // DefaultArmSuppression is the production default for Config.ArmSuppression.
@@ -153,16 +159,23 @@ func New(cfg Config) (*Watcher, error) {
 	}, nil
 }
 
-// Start begins watching. Constructs the fsnotify watcher, walks
-// defaultWatchRoots (pruning ignored dirs), arms parent-dir watches for
-// defaultWatchFiles, spawns the debouncer goroutine that consumes w.events,
-// and runs a select loop that classifies each fsnotify event and pushes
-// triggering events to w.events.
+// Start begins watching. Acquires the pidfile (.frank/watch.pid) — returning
+// an already-running error if another watcher is live — constructs the
+// fsnotify watcher, walks defaultWatchRoots (pruning ignored dirs), arms
+// parent-dir watches for defaultWatchFiles, spawns the debouncer goroutine
+// that consumes w.events, and runs a select loop that classifies each
+// fsnotify event and pushes triggering events to w.events.
 //
-// Blocks until ctx is cancelled or Stop is called.
-//
-// TODO(td-4850c4): pidfile / detached child lifecycle.
+// Blocks until ctx is cancelled or Stop is called. The pidfile is unlinked
+// on return regardless of exit path.
 func (w *Watcher) Start(ctx context.Context) error {
+	if !w.cfg.SkipPidfile {
+		if err := w.acquirePidfile(); err != nil {
+			return err
+		}
+		defer w.releasePidfile()
+	}
+
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
