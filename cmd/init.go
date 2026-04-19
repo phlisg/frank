@@ -17,6 +17,7 @@ var flagPHP string
 var flagLaravel string
 var flagWith string
 var flagRuntime string
+var flagPM string
 var flagSchedule bool
 var flagQueueCount int
 
@@ -26,6 +27,7 @@ func init() {
 	initCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version, skips prompt (e.g. 12 or 12.*)")
 	initCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services, skips prompt (e.g. "pgsql,redis,mailpit")`)
 	initCmd.Flags().StringVar(&flagRuntime, "runtime", "", "runtime, skips prompt: frankenphp or fpm (ignored with --sail)")
+	initCmd.Flags().StringVar(&flagPM, "pm", "", "package manager: npm, pnpm, bun")
 	initCmd.Flags().BoolVar(&flagSchedule, "schedule", false, "enable schedule:work worker, skips prompt")
 	initCmd.Flags().IntVar(&flagQueueCount, "queue-count", 0, "number of queue:work workers (0-4), skips prompt")
 	rootCmd.AddCommand(initCmd)
@@ -195,6 +197,26 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 					huh.NewOption("PHP-FPM + Nginx", "fpm"),
 				).
 				Value(&cfg.PHP.Runtime),
+		))
+	}
+
+	if flagPM != "" {
+		switch flagPM {
+		case "npm", "pnpm", "bun":
+			cfg.Node.PackageManager = flagPM
+		default:
+			return fmt.Errorf("invalid --pm %q: valid options are npm, pnpm, bun", flagPM)
+		}
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Package Manager").
+				Options(
+					huh.NewOption("npm (default)", "npm"),
+					huh.NewOption("pnpm", "pnpm"),
+					huh.NewOption("bun", "bun"),
+				).
+				Value(&cfg.Node.PackageManager),
 		))
 	}
 
@@ -394,6 +416,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Services []string                        `yaml:"services"`
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
 		Workers  *config.Workers                 `yaml:"workers,omitempty"`
+		Node     *config.Node                    `yaml:"node,omitempty"`
 	}
 
 	out := configOutput{
@@ -406,6 +429,10 @@ func marshalConfig(cfg *config.Config) (string, error) {
 	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
 		w := cfg.Workers
 		out.Workers = &w
+	}
+	if cfg.Node.PackageManager != "" && cfg.Node.PackageManager != "npm" {
+		n := cfg.Node
+		out.Node = &n
 	}
 
 	b, err := yaml.Marshal(out)

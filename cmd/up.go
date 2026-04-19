@@ -141,8 +141,12 @@ func runUp(cmd *cobra.Command, args []string) error {
 	// npm install is intentionally not run automatically — it is memory-intensive
 	// and can OOM the container. Run it manually when needed:
 	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
-		fmt.Println("  npm install   # install frontend dependencies")
-		fmt.Println("  npm run dev   # start Vite dev server")
+		pm := "npm"
+		if cfg != nil && cfg.Node.PackageManager != "" {
+			pm = cfg.Node.PackageManager
+		}
+		fmt.Printf("  %s install   # install frontend dependencies\n", pm)
+		fmt.Printf("  %s run dev   # start Vite dev server\n", pm)
 	}
 
 	// -d mode: after laravel.test is healthy and post-start migrations

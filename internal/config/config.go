@@ -11,11 +11,22 @@ import (
 )
 
 const (
-	DefaultPHPVersion     = "8.5"
-	DefaultPHPRuntime     = "frankenphp"
-	DefaultLaravelVersion = "latest"
-	ConfigFileName        = "frank.yaml"
+	DefaultPHPVersion      = "8.5"
+	DefaultPHPRuntime      = "frankenphp"
+	DefaultLaravelVersion  = "latest"
+	DefaultPackageManager  = "npm"
+	ConfigFileName         = "frank.yaml"
 )
+
+var validPackageManagers = map[string]bool{
+	"npm":  true,
+	"pnpm": true,
+	"bun":  true,
+}
+
+var knownNodeKeys = map[string]bool{
+	"packageManager": true,
+}
 
 var validPHPVersions = map[string]bool{
 	"8.2": true,
@@ -80,6 +91,11 @@ type Config struct {
 	Services []string                 `yaml:"services"`
 	Config   map[string]ServiceConfig `yaml:"config"`
 	Workers  Workers                  `yaml:"workers"`
+	Node     Node                     `yaml:"node,omitempty"`
+}
+
+type Node struct {
+	PackageManager string `yaml:"packageManager,omitempty"`
 }
 
 type Workers struct {
@@ -140,6 +156,7 @@ func Load(dir string) (*Config, error) {
 	}
 
 	warnUnknownWorkerKeys(&root)
+	warnUnknownNodeKeys(&root)
 
 	// Capture explicit-empty-queues before defaulting overwrites.
 	explicitEmptyQueues := make([]bool, len(cfg.Workers.Queue))
@@ -176,6 +193,9 @@ func applyDefaults(cfg *Config) {
 	if len(cfg.Services) == 0 {
 		cfg.Services = append([]string{}, defaultServices...)
 	}
+	if cfg.Node.PackageManager == "" {
+		cfg.Node.PackageManager = DefaultPackageManager
+	}
 	for i := range cfg.Workers.Queue {
 		p := &cfg.Workers.Queue[i]
 		if p.Queues == nil {
@@ -199,6 +219,9 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 	}
 	if !validRuntimes[cfg.PHP.Runtime] {
 		return fmt.Errorf("unsupported runtime %q — valid options: frankenphp, fpm", cfg.PHP.Runtime)
+	}
+	if !validPackageManagers[cfg.Node.PackageManager] {
+		return fmt.Errorf("unsupported package manager %q — valid options: npm, pnpm, bun", cfg.Node.PackageManager)
 	}
 
 	var dbCount int
@@ -282,6 +305,28 @@ func warnUnknownWorkerKeys(root *yaml.Node) {
 			if !knownQueueItemKeys[key] {
 				fmt.Fprintf(os.Stderr, "warning: unknown key %q under workers.queue[%d] — ignored\n", key, idx)
 			}
+		}
+	}
+}
+
+// warnUnknownNodeKeys emits a warning for unknown keys under the node block,
+// for forward-compat with future fields.
+func warnUnknownNodeKeys(root *yaml.Node) {
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return
+	}
+	top := root.Content[0]
+	if top.Kind != yaml.MappingNode {
+		return
+	}
+	node := mapValue(top, "node")
+	if node == nil || node.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key := node.Content[i].Value
+		if !knownNodeKeys[key] {
+			fmt.Fprintf(os.Stderr, "warning: unknown key %q under node — ignored\n", key)
 		}
 	}
 }
