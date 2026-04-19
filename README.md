@@ -24,6 +24,7 @@ teammate with `git clone` and `frank up`.
 - Declared `schedule:work` + `queue:work` pools in `frank.yaml`
 - Ad-hoc workers via `frank worker queue|schedule`
 - Host-side file watcher (`frank watch`) reloads workers on code change
+- Multi-pane CCTV view of every worker: `frank worker top`
 
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
@@ -216,6 +217,7 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 | `frank worker list` | List declared + ad-hoc worker containers |
 | `frank worker stop [--all]` | Stop ad-hoc workers; `--all` also stops declared ones |
 | `frank worker logs [name] [-f]` | Tail logs for one or all workers |
+| `frank worker top [--live] [--min-pane-width N]` | Live multi-pane CCTV view of every worker; `--live` reconciles ad-hoc churn |
 | `frank watch [--status\|--stop]` | Run the code-reload watcher in the foreground, or inspect/stop the detached one |
 | `frank activate` | Output eval-able shell aliases for the current project |
 | `frank deactivate` | Output eval-able shell commands to remove all frank aliases |
