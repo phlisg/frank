@@ -55,6 +55,16 @@ var integrationFixtures = []integrationFixture{
 		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
 	},
 	{
+		name: "frankenphp-pgsql-pnpm",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+			Laravel:  config.Laravel{Version: "13.x"},
+			Services: []string{"pgsql", "mailpit"},
+			Node:     config.Node{PackageManager: "pnpm"},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
+	},
+	{
 		name: "frankenphp-pgsql-workers",
 		cfg: &config.Config{
 			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},

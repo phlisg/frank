@@ -3,7 +3,24 @@ package shell
 import (
 	"strings"
 	"testing"
+
+	"github.com/phlisg/frank/internal/config"
 )
+
+func TestActivate(t *testing.T) {
+	cfg := &config.Config{Services: []string{"pgsql", "mailpit"}}
+	out := Activate(cfg)
+	for _, want := range []string{"alias npm=", "alias pnpm=", "alias bun=", "alias artisan=", "alias composer=", "alias psql="} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Activate output missing %q; got:\n%s", want, out)
+		}
+	}
+	for _, bad := range []string{"alias mysql=", "alias mariadb=", "alias redis-cli="} {
+		if strings.Contains(out, bad) {
+			t.Errorf("Activate output contains %q but service not configured", bad)
+		}
+	}
+}
 
 func TestShellSetup_Zsh(t *testing.T) {
 	output := ShellSetup("zsh")

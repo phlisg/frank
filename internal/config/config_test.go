@@ -348,6 +348,66 @@ func containsAll(s string, subs ...string) bool {
 	return true
 }
 
+func TestPackageManagerDefault(t *testing.T) {
+	cfg := New()
+	if cfg.Node.PackageManager != DefaultPackageManager {
+		t.Errorf("Node.PackageManager = %q, want %q", cfg.Node.PackageManager, DefaultPackageManager)
+	}
+}
+
+func TestPackageManagerValid(t *testing.T) {
+	for _, pm := range []string{"npm", "pnpm", "bun"} {
+		t.Run(pm, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, "version: 1\nnode:\n  packageManager: "+pm+"\n")
+			cfg, err := Load(dir)
+			if err != nil {
+				t.Fatalf("Load error: %v", err)
+			}
+			if cfg.Node.PackageManager != pm {
+				t.Errorf("Node.PackageManager = %q, want %q", cfg.Node.PackageManager, pm)
+			}
+		})
+	}
+}
+
+func TestPackageManagerInvalid(t *testing.T) {
+	for _, pm := range []string{"yarn", "bogus"} {
+		t.Run(pm, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, "version: 1\nnode:\n  packageManager: "+pm+"\n")
+			if _, err := Load(dir); err == nil {
+				t.Errorf("expected error for package manager %q", pm)
+			}
+		})
+	}
+}
+
+func TestNodeUnknownKeyWarning(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+node:
+  packageManager: pnpm
+  futureThing: yes
+`)
+	r, w, _ := os.Pipe()
+	oldStderr := os.Stderr
+	os.Stderr = w
+	_, err := Load(dir)
+	w.Close()
+	os.Stderr = oldStderr
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	out := string(buf[:n])
+	if !containsAll(out, "futureThing") {
+		t.Errorf("expected warning for unknown node key, got: %q", out)
+	}
+}
+
 func TestHasService(t *testing.T) {
 	cfg := &Config{Services: []string{"pgsql", "mailpit"}}
 	if !cfg.HasService("pgsql") {
