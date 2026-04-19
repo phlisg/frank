@@ -83,7 +83,7 @@ func TestLogsReader_Declared(t *testing.T) {
 	argv := argvFor(t, spec)
 	want := []string{
 		"docker", "compose", "--project-directory", ".", "-f", ".frank/compose.yaml",
-		"logs", "-f", "--no-log-prefix", "laravel.queue.default.1",
+		"logs", "-f", "--no-log-prefix", "--tail", "25", "laravel.queue.default.1",
 	}
 	if !reflect.DeepEqual(argv, want) {
 		t.Fatalf("declared argv mismatch:\n got: %q\nwant: %q", argv, want)
@@ -143,7 +143,7 @@ func TestLogsReader_Adhoc(t *testing.T) {
 	spec := PaneSpec{Kind: KindAdhoc, Name: "laravel.queue.default.1.adhoc"}
 
 	argv := argvFor(t, spec)
-	want := []string{"docker", "logs", "-f", "laravel.queue.default.1.adhoc"}
+	want := []string{"docker", "logs", "-f", "--tail", "25", "laravel.queue.default.1.adhoc"}
 	if !reflect.DeepEqual(argv, want) {
 		t.Fatalf("adhoc argv mismatch:\n got: %q\nwant: %q", argv, want)
 	}

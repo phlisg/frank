@@ -88,10 +88,10 @@ func NewLogsReader(spec PaneSpec, exec CmdStartFn) *LogsReader {
 	var argv []string
 	argv = append(argv, "docker")
 	if spec.Kind == KindAdhoc {
-		argv = append(argv, "logs", "-f", spec.Name)
+		argv = append(argv, "logs", "-f", "--tail", "25", spec.Name)
 	} else {
 		argv = append(argv, composePrefix...)
-		argv = append(argv, "logs", "-f", "--no-log-prefix", spec.Name)
+		argv = append(argv, "logs", "-f", "--no-log-prefix", "--tail", "25", spec.Name)
 	}
 
 	return &LogsReader{
