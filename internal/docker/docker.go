@@ -232,6 +232,53 @@ func (c *Client) AdhocWorkerNames(projectName string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// AdhocWorker is one row from `docker ps` matching label=frank.worker=adhoc,
+// carrying both the container ID and its name. Used by internal/workertop's
+// reconciler, which needs IDs (for the stats hub's container-scoped poll) as
+// well as names (for log streaming and pane identity).
+type AdhocWorker struct {
+	ID   string
+	Name string
+}
+
+// ListAdhocWorkersWithIDs returns running ad-hoc worker containers for the
+// given project, each with its container ID and name. Only running
+// containers are returned — the `--live` reconciler diffs against its
+// current on-screen set, so stopped rows would spuriously emit EventRemove.
+func (c *Client) ListAdhocWorkersWithIDs(projectName string) ([]AdhocWorker, error) {
+	args := []string{
+		"ps",
+		"--filter", "label=frank.project=" + projectName,
+		"--filter", "label=frank.worker=adhoc",
+		"--format", "{{.ID}} {{.Names}}",
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := runCmd(cmd); err != nil {
+		return nil, err
+	}
+	out := strings.TrimSpace(buf.String())
+	if out == "" {
+		return nil, nil
+	}
+	var workers []AdhocWorker
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		workers = append(workers, AdhocWorker{ID: fields[0], Name: fields[1]})
+	}
+	return workers, nil
+}
+
 // InspectContainer returns the current status ("running", "exited", ...),
 // exit code, and container id of the named container. When no container
 // with that name exists, returns ("", 0, "", nil) — the missing case is
