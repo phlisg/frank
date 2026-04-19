@@ -8,6 +8,7 @@ import (
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -198,9 +199,7 @@ func runWorkerQueue(cmd *cobra.Command, args []string) error {
 		fmt.Println(name)
 	}
 
-	// TODO(td-1a786c): auto-spawn watcher here if none running. Hook into
-	// internal/watch once that lands; for now, leave a user-visible notice.
-	fmt.Println("frank worker queue: code reload not armed — run 'frank watch' or 'frank up' to start the watcher")
+	printWatcherHintIfNeeded(dir, client)
 	return nil
 }
 
@@ -236,7 +235,32 @@ func runWorkerSchedule(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("spawn %s: %w", name, err)
 	}
 	fmt.Println(name)
+
+	printWatcherHintIfNeeded(dir, client)
 	return nil
+}
+
+// printWatcherHintIfNeeded emits a reload hint only when no watcher is
+// running for this project. A live watcher means reload is already armed
+// for any ad-hoc container (queue:restart + schedule restart fire for
+// every queue worker in the compose project, declared or ad-hoc).
+//
+// Uses watch.StatusChecker so an orphaned watcher (pid alive, laravel
+// gone) is cleaned up as a side effect — the user's next action then
+// starts from a known-good state.
+func printWatcherHintIfNeeded(projectRoot string, client *docker.Client) {
+	checker := watch.NewStatusChecker(projectRoot, func() bool {
+		return client.ComposePSServiceExists("laravel.test")
+	})
+	st, _ := checker.Check()
+	switch st.State {
+	case watch.StatusRunning:
+		// Nothing to say — reload is armed.
+	case watch.StatusOrphaned:
+		fmt.Println("frank worker: orphaned watcher cleaned up; run `frank watch` to rearm code reload")
+	default:
+		fmt.Println("frank worker: code reload not armed — run `frank watch` or `frank up` to start the watcher")
+	}
 }
 
 func runWorkerList(cmd *cobra.Command, args []string) error {
