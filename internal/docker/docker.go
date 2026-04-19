@@ -106,6 +106,41 @@ func (c *Client) PS() error {
 	return c.Run("ps")
 }
 
+// PSWorkers lists worker containers (both declared and ad-hoc) for the given
+// project by filtering on the `frank.project` and `frank.worker` labels.
+//
+// This bypasses `docker compose ps` because ad-hoc workers are launched with
+// plain `docker run` and are therefore invisible to compose.
+func (c *Client) PSWorkers(projectName string) error {
+	args := []string{
+		"ps",
+		"--filter", "label=frank.project=" + projectName,
+		"--filter", "label=frank.worker",
+		"--format", "table {{.Names}}\t{{.Status}}\t{{.Label \"frank.worker\"}}\t{{.Label \"frank.worker.name\"}}",
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := runCmd(cmd); err != nil {
+		return err
+	}
+
+	out := buf.String()
+	// `docker ps --format table ...` always emits a header row. If the only
+	// line present is the header, there are no matching containers.
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) <= 1 {
+		fmt.Printf("No worker containers found for project %s.\n", projectName)
+		return nil
+	}
+
+	fmt.Print(out)
+	return nil
+}
+
 // Clean runs `docker compose down -v` (removes volumes).
 func (c *Client) Clean() error {
 	return c.Run("down", "-v")
