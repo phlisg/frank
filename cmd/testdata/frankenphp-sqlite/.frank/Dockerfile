@@ -71,8 +71,9 @@ RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g npm pnpm bun \
-    && corepack enable && corepack prepare yarn@stable --activate \
+    && npm install -g bun \
+    && corepack enable \
+    && corepack prepare npm@latest pnpm@latest --activate \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Database clients (pgdg repo — detect Debian codename dynamically)

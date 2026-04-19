@@ -69,6 +69,32 @@ func TestMarshalConfigOmitsEmptyWorkers(t *testing.T) {
 	}
 }
 
+func TestMarshalConfigOmitsDefaultNode(t *testing.T) {
+	cfg := config.New() // Node.PackageManager = "npm" (default)
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+	if strings.Contains(out, "node:") {
+		t.Errorf("expected no node key for default npm, got:\n%s", out)
+	}
+}
+
+func TestMarshalConfigEmitsNonDefaultNode(t *testing.T) {
+	cfg := config.New()
+	cfg.Node.PackageManager = "pnpm"
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+	if !strings.Contains(out, "node:") {
+		t.Errorf("expected node key for pnpm, got:\n%s", out)
+	}
+	if !strings.Contains(out, "packageManager: pnpm") {
+		t.Errorf("expected packageManager: pnpm, got:\n%s", out)
+	}
+}
+
 func TestMarshalConfigEmitsWorkers(t *testing.T) {
 	cfg := config.New()
 	applyWorkersFromInit(cfg, true, 2)
