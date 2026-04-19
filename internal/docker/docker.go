@@ -232,6 +232,91 @@ func (c *Client) AdhocWorkerNames(projectName string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// AdhocWorker is one row from `docker ps` matching label=frank.worker=adhoc,
+// carrying both the container ID and its name. Used by internal/workertop's
+// reconciler, which needs IDs (for the stats hub's container-scoped poll) as
+// well as names (for log streaming and pane identity).
+type AdhocWorker struct {
+	ID   string
+	Name string
+}
+
+// ListAdhocWorkersWithIDs returns running ad-hoc worker containers for the
+// given project, each with its container ID and name. Only running
+// containers are returned — the `--live` reconciler diffs against its
+// current on-screen set, so stopped rows would spuriously emit EventRemove.
+func (c *Client) ListAdhocWorkersWithIDs(projectName string) ([]AdhocWorker, error) {
+	args := []string{
+		"ps",
+		"--filter", "label=frank.project=" + projectName,
+		"--filter", "label=frank.worker=adhoc",
+		"--format", "{{.ID}} {{.Names}}",
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := runCmd(cmd); err != nil {
+		return nil, err
+	}
+	out := strings.TrimSpace(buf.String())
+	if out == "" {
+		return nil, nil
+	}
+	var workers []AdhocWorker
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		workers = append(workers, AdhocWorker{ID: fields[0], Name: fields[1]})
+	}
+	return workers, nil
+}
+
+// InspectContainer returns the current status ("running", "exited", ...),
+// exit code, and container id of the named container. When no container
+// with that name exists, returns ("", 0, "", nil) — the missing case is
+// a normal outcome, not an error.
+//
+// Shells out to `docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.Id}}' <name>`.
+// Used by internal/workertop to resolve pane state at TUI startup.
+func (c *Client) InspectContainer(name string) (string, int, string, error) {
+	cmd := exec.Command("docker", "inspect",
+		"--format", "{{.State.Status}} {{.State.ExitCode}} {{.Id}}",
+		name,
+	)
+	cmd.Dir = c.dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// `docker inspect` on a missing container exits non-zero with
+		// "No such object" on stderr. Treat that as a missing container,
+		// not an error.
+		if strings.Contains(stderr.String(), "No such object") {
+			return "", 0, "", nil
+		}
+		return "", 0, "", fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
+	}
+	fields := strings.Fields(strings.TrimSpace(stdout.String()))
+	if len(fields) < 3 {
+		return "", 0, "", fmt.Errorf("docker inspect %s: unexpected output %q", name, stdout.String())
+	}
+	status := fields[0]
+	var exitCode int
+	if _, err := fmt.Sscanf(fields[1], "%d", &exitCode); err != nil {
+		return "", 0, "", fmt.Errorf("docker inspect %s: parse exit code %q: %w", name, fields[1], err)
+	}
+	id := fields[2]
+	return status, exitCode, id, nil
+}
+
 // LogsForWorkers streams `docker compose logs` for the given service list.
 // If follow is true, `-f` is passed.
 func (c *Client) LogsForWorkers(services []string, follow bool) error {

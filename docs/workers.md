@@ -59,6 +59,47 @@ frank worker stop --all                      # stop declared workers too
 
 Ad-hoc workers are labelled `frank.worker=adhoc` so `frank down` cleans them up automatically — no orphans.
 
+## Live multi-pane view: `frank worker top`
+
+`frank worker top` opens a CCTV-style terminal UI that tails every worker's
+log in its own pane. One full-width row for the scheduler, one row per
+declared queue pool, and a trailing row for any ad-hoc workers. Memory
+usage sits in each pane's title bar.
+
+```bash
+frank worker top                       # snapshot layout — ad-hoc changes ignored
+frank worker top --live                # poll for new/removed ad-hoc workers every 2s
+frank worker top --min-pane-width 40   # force denser panes on ultrawide terminals
+```
+
+**Key bindings:**
+
+| Key                 | Action                                 |
+| ------------------- | -------------------------------------- |
+| `q`, `Ctrl-C`       | Quit (workers keep running)            |
+| `Tab`, `←`, `→`     | Cycle focus between panes              |
+| `Enter`             | Zoom focused pane full-screen          |
+| Left-click pane     | Focus + zoom that pane in one shot     |
+| `Esc`               | Return from zoom to grid (click zoomed pane also unzooms) |
+| `PgUp`, `PgDn`      | Scroll back through logs (zoom only)   |
+| `g`, `G`            | Jump to top / bottom of scrollback     |
+
+The TUI is read-only: it never starts, stops, or restarts a container.
+If no workers are running when you launch, it exits with a hint pointing
+you at `frank.yaml` or `frank worker queue`.
+
+Border colors reflect state: green (running), yellow (no stats sample in
+the last 10 s — likely stalled), red (`[exited N]` — the container exited
+with code `N`), thick bright-magenta (currently focused pane). Worker log
+output arrives with ANSI color intact; Laravel's green `DONE` and red
+`FAIL` are visible as written.
+
+On launch each pane seeds with the last 25 log lines (`docker logs --tail 25`)
+and then follows live — avoids a thousand-job replay flooding the grid when
+you've been processing a backlog.
+
+Design details: [`docs/superpowers/specs/2026-04-19-worker-top-tui-design.md`](superpowers/specs/2026-04-19-worker-top-tui-design.md).
+
 ## Code reload: `frank watch`
 
 Queue workers bootstrap your Laravel app once and hold it in memory — great for throughput, painful for development. Edit a class, and without a reload the worker keeps running the old code.
