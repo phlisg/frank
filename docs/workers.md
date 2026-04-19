@@ -90,9 +90,13 @@ you at `frank.yaml` or `frank worker queue`.
 
 Border colors reflect state: green (running), yellow (no stats sample in
 the last 10 s — likely stalled), red (`[exited N]` — the container exited
-with code `N`), cyan (currently focused pane). Worker log output arrives
-with ANSI color intact; Laravel's green `DONE` and red `FAIL` are visible
-as written.
+with code `N`), thick bright-magenta (currently focused pane). Worker log
+output arrives with ANSI color intact; Laravel's green `DONE` and red
+`FAIL` are visible as written.
+
+On launch each pane seeds with the last 25 log lines (`docker logs --tail 25`)
+and then follows live — avoids a thousand-job replay flooding the grid when
+you've been processing a backlog.
 
 Design details: [`docs/superpowers/specs/2026-04-19-worker-top-tui-design.md`](superpowers/specs/2026-04-19-worker-top-tui-design.md).
 
