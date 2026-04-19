@@ -110,20 +110,6 @@ func TestBuildQueueArtisanArgs_Passthrough(t *testing.T) {
 	}
 }
 
-func TestSplitArgs_NoSeparator(t *testing.T) {
-	got := splitArgs([]string{"a", "b"})
-	if !equalSlice(got, []string{"a", "b"}) {
-		t.Errorf("without '--', splitArgs should return input verbatim, got %v", got)
-	}
-}
-
-func TestSplitArgs_WithSeparator(t *testing.T) {
-	got := splitArgs([]string{"a", "--", "b", "c"})
-	if !equalSlice(got, []string{"b", "c"}) {
-		t.Errorf("after '--', splitArgs should return tail, got %v", got)
-	}
-}
-
 func equalSlice(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

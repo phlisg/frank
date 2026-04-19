@@ -36,18 +36,13 @@ func runCompose(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Manually extract --dir <value> since DisableFlagParsing=true.
-	dir := resolveDir()
-	var composeArgs []string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--dir" {
-			if i+1 < len(args) {
-				dir = args[i+1]
-				i++ // skip the value
-			}
-		} else {
-			composeArgs = append(composeArgs, args[i])
-		}
+	dir, composeArgs := stripDirFlag(args)
+
+	// Accept a leading `--` for convention parity with `frank up`, but
+	// the terse form (`frank compose ps -a`) still works — compose has
+	// no frank-owned flags to shield.
+	if len(composeArgs) > 0 && composeArgs[0] == "--" {
+		composeArgs = composeArgs[1:]
 	}
 
 	return docker.New(dir).Run(composeArgs...)

@@ -74,6 +74,17 @@ Worker fragment invariants (in the templates themselves):
 
 Ad-hoc workers (from `frank worker queue|schedule`) are launched via `docker compose run -d --name <name> --label frank.worker=adhoc laravel.test …`. They are **not** in compose.yaml, so `frank down` must clean them explicitly (`docker.Client.AdhocWorkerNames` → `StopContainers`). That cleanup lives in `cmd/down.go`; do not move it back into compose.
 
+## Passthrough Convention
+
+Frank commands that forward to docker compose follow a uniform rule: **frank-owned flags before `--`, raw docker compose args after `--`**.
+
+- `frank up [-d] [--quick] [-- <compose args>]` — typed flags `-d/--detach` and `--quick`; everything else must come after `--`. `upFlagError` in cmd/up.go rewrites pflag's "unknown flag" error into a hint pointing at `--`.
+- `frank compose [--] <compose argv>` — no frank-owned flags, so the terse form (`frank compose ps -a`) still works; a leading `--` is tolerated for consistency.
+- `frank exec <cmd> [args...]` — no frank-owned flags, no `--` needed.
+- `frank worker queue [frank flags] -- <artisan flags>` — canonical.
+
+`splitPassthrough` (cmd/passthrough.go) is the single source for tail extraction — uses cobra's `ArgsLenAtDash` with a scan fallback for `DisableFlagParsing` subcommands. `stripDirFlag` in the same file pulls `--dir` out manually for compose/exec, which keep `DisableFlagParsing=true` and therefore don't get cobra's persistent-flag parsing.
+
 ## Sail Interop Notes
 
 `vendor/bin/sail` is a **bash script** (not PHP) — `./vendor/bin/sail <cmd>` works without a local PHP install. Keep this in mind when writing user-facing messages or docs that reference Sail commands.

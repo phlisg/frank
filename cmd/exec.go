@@ -33,18 +33,6 @@ func runExec(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	dir := resolveDir()
-	var execArgs []string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--dir" {
-			if i+1 < len(args) {
-				dir = args[i+1]
-				i++
-			}
-		} else {
-			execArgs = append(execArgs, args[i])
-		}
-	}
-
+	dir, execArgs := stripDirFlag(args)
 	return docker.New(dir).Exec("laravel.test", execArgs...)
 }
