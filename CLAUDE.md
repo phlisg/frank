@@ -93,8 +93,7 @@ Frank commands that forward to docker compose follow a uniform rule: **frank-own
 
 ## FPM Runtime Notes
 
-The FPM Dockerfile uses `CMD ["php-fpmX.Y", "-F"]` to run in foreground (no-daemonize).  
-**Do not add `daemonize = no` to php-fpm.conf** — PHP 8.5 removed this as a valid global directive and FPM will refuse to start with `unknown entry 'daemonize'`.
+FPM runs foreground (`php-fpmX.Y -F`). Do not add `daemonize = no` to php-fpm.conf — PHP 8.5 rejects it with `unknown entry 'daemonize'`. User-facing docs: [`docs/runtimes.md`](docs/runtimes.md).
 
 ## Testing
 
