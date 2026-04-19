@@ -1,5 +1,6 @@
 {{.ServiceName}}:
   container_name: "{{.ServiceName}}"
+  tty: true
   image: "frank-{{.ProjectName}}-laravel.test"
   depends_on:
     laravel.test:

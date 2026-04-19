@@ -1,5 +1,6 @@
 laravel.schedule:
   container_name: laravel.schedule
+  tty: true
   image: "frank-{{.ProjectName}}-laravel.test"
   depends_on:
     laravel.test:
