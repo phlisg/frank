@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/phlisg/frank/internal/config"
@@ -330,30 +331,108 @@ func runWorkerLogs(cmd *cobra.Command, args []string) error {
 
 	if len(args) == 1 {
 		name := args[0]
-		// Declared workers live under compose; ad-hoc ones may not, so detect.
+		// Declared workers live under compose; ad-hoc ones don't, so detect.
 		if client.ComposePSServiceExists(name) {
 			return client.LogsForWorkers([]string{name}, workerLogsFollow)
 		}
 		return client.LogsRaw(name, workerLogsFollow)
 	}
 
-	// No name: collect declared worker service names and tail their compose logs.
-	out, err := client.ListContainers(projectName, "declared", "{{.Names}}")
-	if err != nil {
-		fmt.Printf("No declared workers for project %s.\n", projectName)
+	declared, adhoc, err := listWorkerNames(client, projectName)
+	if err != nil || (len(declared) == 0 && len(adhoc) == 0) {
+		fmt.Printf("No workers for project %s.\n", projectName)
 		return nil
 	}
-	var services []string
+
+	// Fast paths: single-backend invocations keep the native log UX.
+	if len(adhoc) == 0 {
+		return client.LogsForWorkers(declared, workerLogsFollow)
+	}
+	if len(declared) == 0 && len(adhoc) == 1 && !workerLogsFollow {
+		return client.LogsRaw(adhoc[0], workerLogsFollow)
+	}
+
+	// Mixed or multi-adhoc: fan out. Compose handles its own multi-service
+	// tail; each ad-hoc container gets its own goroutine with a line prefix
+	// so interleaved output stays readable.
+	return streamMixedWorkerLogs(client, declared, adhoc, workerLogsFollow)
+}
+
+// listWorkerNames partitions the project's worker containers into declared
+// (managed by compose) and ad-hoc (started via `compose run -d`). Both
+// lists preserve docker's output order so the UX is predictable.
+func listWorkerNames(client *docker.Client, projectName string) (declared, adhoc []string, err error) {
+	out, err := client.ListContainers(projectName, "", "{{.Names}}\t{{.Label \"frank.worker\"}}")
+	if err != nil {
+		return nil, nil, err
+	}
+	declared, adhoc = parseWorkerList(out)
+	return declared, adhoc, nil
+}
+
+// parseWorkerList splits docker ps output (one "<name>\t<frank.worker>"
+// line per container) into declared and ad-hoc names. Lines without a
+// label kind default to declared so containers predating the label scheme
+// stay addressable; ad-hoc classification requires an explicit "adhoc".
+func parseWorkerList(out string) (declared, adhoc []string) {
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		services = append(services, line)
+		parts := strings.SplitN(line, "\t", 2)
+		name := strings.TrimSpace(parts[0])
+		if name == "" {
+			continue
+		}
+		kind := ""
+		if len(parts) == 2 {
+			kind = strings.TrimSpace(parts[1])
+		}
+		if kind == "adhoc" {
+			adhoc = append(adhoc, name)
+		} else {
+			declared = append(declared, name)
+		}
 	}
-	if len(services) == 0 {
-		fmt.Printf("No declared workers for project %s.\n", projectName)
-		return nil
+	return declared, adhoc
+}
+
+// streamMixedWorkerLogs fans a mixed set of declared + ad-hoc workers out
+// to their respective backends. `docker compose logs` handles the declared
+// subset natively (it already prefixes lines with the service name). Each
+// ad-hoc container is streamed via LogsRawPrefixed in its own goroutine
+// so the prefix form matches. Blocks until every backend exits.
+func streamMixedWorkerLogs(client *docker.Client, declared, adhoc []string, follow bool) error {
+	var wg sync.WaitGroup
+	errs := make(chan error, len(adhoc)+1)
+
+	if len(declared) > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := client.LogsForWorkers(declared, follow); err != nil {
+				errs <- fmt.Errorf("declared logs: %w", err)
+			}
+		}()
 	}
-	return client.LogsForWorkers(services, workerLogsFollow)
+	for _, name := range adhoc {
+		wg.Add(1)
+		go func(n string) {
+			defer wg.Done()
+			if err := client.LogsRawPrefixed(n, follow); err != nil {
+				errs <- fmt.Errorf("%s logs: %w", n, err)
+			}
+		}(name)
+	}
+
+	wg.Wait()
+	close(errs)
+	var firstErr error
+	for e := range errs {
+		if firstErr == nil {
+			firstErr = e
+		}
+	}
+	return firstErr
 }

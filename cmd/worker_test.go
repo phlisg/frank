@@ -21,6 +21,51 @@ func TestAdhocScheduleName(t *testing.T) {
 	}
 }
 
+func TestParseWorkerList_PartitionsByLabel(t *testing.T) {
+	in := strings.Join([]string{
+		"laravel.queue.default.1\tdeclared",
+		"laravel.queue.default.2\tdeclared",
+		"laravel.schedule\tdeclared",
+		"laravel.queue.adhoc.1700000000.1\tadhoc",
+		"laravel.schedule.adhoc.1700000000\tadhoc",
+	}, "\n")
+
+	declared, adhoc := parseWorkerList(in)
+
+	wantDeclared := []string{"laravel.queue.default.1", "laravel.queue.default.2", "laravel.schedule"}
+	wantAdhoc := []string{"laravel.queue.adhoc.1700000000.1", "laravel.schedule.adhoc.1700000000"}
+
+	if !equalSlice(declared, wantDeclared) {
+		t.Errorf("declared = %v, want %v", declared, wantDeclared)
+	}
+	if !equalSlice(adhoc, wantAdhoc) {
+		t.Errorf("adhoc = %v, want %v", adhoc, wantAdhoc)
+	}
+}
+
+func TestParseWorkerList_EmptyAndBlankLines(t *testing.T) {
+	declared, adhoc := parseWorkerList("")
+	if declared != nil || adhoc != nil {
+		t.Errorf("empty input should yield nil slices, got declared=%v adhoc=%v", declared, adhoc)
+	}
+
+	declared, adhoc = parseWorkerList("\n\n  \n")
+	if declared != nil || adhoc != nil {
+		t.Errorf("blank input should yield nil slices, got declared=%v adhoc=%v", declared, adhoc)
+	}
+}
+
+func TestParseWorkerList_MissingKindDefaultsDeclared(t *testing.T) {
+	in := "legacy.worker.name\t"
+	declared, adhoc := parseWorkerList(in)
+	if len(adhoc) != 0 {
+		t.Errorf("empty kind should not classify as adhoc: %v", adhoc)
+	}
+	if len(declared) != 1 || declared[0] != "legacy.worker.name" {
+		t.Errorf("declared = %v, want [legacy.worker.name]", declared)
+	}
+}
+
 func TestBuildQueueArtisanArgs_Defaults(t *testing.T) {
 	got := buildQueueArtisanArgs("default", 0, 0, 0, 0, 0, nil)
 	want := []string{"php", "artisan", "queue:work", "--queue=default"}

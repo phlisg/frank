@@ -1,13 +1,16 @@
 package docker
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -266,6 +269,50 @@ func (c *Client) LogsRaw(name string, follow bool) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return runCmd(cmd)
+}
+
+// LogsRawPrefixed streams `docker logs <name>` to stdout/stderr, prefixing
+// each line with the container name so callers can interleave multiple
+// raw-logs streams without confusing the output. Mirrors the `<svc>  |`
+// format that `docker compose logs` uses natively.
+func (c *Client) LogsRawPrefixed(name string, follow bool) error {
+	args := []string{"logs"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, name)
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); copyWithPrefix(os.Stdout, stdout, name) }()
+	go func() { defer wg.Done(); copyWithPrefix(os.Stderr, stderr, name) }()
+	waitErr := cmd.Wait()
+	wg.Wait()
+	return waitErr
+}
+
+// copyWithPrefix reads lines from src and writes them to dst with a
+// compose-style "<name>  | " prefix. Stops on EOF or scan error.
+func copyWithPrefix(dst io.Writer, src io.Reader, name string) {
+	sc := bufio.NewScanner(src)
+	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	for sc.Scan() {
+		fmt.Fprintf(dst, "%s  | %s\n", name, sc.Text())
+	}
 }
 
 // Clean runs `docker compose down -v` (removes volumes).
