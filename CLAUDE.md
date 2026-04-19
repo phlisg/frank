@@ -74,6 +74,29 @@ Worker fragment invariants (in the templates themselves):
 
 Ad-hoc workers (from `frank worker queue|schedule`) are launched via `docker compose run -d --name <name> --label frank.worker=adhoc laravel.test …`. They are **not** in compose.yaml, so `frank down` must clean them explicitly (`docker.Client.AdhocWorkerNames` → `StopContainers`). That cleanup lives in `cmd/down.go`; do not move it back into compose.
 
+## Worker Top TUI
+
+`frank worker top` is a bubbletea multi-pane CCTV view of scheduler + queue + ad-hoc workers. Spec: `docs/superpowers/specs/2026-04-19-worker-top-tui-design.md`. Package: `internal/workertop/`.
+
+File responsibilities:
+- `discover.go` — resolves `[]PaneSpec` from cfg + docker. Owns `PaneKind`/`PaneState` enums. Uses a `containerInspector` interface so tests mock docker.
+- `layout.go` — pure `ComputeLayout(w, h, rows, minPaneWidth)`. Header/footer=1 each; budget split among rows min 5; col widths `w/count`; <20 cols paginates horizontally; <minPaneWidth (default 30) sets `TruncateTitles`.
+- `stats.go` — `Hub` polls `docker stats --no-stream --format '{{.ID}} {{.MemPerc}} {{.MemUsage}}' <ids...>` every 2s. **Always scope to explicit IDs** — bare `docker stats` dumps every container on the host.
+- `logs.go` — one `LogsReader` subprocess per pane. Declared → `docker compose --project-directory . -f .frank/compose.yaml logs -f --no-log-prefix --tail 25 <svc>`; adhoc → `docker logs -f --tail 25 <name>`. `--tail 25` skips historic flood on launch.
+- `reconciler.go` — `--live` only. 2s poll of `docker ps --filter label=frank.worker=adhoc` via `adhocLister` interface; diff emits `EventAdd`/`EventRemove`. Seeded with initial adhoc panes so pre-existing ones don't spuriously re-emit.
+- `pane.go` — per-pane bubbletea model: viewport + 500-line FIFO, stats snapshot, state. PaneID-filtered msgs (`LogLineMsg`, `StatsMsg`, `ResizeMsg`, `FocusMsg`, `StateMsg`).
+- `top.go` — root `TopModel`. Owns rows/panes, statsHub, reconciler, per-pane LogsReaders, focus/zoom, paneBounds (for mouse hit-tests). Keys: q/ctrl+c quit, tab/arrows focus, enter zoom, esc back, pgup/pgdn + g/G scrollback (zoom only). Mouse: left-click zoom toggle, wheel scroll pane under cursor.
+- `style.go` — lipgloss theme vars. Focus border = thick magenta (13), not cyan — avoids ambiguity with green running.
+- `cmd/worker_top.go` — cobra wiring; flags `--live`, `--min-pane-width` (default 30).
+
+TUI is strictly read-only: never starts, stops, or restarts containers. Discovery empty-set exits early with a hint (exit 0, not error).
+
+Worker fragment invariant for this feature: `tty: true` on `queue.fragment.tmpl` + `schedule.fragment.tmpl` (NOT `init.fragment.tmpl` — that's the one-shot laravel.migrate). Needed so Laravel's `queue:work`/`schedule:work` emit ANSI color, which the TUI passes through unchanged.
+
+`docker.Client` additions for this feature (in `internal/docker/docker.go`):
+- `InspectContainer(name) (status, exitCode, id string, err)` — returns raw status string (avoids workertop→docker package import cycle on `PaneState`).
+- `ListAdhocWorkersWithIDs(projectName) ([]AdhocWorker{ID, Name}, error)` — running-only (no `-a`), reconciler relies on this to see live transitions rather than historical state.
+
 ## Passthrough Convention
 
 Frank commands that forward to docker compose follow a uniform rule: **frank-owned flags before `--`, raw docker compose args after `--`**.
