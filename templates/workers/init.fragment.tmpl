@@ -1,0 +1,28 @@
+laravel.migrate:
+  container_name: laravel.migrate
+  image: "frank-{{.ProjectName}}-laravel.test"
+  volumes:
+    - .:/var/www/html
+  environment:
+    - WWWUSER=${UID:-1000}
+  env_file:
+    - .env
+  working_dir: /var/www/html
+  restart: "no"
+  networks:
+    - frank
+  healthcheck:
+    disable: true
+  labels:
+    frank.project: "{{.ProjectName}}"
+    frank.init: migrate
+  entrypoint: ["/bin/bash", "-lc"]
+  command:
+    - |
+      set -e
+      if [ ! -d vendor ]; then
+        echo "[frank.migrate] composer install"
+        composer install --no-interaction --prefer-dist --no-progress
+      fi
+      echo "[frank.migrate] artisan migrate --force"
+      php artisan migrate --force

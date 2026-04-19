@@ -76,17 +76,7 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 
 	// 3. Inject depends_on into laravel.test based on which services are present.
 	//    Done post-merge because templates don't know which services were selected.
-	deps := map[string]interface{}{}
-	for _, svc := range cfg.Services {
-		if svc == "sqlite" {
-			continue // sqlite has no compose service
-		}
-		condition := "service_started"
-		if healthcheckedServices[svc] {
-			condition = "service_healthy"
-		}
-		deps[svc] = map[string]interface{}{"condition": condition}
-	}
+	deps := serviceDepends(cfg)
 	if len(deps) > 0 {
 		if lt, ok := services["laravel.test"].(map[string]interface{}); ok {
 			lt["depends_on"] = deps
@@ -137,10 +127,36 @@ func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
 	return os.WriteFile(filepath.Join(frankDir, "compose.yaml"), []byte(content), 0644)
 }
 
+// serviceDepends returns the depends_on map for laravel.test and the
+// laravel.migrate helper, keyed by db/cache/queue service name with the right
+// condition (service_healthy when the service ships a healthcheck, otherwise
+// service_started). sqlite has no compose service and is skipped.
+func serviceDepends(cfg *config.Config) map[string]interface{} {
+	deps := map[string]interface{}{}
+	for _, svc := range cfg.Services {
+		if svc == "sqlite" {
+			continue
+		}
+		condition := "service_started"
+		if healthcheckedServices[svc] {
+			condition = "service_healthy"
+		}
+		deps[svc] = map[string]interface{}{"condition": condition}
+	}
+	return deps
+}
+
 // emitWorkers renders and merges declared worker services (schedule + queue
 // pools) into the services map. When cfg.PHP.Runtime == "fpm", it also injects
 // `user: sail` on every declared worker so CLI commands drop root before
 // touching the bind mount (php-fpm's in-pool user drop doesn't apply to CLI).
+//
+// A one-shot laravel.migrate service is emitted alongside the workers: it
+// runs composer install (when vendor/ is missing) and php artisan migrate
+// --force, then exits. Workers depend on its service_completed_successfully
+// so queue:work does not boot before the Laravel cache/jobs tables exist —
+// Laravel 11+'s default database cache driver otherwise crash-loops workers
+// on startup with SQLSTATE[42P01] relation "cache" does not exist.
 //
 // Keep worker fragment templates runtime-agnostic; the runtime coupling lives
 // here, parallel to the depends_on injection in Generate().
@@ -158,6 +174,28 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 	// alone would have compose try to pull frank-<project>-laravel.test from
 	// docker.io and fail.
 	laravelBuild := laravelTestBuild(services)
+
+	// Emit the one-shot laravel.migrate initializer.
+	initFrag, err := g.engine.RenderWorker("init", template.WorkerData{
+		ProjectName: projectName,
+	})
+	if err != nil {
+		return fmt.Errorf("init fragment: %w", err)
+	}
+	if err := mergeFragment(services, initFrag); err != nil {
+		return fmt.Errorf("merge init fragment: %w", err)
+	}
+	injectBuild(services, "laravel.migrate", laravelBuild)
+	if migrateDeps := serviceDepends(cfg); len(migrateDeps) > 0 {
+		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
+			svc["depends_on"] = migrateDeps
+		}
+	}
+	if isFPM {
+		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
+			svc["user"] = "sail"
+		}
+	}
 
 	if w.Schedule {
 		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{

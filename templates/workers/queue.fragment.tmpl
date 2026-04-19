@@ -4,6 +4,8 @@
   depends_on:
     laravel.test:
       condition: service_started
+    laravel.migrate:
+      condition: service_completed_successfully
   volumes:
     - .:/var/www/html
   environment:

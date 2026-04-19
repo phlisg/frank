@@ -4,6 +4,47 @@ networks:
     frank:
         driver: bridge
 services:
+    laravel.migrate:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - |
+              set -e
+              if [ ! -d vendor ]; then
+                echo "[frank.migrate] composer install"
+                composer install --no-interaction --prefer-dist --no-progress
+              fi
+              echo "[frank.migrate] artisan migrate --force"
+              php artisan migrate --force
+        container_name: laravel.migrate
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        entrypoint:
+            - /bin/bash
+            - -lc
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-fpm-mysql-redis-workers-laravel.test
+        labels:
+            frank.init: migrate
+            frank.project: fpm-mysql-redis-workers
+        networks:
+            - frank
+        restart: "no"
+        user: sail
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
     laravel.queue.default.1:
         build:
             args:
@@ -17,6 +58,8 @@ services:
             - --queue=default
         container_name: laravel.queue.default.1
         depends_on:
+            laravel.migrate:
+                condition: service_completed_successfully
             laravel.test:
                 condition: service_started
         env_file:
@@ -51,6 +94,8 @@ services:
             - --queue=default
         container_name: laravel.queue.default.2
         depends_on:
+            laravel.migrate:
+                condition: service_completed_successfully
             laravel.test:
                 condition: service_started
         env_file:
@@ -85,6 +130,8 @@ services:
             - --queue=high
         container_name: laravel.queue.high.1
         depends_on:
+            laravel.migrate:
+                condition: service_completed_successfully
             laravel.test:
                 condition: service_started
         env_file:

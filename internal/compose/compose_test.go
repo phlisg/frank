@@ -349,10 +349,11 @@ func TestGenerate_FPMWorkersInjectSailUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
-	// Each declared worker (schedule + 2 queue) needs user: sail.
+	// Each declared worker (schedule + 2 queue) plus the laravel.migrate
+	// init helper needs user: sail → 4 occurrences.
 	n := strings.Count(out, "user: sail")
-	if n != 3 {
-		t.Errorf("expected 3 occurrences of 'user: sail' (schedule + 2 queue), got %d in:\n%s", n, out)
+	if n != 4 {
+		t.Errorf("expected 4 occurrences of 'user: sail' (schedule + 2 queue + migrate), got %d in:\n%s", n, out)
 	}
 }
 
