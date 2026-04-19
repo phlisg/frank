@@ -79,7 +79,8 @@ frank worker top --min-pane-width 40   # force denser panes on ultrawide termina
 | `q`, `Ctrl-C`       | Quit (workers keep running)            |
 | `Tab`, `←`, `→`     | Cycle focus between panes              |
 | `Enter`             | Zoom focused pane full-screen          |
-| `Esc`               | Return from zoom to grid               |
+| Left-click pane     | Focus + zoom that pane in one shot     |
+| `Esc`               | Return from zoom to grid (click zoomed pane also unzooms) |
 | `PgUp`, `PgDn`      | Scroll back through logs (zoom only)   |
 | `g`, `G`            | Jump to top / bottom of scrollback     |
 

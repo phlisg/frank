@@ -70,6 +70,10 @@ type TopModel struct {
 	width, height int
 	layout        Layout
 
+	// paneBounds maps paneID → absolute terminal rect (0-indexed cells).
+	// Populated by recomputeLayout; consumed by mouse hit-testing in Update.
+	paneBounds map[string]paneRect
+
 	// Focus / zoom — focusedID == "" means no pane focused;
 	// zoomedID != "" means rendering one pane full-screen.
 	focusedID string
@@ -86,6 +90,15 @@ type TopModel struct {
 // EventRemove so the pane can finally be deleted.
 type reconcileMsg struct {
 	evt ReconcileEvent
+}
+
+// paneRect is an absolute terminal rect in cells (x/y 0-indexed).
+type paneRect struct {
+	x, y, w, h int
+}
+
+func (r paneRect) contains(x, y int) bool {
+	return x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h
 }
 type paneCleanupMsg struct {
 	paneID string
@@ -189,6 +202,7 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	prog := tea.NewProgram(m,
 		tea.WithContext(svcCtx),
 		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
 	)
 	_, runErr := prog.Run()
 
@@ -335,6 +349,9 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 
 	case StatsMsg:
 		// Fan out to every pane, then re-subscribe.
@@ -585,6 +602,65 @@ func (m *TopModel) recomputeLayout() {
 		specs[i] = RowSpec{Label: r.label, PaneCount: len(r.paneIDs)}
 	}
 	m.layout = ComputeLayout(m.width, m.height, specs, m.opts.MinPaneWidth)
+	m.recomputeBounds()
+}
+
+// recomputeBounds rebuilds paneBounds from the current layout + zoom state.
+// In zoom mode every rect is the full body area (so any click unzooms).
+func (m *TopModel) recomputeBounds() {
+	m.paneBounds = make(map[string]paneRect)
+	if m.zoomedID != "" {
+		h := m.height - m.layout.HeaderHeight - m.layout.FooterHeight
+		if h < 1 {
+			h = 1
+		}
+		m.paneBounds[m.zoomedID] = paneRect{
+			x: 0, y: m.layout.HeaderHeight, w: m.width, h: h,
+		}
+		return
+	}
+	y := m.layout.HeaderHeight
+	for i, row := range m.rowOrder {
+		if i >= len(m.layout.Rows) {
+			break
+		}
+		rl := m.layout.Rows[i]
+		x := 0
+		for j, paneID := range row.paneIDs {
+			if j >= len(rl.Panes) {
+				break
+			}
+			pl := rl.Panes[j]
+			m.paneBounds[paneID] = paneRect{x: x, y: y, w: pl.Width, h: rl.Height}
+			x += pl.Width
+		}
+		y += rl.Height
+	}
+}
+
+// handleMouse implements click-to-zoom per the Controls extension.
+// Left-click on a pane: if not zoomed → zoom into it; if zoomed into the
+// same pane → unzoom; if zoomed into a different pane → switch zoom target.
+// Other buttons and motion events are ignored.
+func (m *TopModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
+		return m, nil
+	}
+	for paneID, r := range m.paneBounds {
+		if !r.contains(msg.X, msg.Y) {
+			continue
+		}
+		if m.zoomedID == paneID {
+			// Click on zoomed pane → unzoom.
+			m.zoomedID = ""
+		} else {
+			m.focusedID = paneID
+			m.zoomedID = paneID
+		}
+		m.recomputeLayout()
+		return m, tea.Batch(m.broadcastFocus(), m.resizeAllCmd())
+	}
+	return m, nil
 }
 
 // resizeAllCmd dispatches a ResizeMsg to every pane based on the current
@@ -684,9 +760,9 @@ func (m *TopModel) header() string {
 func (m *TopModel) footer() string {
 	var text string
 	if m.zoomedID != "" {
-		text = "esc back · pgup/pgdn scroll · q quit"
+		text = "esc / click back · pgup/pgdn scroll · q quit"
 	} else {
-		text = "q quit · tab focus · enter zoom · esc back"
+		text = "q quit · tab focus · enter / click zoom · esc back"
 	}
 	return Footer.Render(text)
 }
