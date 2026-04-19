@@ -7,7 +7,7 @@ var (
 	BorderRunning  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("2")) // green
 	BorderDegraded = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("3")) // yellow
 	BorderExited   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("1")) // red
-	BorderFocused  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("6")) // cyan for focused pane
+	BorderFocused  = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("13")) // bright magenta, thick — unmistakable vs green running
 
 	// Title bar parts
 	TitleName = lipgloss.NewStyle().Bold(true)
