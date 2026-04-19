@@ -38,8 +38,9 @@ services:
             MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
             MYSQL_USER: ${DB_USERNAME}
         healthcheck:
-            interval: 5s
-            retries: 10
+            interval: 1s
+            retries: 30
+            start_period: 30s
             test:
                 - CMD
                 - mysqladmin
@@ -71,8 +72,9 @@ services:
             - .:/var/www/html
     redis:
         healthcheck:
-            interval: 5s
-            retries: 10
+            interval: 1s
+            retries: 30
+            start_period: 30s
             test:
                 - CMD
                 - redis-cli
