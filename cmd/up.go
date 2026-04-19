@@ -58,6 +58,9 @@ func runUp(cmd *cobra.Command, args []string) error {
 	client := docker.New(dir)
 
 	composeArgs := splitPassthrough(cmd, args)
+	if upDetach {
+		composeArgs = append([]string{"-d"}, composeArgs...)
+	}
 
 	// Pre-flight: ensure .frank/ has been generated
 	if _, err := os.Stat(filepath.Join(dir, ".frank", "compose.yaml")); os.IsNotExist(err) {

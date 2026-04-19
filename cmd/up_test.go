@@ -32,6 +32,32 @@ func TestUpCmd_UnknownFlagHintsAtDash(t *testing.T) {
 	}
 }
 
+// buildUpComposeArgs mirrors the composeArgs construction in runUp so the
+// behavior can be exercised without booting docker. Keep in sync with runUp.
+func buildUpComposeArgs(detach bool, passthrough []string) []string {
+	out := append([]string{}, passthrough...)
+	if detach {
+		out = append([]string{"-d"}, out...)
+	}
+	return out
+}
+
+func TestUpCmd_DetachInjectedIntoComposeArgs(t *testing.T) {
+	got := buildUpComposeArgs(true, []string{"--remove-orphans"})
+	want := []string{"-d", "--remove-orphans"}
+	if !equalSlice(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestUpCmd_NoDetachNoInjection(t *testing.T) {
+	got := buildUpComposeArgs(false, []string{"--remove-orphans"})
+	want := []string{"--remove-orphans"}
+	if !equalSlice(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestShouldRunWatcher_ScheduleEnabled(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Workers.Schedule = true
