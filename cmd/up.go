@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -18,43 +17,47 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	upDetach bool
+	upQuick  bool
+)
+
 func init() {
+	upCmd.Flags().BoolVarP(&upDetach, "detach", "d", false, "Run containers in the background")
+	upCmd.Flags().BoolVar(&upQuick, "quick", false, "Skip post-start tasks (composer install + artisan migrate)")
+	upCmd.SetFlagErrorFunc(upFlagError)
 	rootCmd.AddCommand(upCmd)
 }
 
 var upCmd = &cobra.Command{
-	Use:   "up [docker compose flags]",
-	Short: "Start containers (passes flags through to docker compose up)",
-	Long: `Start containers by passing all flags directly to docker compose up.
+	Use:   "up [-d] [--quick] [-- <compose args>]",
+	Short: "Start containers (-d / --quick frank-owned; compose flags after --)",
+	Long: `Start containers. Frank owns -d/--detach and --quick because it
+needs those decisions for watcher spawn and post-start task skipping.
+Every other docker compose flag must come after a literal "--".
 
 Examples:
-  frank up              # foreground
-  frank up -d           # detached
-  frank up -d --build   # detached, force rebuild
+  frank up                              # foreground
+  frank up -d                           # detached
+  frank up --quick                      # skip post-start tasks
+  frank up -- --build                   # force rebuild
+  frank up -d -- --force-recreate       # detached + compose flag`,
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
+	RunE:              runUp,
+}
 
-Frank-specific flag:
-  --quick   Skip post-start tasks (composer install + artisan migrate)`,
-	DisableFlagParsing: true,
-	SilenceUsage:       true,
-	ValidArgsFunction:  cobra.NoFileCompletions,
-	RunE:               runUp,
+// upFlagError turns "unknown flag: --foo" into an actionable hint that
+// points the user at the `--` separator for docker compose passthrough.
+func upFlagError(cmd *cobra.Command, err error) error {
+	return fmt.Errorf("%w\n\nHint: frank up only owns -d/--detach and --quick — pass docker compose flags after `--`\n  frank up -- --build", err)
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 	client := docker.New(dir)
 
-	quick := false
-	var composeArgs []string
-	for _, a := range args {
-		if a == "--quick" {
-			quick = true
-		} else if a == "--help" || a == "-h" {
-			return cmd.Help()
-		} else {
-			composeArgs = append(composeArgs, a)
-		}
-	}
+	composeArgs := splitPassthrough(cmd, args)
 
 	// Pre-flight: ensure .frank/ has been generated
 	if _, err := os.Stat(filepath.Join(dir, ".frank", "compose.yaml")); os.IsNotExist(err) {
@@ -77,7 +80,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	detached := detachedMode(composeArgs)
+	detached := upDetach
 
 	// Resolve watcher intent once so fg + -d paths share the decision.
 	cfg, _ := config.Load(dir)
@@ -107,7 +110,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		return upErr
 	}
 
-	if quick {
+	if upQuick {
 		return nil
 	}
 
@@ -149,23 +152,6 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// detachedMode reports whether the compose pass-through flags include -d
-// or --detach (compose's canonical detach signals).
-func detachedMode(composeArgs []string) bool {
-	for _, a := range composeArgs {
-		switch a {
-		case "-d", "--detach":
-			return true
-		}
-		if strings.HasPrefix(a, "--detach=") {
-			if v := strings.TrimPrefix(a, "--detach="); v != "false" && v != "0" {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // shouldRunWatcher decides whether `frank up` should spawn a watcher.

@@ -137,32 +137,6 @@ func adhocScheduleName(epoch int64) string {
 	return fmt.Sprintf("laravel.schedule.adhoc.%d", epoch)
 }
 
-// splitArgs separates user positional args from passthrough args after "--".
-// Cobra normally strips the literal "--" token from args while reporting the
-// split position via ArgsLenAtDash. We still scan defensively in case the
-// token survives (it does in some cobra versions / with DisableFlagParsing).
-func splitArgs(args []string) []string {
-	for i, a := range args {
-		if a == "--" {
-			return args[i+1:]
-		}
-	}
-	return args
-}
-
-// passthroughFromCobra returns args after a literal `--` separator, using
-// cobra's ArgsLenAtDash when available and falling back to splitArgs. Called
-// from the RunE handler so it can access the cobra.Command.
-func passthroughFromCobra(cmd *cobra.Command, args []string) []string {
-	// When flag parsing is enabled, cobra reports the index in args where
-	// "--" appeared. Args with index >= dash are positional-after-dash.
-	dash := cmd.ArgsLenAtDash()
-	if dash >= 0 && dash <= len(args) {
-		return args[dash:]
-	}
-	return splitArgs(args)
-}
-
 func runWorkerQueue(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 	projectName := config.ProjectName(dir)
@@ -172,7 +146,7 @@ func runWorkerQueue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--count must be >= 1")
 	}
 
-	passthrough := passthroughFromCobra(cmd, args)
+	passthrough := splitPassthrough(cmd, args)
 	epoch := time.Now().Unix()
 
 	labels := map[string]string{

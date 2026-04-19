@@ -373,7 +373,7 @@ You rarely need to invoke it directly: **`frank up` auto-spawns the watcher** wh
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
 | `frank remove <service>` | Remove a service from `frank.yaml` and regenerate |
-| `frank up [-d] [--quick] [flags…]` | Start containers; `-d` for detached, `--quick` skips composer install + migrate; all other flags pass through to `docker compose up`. Auto-spawns the watcher when workers are declared |
+| `frank up [-d] [--quick] [-- <compose args>]` | Start containers. Frank owns `-d/--detach` and `--quick`; all other docker compose flags must come after a literal `--` (e.g. `frank up -- --build`). Auto-spawns the watcher when workers are declared |
 | `frank down` | Stop containers and the watcher |
 | `frank ps` | Show running containers |
 | `frank clean` | Stop containers and delete volumes |
