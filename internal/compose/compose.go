@@ -76,29 +76,24 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 
 	// 3. Inject depends_on into laravel.test based on which services are present.
 	//    Done post-merge because templates don't know which services were selected.
-	deps := map[string]interface{}{}
-	for _, svc := range cfg.Services {
-		if svc == "sqlite" {
-			continue // sqlite has no compose service
-		}
-		condition := "service_started"
-		if healthcheckedServices[svc] {
-			condition = "service_healthy"
-		}
-		deps[svc] = map[string]interface{}{"condition": condition}
-	}
+	deps := serviceDepends(cfg)
 	if len(deps) > 0 {
 		if lt, ok := services["laravel.test"].(map[string]interface{}); ok {
 			lt["depends_on"] = deps
 		}
 	}
 
-	// 4. Validate host port uniqueness.
+	// 4. Emit declared worker services (schedule + queue pools).
+	if err := g.emitWorkers(services, cfg, projectName); err != nil {
+		return "", err
+	}
+
+	// 5. Validate host port uniqueness.
 	if err := validatePorts(services); err != nil {
 		return "", err
 	}
 
-	// 5. Assemble final structure.
+	// 6. Assemble final structure.
 	compose := map[string]interface{}{
 		"services": services,
 		"networks": map[string]interface{}{
@@ -130,6 +125,166 @@ func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
 		return fmt.Errorf("create .frank directory: %w", err)
 	}
 	return os.WriteFile(filepath.Join(frankDir, "compose.yaml"), []byte(content), 0644)
+}
+
+// serviceDepends returns the depends_on map for laravel.test and the
+// laravel.migrate helper, keyed by db/cache/queue service name with the right
+// condition (service_healthy when the service ships a healthcheck, otherwise
+// service_started). sqlite has no compose service and is skipped.
+func serviceDepends(cfg *config.Config) map[string]interface{} {
+	deps := map[string]interface{}{}
+	for _, svc := range cfg.Services {
+		if svc == "sqlite" {
+			continue
+		}
+		condition := "service_started"
+		if healthcheckedServices[svc] {
+			condition = "service_healthy"
+		}
+		deps[svc] = map[string]interface{}{"condition": condition}
+	}
+	return deps
+}
+
+// emitWorkers renders and merges declared worker services (schedule + queue
+// pools) into the services map. When cfg.PHP.Runtime == "fpm", it also injects
+// `user: sail` on every declared worker so CLI commands drop root before
+// touching the bind mount (php-fpm's in-pool user drop doesn't apply to CLI).
+//
+// A one-shot laravel.migrate service is emitted alongside the workers: it
+// runs composer install (when vendor/ is missing) and php artisan migrate
+// --force, then exits. Workers depend on its service_completed_successfully
+// so queue:work does not boot before the Laravel cache/jobs tables exist —
+// Laravel 11+'s default database cache driver otherwise crash-loops workers
+// on startup with SQLSTATE[42P01] relation "cache" does not exist.
+//
+// Keep worker fragment templates runtime-agnostic; the runtime coupling lives
+// here, parallel to the depends_on injection in Generate().
+func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Config, projectName string) error {
+	w := cfg.Workers
+	if !w.Schedule && len(w.Queue) == 0 {
+		return nil
+	}
+
+	isFPM := cfg.PHP.Runtime == "fpm"
+
+	// Copy laravel.test's build block into every declared worker so compose
+	// builds the image once (dedup by tag) and workers stop triggering a
+	// registry pull attempt when the image is not yet present. Using image:
+	// alone would have compose try to pull frank-<project>-laravel.test from
+	// docker.io and fail.
+	laravelBuild := laravelTestBuild(services)
+
+	// Emit the one-shot laravel.migrate initializer.
+	initFrag, err := g.engine.RenderWorker("init", template.WorkerData{
+		ProjectName: projectName,
+	})
+	if err != nil {
+		return fmt.Errorf("init fragment: %w", err)
+	}
+	if err := mergeFragment(services, initFrag); err != nil {
+		return fmt.Errorf("merge init fragment: %w", err)
+	}
+	injectBuild(services, "laravel.migrate", laravelBuild)
+	if migrateDeps := serviceDepends(cfg); len(migrateDeps) > 0 {
+		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
+			svc["depends_on"] = migrateDeps
+		}
+	}
+	if isFPM {
+		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
+			svc["user"] = "sail"
+		}
+	}
+
+	if w.Schedule {
+		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{
+			ProjectName: projectName,
+		})
+		if err != nil {
+			return fmt.Errorf("schedule worker fragment: %w", err)
+		}
+		if err := mergeFragment(services, frag); err != nil {
+			return fmt.Errorf("merge schedule worker fragment: %w", err)
+		}
+		injectBuild(services, "laravel.schedule", laravelBuild)
+		if isFPM {
+			injectSailUser(services, "laravel.schedule")
+		}
+	}
+
+	for _, pool := range w.Queue {
+		queuesCSV := strings.Join(pool.Queues, ",")
+		for i := 1; i <= pool.Count; i++ {
+			name := fmt.Sprintf("laravel.queue.%s.%d", pool.Name, i)
+			frag, err := g.engine.RenderWorker("queue", template.WorkerData{
+				ProjectName: projectName,
+				ServiceName: name,
+				PoolName:    pool.Name,
+				QueuesCSV:   queuesCSV,
+				Tries:       pool.Tries,
+				Timeout:     pool.Timeout,
+				Memory:      pool.Memory,
+				Sleep:       pool.Sleep,
+				Backoff:     pool.Backoff,
+			})
+			if err != nil {
+				return fmt.Errorf("queue worker fragment %q: %w", name, err)
+			}
+			if err := mergeFragment(services, frag); err != nil {
+				return fmt.Errorf("merge queue worker fragment %q: %w", name, err)
+			}
+			injectBuild(services, name, laravelBuild)
+			if isFPM {
+				injectSailUser(services, name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// laravelTestBuild returns the build: block declared on the laravel.test
+// service, or nil if the service has no build (shouldn't happen for supported
+// runtimes). The returned value is safe to share across worker services —
+// compose does not mutate the build block at runtime.
+func laravelTestBuild(services map[string]interface{}) interface{} {
+	lt, ok := services["laravel.test"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return lt["build"]
+}
+
+// injectBuild copies the laravel.test build block onto the named worker
+// service. No-op when laravelBuild is nil or the service is absent.
+func injectBuild(services map[string]interface{}, name string, laravelBuild interface{}) {
+	if laravelBuild == nil {
+		return
+	}
+	svc, ok := services[name].(map[string]interface{})
+	if !ok {
+		return
+	}
+	svc["build"] = laravelBuild
+}
+
+// injectSailUser sets `user: sail` on the named service if it is a declared
+// worker (label frank.worker == "declared"). No-op if the service is missing
+// or not a declared worker.
+func injectSailUser(services map[string]interface{}, name string) {
+	svc, ok := services[name].(map[string]interface{})
+	if !ok {
+		return
+	}
+	labels, ok := svc["labels"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if labels["frank.worker"] != "declared" {
+		return
+	}
+	svc["user"] = "sail"
 }
 
 // mergeFragment parses a YAML service fragment and merges it into services.

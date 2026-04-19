@@ -22,6 +22,25 @@ type Data struct {
 	DashboardPort int // mailpit UI port
 }
 
+// WorkerData is the context passed to worker fragment templates.
+// Fields not applicable to a given kind (e.g. schedule has no pool) are zero-valued.
+type WorkerData struct {
+	ProjectName string
+	// ServiceName is the full compose service key for a queue worker,
+	// e.g. "laravel.queue.default.1". Unused by the schedule fragment.
+	ServiceName string
+	// PoolName is the queue pool identifier (label frank.worker.pool).
+	PoolName string
+	// QueuesCSV is the comma-joined queue list for --queue.
+	QueuesCSV string
+	// Passthrough flags — rendered only when > 0.
+	Tries   int
+	Timeout int
+	Memory  int
+	Sleep   int
+	Backoff int
+}
+
 // defaultPorts maps service name → default host port.
 var defaultPorts = map[string]int{
 	"pgsql":       5432,
@@ -81,6 +100,26 @@ func (e *Engine) Render(tmplPath string, data Data) (string, error) {
 // RenderRuntime renders a file from templates/runtimes/<runtime>/.
 func (e *Engine) RenderRuntime(runtime, file string, data Data) (string, error) {
 	return e.Render(path.Join("templates", "runtimes", runtime, file), data)
+}
+
+// RenderWorker renders templates/workers/<kind>.fragment.tmpl where kind is
+// "schedule" or "queue". Templates stay runtime-agnostic; any runtime-specific
+// injection (e.g. `user: sail` for fpm) is the caller's responsibility.
+func (e *Engine) RenderWorker(kind string, data WorkerData) (string, error) {
+	tmplPath := path.Join("templates", "workers", kind+".fragment.tmpl")
+	content, err := fs.ReadFile(e.fs, tmplPath)
+	if err != nil {
+		return "", fmt.Errorf("worker template %q not found: %w", tmplPath, err)
+	}
+	t, err := texttemplate.New(path.Base(tmplPath)).Parse(string(content))
+	if err != nil {
+		return "", fmt.Errorf("worker template %q parse error: %w", tmplPath, err)
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("worker template %q render error: %w", tmplPath, err)
+	}
+	return buf.String(), nil
 }
 
 // RenderServiceCompose renders the compose.fragment.tmpl for a service.
