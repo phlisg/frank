@@ -204,6 +204,31 @@ func (c *Client) ListContainers(projectName string, workerFilter string, format 
 	return buf.String(), nil
 }
 
+// AdhocWorkerNames returns the names of every ad-hoc worker container for
+// this project, including stopped ones. Used by frank down to clean state
+// that docker compose would otherwise leave behind as orphans.
+func (c *Client) AdhocWorkerNames(projectName string) ([]string, error) {
+	args := []string{
+		"ps", "-a",
+		"--filter", "label=frank.project=" + projectName,
+		"--filter", "label=frank.worker=adhoc",
+		"--format", "{{.Names}}",
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := runCmd(cmd); err != nil {
+		return nil, err
+	}
+	out := strings.TrimSpace(buf.String())
+	if out == "" {
+		return nil, nil
+	}
+	return strings.Split(out, "\n"), nil
+}
+
 // LogsForWorkers streams `docker compose logs` for the given service list.
 // If follow is true, `-f` is passed.
 func (c *Client) LogsForWorkers(services []string, follow bool) error {
