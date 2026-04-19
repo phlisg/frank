@@ -19,6 +19,7 @@ package watch
 
 import (
 	"context"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	ignore "github.com/sabhiram/go-gitignore"
@@ -76,9 +77,20 @@ type Watcher struct {
 	events chan fsnotify.Event
 	done   chan struct{}
 
+	stopOnce sync.Once
+
 	// gitignore is populated by the walker (td-18d17c) from the project
 	// .gitignore at arm time. Nil means baseline-only matching.
 	gitignore *ignore.GitIgnore
+}
+
+// Events exposes the filtered event stream. The debouncer (td-057aa5) is
+// the intended consumer — it reads from this channel, coalesces bursts
+// within a debounce window, and hands the collapsed trigger to the
+// dispatcher (td-a000b6). Only events that pass the classifier filter
+// (.php / .env / composer.lock, not ignored) land here.
+func (w *Watcher) Events() <-chan fsnotify.Event {
+	return w.events
 }
 
 // defaultWatchRoots lists the Laravel source directories walked at arm
@@ -117,17 +129,66 @@ func New(cfg Config) (*Watcher, error) {
 	}, nil
 }
 
-// Start begins watching. Blocks until ctx is cancelled or Stop is called.
+// Start begins watching. Constructs the fsnotify watcher, walks
+// defaultWatchRoots (pruning ignored dirs), arms parent-dir watches for
+// defaultWatchFiles, and runs a select loop that classifies each event
+// and pushes triggering events to w.events for the debouncer to consume.
 //
-// TODO(td-18d17c, td-057aa5, td-a000b6): walker + debouncer + dispatcher.
+// Blocks until ctx is cancelled or Stop is called.
+//
+// TODO(td-057aa5, td-a000b6, td-4850c4): debouncer, dispatcher, pidfile.
 func (w *Watcher) Start(ctx context.Context) error {
-	return nil
+	fsw, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	w.fsw = fsw
+	w.gitignore = compileIgnore(w.cfg.ProjectRoot)
+
+	if _, werr := w.armWatches(); werr != nil {
+		// Arm errors are non-fatal — log and proceed with whatever
+		// watches succeeded. Detailed logging lives in armWatches.
+		_ = werr
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			_ = w.fsw.Close()
+			return ctx.Err()
+		case <-w.done:
+			_ = w.fsw.Close()
+			return nil
+		case ev, ok := <-w.fsw.Events:
+			if !ok {
+				return nil
+			}
+			if _, fire := w.classify(ev); !fire {
+				continue
+			}
+			// Non-blocking send — if the debouncer is slow, we drop
+			// the event rather than stall the watch loop. The debouncer
+			// only cares that *something* happened in the window.
+			select {
+			case w.events <- ev:
+			default:
+			}
+		case err, ok := <-w.fsw.Errors:
+			if !ok {
+				return nil
+			}
+			// fsnotify errors are informational — log and continue.
+			_ = err
+		}
+	}
 }
 
-// Stop gracefully tears down the watcher.
+// Stop gracefully tears down the watcher. Idempotent.
 //
-// TODO(td-18d17c, td-4850c4): close fsnotify watcher, drain channels,
-// coordinate with lifecycle pidfile cleanup.
+// TODO(td-4850c4): coordinate with lifecycle pidfile cleanup.
 func (w *Watcher) Stop() error {
+	w.stopOnce.Do(func() {
+		close(w.done)
+	})
 	return nil
 }
