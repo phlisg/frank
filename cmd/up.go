@@ -1,14 +1,20 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -71,8 +77,34 @@ func runUp(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := client.Up(composeArgs...); err != nil {
-		return err
+	detached := detachedMode(composeArgs)
+
+	// Resolve watcher intent once so fg + -d paths share the decision.
+	cfg, _ := config.Load(dir)
+	wantWatcher := shouldRunWatcher(cfg, client, dir)
+
+	// Foreground mode: spawn watcher goroutine BEFORE compose so a .php
+	// edit during container boot still lands a reload trigger once the
+	// arm-suppression window clears. SIGINT/SIGTERM cancels both.
+	var stopWatcher func() error
+	if !detached && wantWatcher {
+		var err error
+		stopWatcher, err = startForegroundWatcher(dir, cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: watcher not started: %v\n", err)
+		}
+	}
+
+	upErr := client.Up(composeArgs...)
+
+	if stopWatcher != nil {
+		if err := stopWatcher(); err != nil && !errors.Is(err, context.Canceled) {
+			fmt.Fprintf(os.Stderr, "warning: watcher stopped with error: %v\n", err)
+		}
+	}
+
+	if upErr != nil {
+		return upErr
 	}
 
 	if quick {
@@ -107,5 +139,116 @@ func runUp(cmd *cobra.Command, args []string) error {
 		fmt.Println("  npm run dev   # start Vite dev server")
 	}
 
+	// -d mode: after laravel.test is healthy and post-start migrations
+	// have run, spawn a detached `frank watch` child. The child acquires
+	// .frank/watch.pid via its own Start — we don't pre-write it here.
+	if detached && wantWatcher {
+		if err := spawnDetachedWatcher(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not start watcher: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// detachedMode reports whether the compose pass-through flags include -d
+// or --detach (compose's canonical detach signals).
+func detachedMode(composeArgs []string) bool {
+	for _, a := range composeArgs {
+		switch a {
+		case "-d", "--detach":
+			return true
+		}
+		if strings.HasPrefix(a, "--detach=") {
+			if v := strings.TrimPrefix(a, "--detach="); v != "false" && v != "0" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// shouldRunWatcher decides whether `frank up` should spawn a watcher.
+// Returns true when schedule is enabled, any queue pool is declared, or
+// any ad-hoc worker is already running under this project. Degrades to
+// false (no watcher) on load/docker errors — worker reload is
+// nice-to-have, not a reason to block `frank up`.
+func shouldRunWatcher(cfg *config.Config, client *docker.Client, projectRoot string) bool {
+	if cfg != nil {
+		if cfg.Workers.Schedule {
+			return true
+		}
+		if totalQueueCount(cfg) > 0 {
+			return true
+		}
+	}
+	if client != nil {
+		project := config.ProjectName(projectRoot)
+		if names, err := client.AdhocWorkerNames(project); err == nil && len(names) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// startForegroundWatcher spins up an in-process watcher goroutine that
+// shares the parent process's lifecycle. Returns a stop function the
+// caller invokes once the compose run returns (Ctrl-C or normal exit).
+// Nil cfg is tolerated — callers warn separately on a missing frank.yaml.
+func startForegroundWatcher(projectRoot string, cfg *config.Config) (func() error, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("frank.yaml missing — skipping watcher")
+	}
+
+	w, err := watch.New(watch.Config{
+		ProjectRoot:       projectRoot,
+		ScheduleEnabled:   cfg.Workers.Schedule,
+		QueueCount:        totalQueueCount(cfg),
+		DockerComposeFile: ".frank/compose.yaml",
+		ArmSuppression:    watch.DefaultArmSuppression,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-sigCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	done := make(chan error, 1)
+	go func() { done <- w.Start(ctx) }()
+
+	fmt.Fprintf(os.Stderr, "frank watch: foreground (pid %d) armed with containers\n", os.Getpid())
+
+	return func() error {
+		signal.Stop(sigCh)
+		cancel()
+		err := <-done
+		return err
+	}, nil
+}
+
+// spawnDetachedWatcher forks the current binary as `frank watch` detached
+// from the controlling terminal. Stdout/stderr land in .frank/watch.log.
+// The spawned child writes its own pidfile via Start.
+func spawnDetachedWatcher(projectRoot string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable: %w", err)
+	}
+	argv := []string{self, "--dir", projectRoot, "watch"}
+	pid, err := watch.Daemonize(argv, watch.LogfilePath(projectRoot))
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "frank watch: detached child started (pid %d) — logs at %s\n",
+		pid, watch.LogfilePath(projectRoot))
 	return nil
 }
