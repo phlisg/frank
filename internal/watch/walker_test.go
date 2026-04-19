@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -308,13 +309,20 @@ func TestCompileIgnore_ReadError(t *testing.T) {
 	}
 }
 
-// TestStartStop_LifecycleDeliversPhpEvent spins up Start in a goroutine,
-// writes to a .php file inside the watched set, asserts the event lands
-// on w.Events(), then calls Stop and asserts the goroutine exits.
-func TestStartStop_LifecycleDeliversPhpEvent(t *testing.T) {
+// TestStartStop_LifecycleFiresTriggerOnPhpEdit spins up Start in a
+// goroutine, writes to a .php file inside the watched set, and asserts
+// the debouncer dispatched a queue:restart through the injected runner.
+// Covers the full fsnotify → classifier → debouncer → dispatch pipeline.
+func TestStartStop_LifecycleFiresTriggerOnPhpEdit(t *testing.T) {
 	root := fakeLaravelProject(t)
 
-	w, err := New(Config{ProjectRoot: root})
+	fake := &fakeRunner{}
+	w, err := New(Config{
+		ProjectRoot:  root,
+		Runner:       fake,
+		DebounceBase: 20 * time.Millisecond,
+		DebounceMax:  80 * time.Millisecond,
+	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -333,13 +341,18 @@ func TestStartStop_LifecycleDeliversPhpEvent(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	select {
-	case ev := <-w.Events():
-		if !strings.HasSuffix(ev.Name, "Foo.php") {
-			t.Errorf("unexpected event: %v", ev)
+	// Wait for dispatch — up to a few debounce windows + margin.
+	deadline := time.After(2 * time.Second)
+	for {
+		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
+			break
 		}
-	case <-time.After(3 * time.Second):
-		t.Fatalf("no event received within 3s")
+		select {
+		case <-deadline:
+			t.Fatalf("queue:restart not dispatched within 2s after .php edit")
+		default:
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 
 	if err := w.Stop(); err != nil {

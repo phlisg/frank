@@ -20,6 +20,7 @@ package watch
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	ignore "github.com/sabhiram/go-gitignore"
@@ -54,6 +55,19 @@ type Config struct {
 	// config key (spec "Extending the watch set"). Out of scope for v1;
 	// reserved here so the type signature is stable.
 	ExtraPaths []string
+
+	// Runner dispatches individual triggers (queue:restart, schedule
+	// restart). Injected for tests; when nil, New installs a dockerRunner
+	// that shells out to `docker compose` against DockerComposeFile.
+	Runner Runner
+
+	// DebounceBase is the initial debounce window length. Zero uses
+	// defaultDebounceBase (250ms). Overridden in tests for fast turnaround.
+	DebounceBase time.Duration
+
+	// DebounceMax caps backoff growth after repeated dispatch failures.
+	// Zero uses defaultDebounceMax (5s).
+	DebounceMax time.Duration
 }
 
 // TriggerKind identifies which reload action a dispatch should perform.
@@ -76,21 +90,13 @@ type Watcher struct {
 	fsw    *fsnotify.Watcher
 	events chan fsnotify.Event
 	done   chan struct{}
+	runner Runner
 
 	stopOnce sync.Once
 
 	// gitignore is populated by the walker (td-18d17c) from the project
 	// .gitignore at arm time. Nil means baseline-only matching.
 	gitignore *ignore.GitIgnore
-}
-
-// Events exposes the filtered event stream. The debouncer (td-057aa5) is
-// the intended consumer — it reads from this channel, coalesces bursts
-// within a debounce window, and hands the collapsed trigger to the
-// dispatcher (td-a000b6). Only events that pass the classifier filter
-// (.php / .env / composer.lock, not ignored) land here.
-func (w *Watcher) Events() <-chan fsnotify.Event {
-	return w.events
 }
 
 // defaultWatchRoots lists the Laravel source directories walked at arm
@@ -120,23 +126,30 @@ var baselineIgnorePatterns = []string{
 }
 
 // New constructs a Watcher with the given Config. It does NOT arm fsnotify
-// watches; walking + Add() calls land in td-18d17c.
+// watches; walking + Add() calls land in Start. If cfg.Runner is nil, a
+// dockerRunner is installed as the default dispatcher.
 func New(cfg Config) (*Watcher, error) {
+	runner := cfg.Runner
+	if runner == nil {
+		runner = newDockerRunner(cfg.ProjectRoot, cfg.DockerComposeFile)
+	}
 	return &Watcher{
 		cfg:    cfg,
 		events: make(chan fsnotify.Event, 128),
 		done:   make(chan struct{}),
+		runner: runner,
 	}, nil
 }
 
 // Start begins watching. Constructs the fsnotify watcher, walks
 // defaultWatchRoots (pruning ignored dirs), arms parent-dir watches for
-// defaultWatchFiles, and runs a select loop that classifies each event
-// and pushes triggering events to w.events for the debouncer to consume.
+// defaultWatchFiles, spawns the debouncer goroutine that consumes w.events,
+// and runs a select loop that classifies each fsnotify event and pushes
+// triggering events to w.events.
 //
 // Blocks until ctx is cancelled or Stop is called.
 //
-// TODO(td-057aa5, td-a000b6, td-4850c4): debouncer, dispatcher, pidfile.
+// TODO(td-4850c4): pidfile / detached child lifecycle.
 func (w *Watcher) Start(ctx context.Context) error {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -151,10 +164,18 @@ func (w *Watcher) Start(ctx context.Context) error {
 		_ = werr
 	}
 
+	debouncerDone := make(chan struct{})
+	go func() {
+		defer close(debouncerDone)
+		w.runDebouncer(ctx)
+	}()
+	defer func() { <-debouncerDone }()
+
 	for {
 		select {
 		case <-ctx.Done():
 			_ = w.fsw.Close()
+			w.stopOnce.Do(func() { close(w.done) })
 			return ctx.Err()
 		case <-w.done:
 			_ = w.fsw.Close()

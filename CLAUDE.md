@@ -18,7 +18,7 @@ internal/
   docker/         thin docker compose CLI wrapper (always uses -f .frank/compose.yaml)
   shell/          alias table for frank activate/deactivate
   template/       template engine (renders from templates/ FS)
-  watch/          host-side fsnotify watcher (walker + classifier done; debouncer / dispatcher / lifecycle still open — see td)
+  watch/          host-side fsnotify watcher (walker, classifier, debouncer, parallel dispatcher + backoff done; first-run suppression / orphan detection / lifecycle still open — see td)
 templates/
   runtimes/       frankenphp/, fpm/ — each has compose.fragment.tmpl + Dockerfile.tmpl
   services/       one dir per service — compose.fragment.tmpl + env.tmpl
