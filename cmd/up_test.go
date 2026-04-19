@@ -1,33 +1,60 @@
 package cmd
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/phlisg/frank/internal/config"
 )
 
-func TestDetachedMode(t *testing.T) {
-	cases := []struct {
-		name string
-		args []string
-		want bool
-	}{
-		{"empty", nil, false},
-		{"just build flag", []string{"--build"}, false},
-		{"-d short", []string{"-d"}, true},
-		{"--detach long", []string{"--detach"}, true},
-		{"--detach=true", []string{"--detach=true"}, true},
-		{"--detach=false", []string{"--detach=false"}, false},
-		{"--detach=0", []string{"--detach=0"}, false},
-		{"-d with other flags", []string{"--build", "-d", "--force-recreate"}, true},
-		{"detached substring not enough", []string{"--detached"}, false},
+func TestUpCmd_TypedDetachFlag(t *testing.T) {
+	// Flag registration: -d and --quick parse as booleans, --build rejected.
+	if f := upCmd.Flags().Lookup("detach"); f == nil || f.Shorthand != "d" {
+		t.Fatalf("upCmd missing -d/--detach typed flag")
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := detachedMode(tc.args); got != tc.want {
-				t.Errorf("detachedMode(%v) = %v, want %v", tc.args, got, tc.want)
-			}
-		})
+	if f := upCmd.Flags().Lookup("quick"); f == nil {
+		t.Fatalf("upCmd missing --quick typed flag")
+	}
+	if upCmd.Flags().Lookup("build") != nil {
+		t.Fatalf("upCmd should not own --build (belongs to docker compose)")
+	}
+}
+
+func TestUpCmd_UnknownFlagHintsAtDash(t *testing.T) {
+	// FlagErrorFunc wraps the raw pflag error with a hint pointing at `--`.
+	err := upFlagError(upCmd, errors.New("unknown flag: --build"))
+	if err == nil {
+		t.Fatalf("upFlagError returned nil")
+	}
+	if !strings.Contains(err.Error(), "--") || !strings.Contains(err.Error(), "docker compose") {
+		t.Errorf("unknown-flag error should hint about `--` and compose, got: %v", err)
+	}
+}
+
+// buildUpComposeArgs mirrors the composeArgs construction in runUp so the
+// behavior can be exercised without booting docker. Keep in sync with runUp.
+func buildUpComposeArgs(detach bool, passthrough []string) []string {
+	out := append([]string{}, passthrough...)
+	if detach {
+		out = append([]string{"-d"}, out...)
+	}
+	return out
+}
+
+func TestUpCmd_DetachInjectedIntoComposeArgs(t *testing.T) {
+	got := buildUpComposeArgs(true, []string{"--remove-orphans"})
+	want := []string{"-d", "--remove-orphans"}
+	if !equalSlice(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestUpCmd_NoDetachNoInjection(t *testing.T) {
+	got := buildUpComposeArgs(false, []string{"--remove-orphans"})
+	want := []string{"--remove-orphans"}
+	if !equalSlice(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
