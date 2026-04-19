@@ -11,14 +11,14 @@ Frank is a Go CLI that scaffolds and manages Laravel Docker environments. It rea
 ## Architecture
 
 ```
-cmd/              cobra commands (activate, init, generate, up, down, add, remove, worker, ps, …)
+cmd/              cobra commands (activate, init, generate, up, down, add, remove, worker, watch, ps, …)
 internal/
   compose/        generates .frank/compose.yaml by merging template fragments
   config/         frank.yaml schema, validation, defaults
   docker/         thin docker compose CLI wrapper (always uses -f .frank/compose.yaml)
   shell/          alias table for frank activate/deactivate
   template/       template engine (renders from templates/ FS)
-  watch/          host-side fsnotify watcher (walker, classifier, debouncer, dispatcher, first-run suppression, pidfile lifecycle + already-running guard, orphan detection, Daemonize helper done; CLI + up/down integration still open — see td)
+  watch/          host-side fsnotify watcher (walker, classifier, debouncer, dispatcher, first-run suppression, pidfile lifecycle + already-running guard, orphan detection, Daemonize helper done; up/down integration still open — see td)
 templates/
   runtimes/       frankenphp/, fpm/ — each has compose.fragment.tmpl + Dockerfile.tmpl
   services/       one dir per service — compose.fragment.tmpl + env.tmpl
