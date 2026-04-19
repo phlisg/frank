@@ -76,6 +76,7 @@ services:
         networks:
             - frank
         restart: unless-stopped
+        tty: true
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -111,6 +112,7 @@ services:
         networks:
             - frank
         restart: unless-stopped
+        tty: true
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -145,6 +147,7 @@ services:
             - frank
         restart: unless-stopped
         stop_signal: SIGKILL
+        tty: true
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
