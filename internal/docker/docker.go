@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 )
@@ -139,6 +140,107 @@ func (c *Client) PSWorkers(projectName string) error {
 
 	fmt.Print(out)
 	return nil
+}
+
+// RunAdhoc spawns a detached container via `docker compose run -d` with the
+// given name and labels. The container inherits image/env/network/entrypoint
+// from the `laravel.test` service. cmdArgs are appended verbatim after the
+// service name (e.g. ["php", "artisan", "queue:work", "--queue=default"]).
+func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []string) error {
+	args := []string{"run", "-d", "--name", name}
+	// Sort label keys for deterministic arg order (makes tests + user output stable).
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		args = append(args, "--label", k+"="+labels[k])
+	}
+	args = append(args, "laravel.test")
+	args = append(args, cmdArgs...)
+	return c.Run(args...)
+}
+
+// StopContainers stops + removes containers by name using `docker rm -f`.
+// SIGKILL is used; queue workers can be restarted safely.
+func (c *Client) StopContainers(names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"rm", "-f"}, names...)
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return runCmd(cmd)
+}
+
+// ListContainers runs `docker ps` filtered by the frank.project label and
+// optionally by the frank.worker label value. workerFilter is one of
+// "declared", "adhoc", or "" (both). The format string is passed through to
+// `--format`. Output is captured and returned.
+func (c *Client) ListContainers(projectName string, workerFilter string, format string) (string, error) {
+	args := []string{
+		"ps",
+		"--filter", "label=frank.project=" + projectName,
+	}
+	if workerFilter == "" {
+		args = append(args, "--filter", "label=frank.worker")
+	} else {
+		args = append(args, "--filter", "label=frank.worker="+workerFilter)
+	}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := runCmd(cmd); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// LogsForWorkers streams `docker compose logs` for the given service list.
+// If follow is true, `-f` is passed.
+func (c *Client) LogsForWorkers(services []string, follow bool) error {
+	args := []string{"logs"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, services...)
+	return c.Run(args...)
+}
+
+// ComposePSServiceExists returns true if the given service name resolves to
+// a container under the current compose project. Used to decide whether to
+// use `docker compose logs <name>` vs `docker logs <name>` for ad-hoc workers.
+func (c *Client) ComposePSServiceExists(name string) bool {
+	out, err := c.RunQuiet("ps", "-q", name)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(out) != ""
+}
+
+// LogsRaw streams `docker logs <name>` for a non-compose container (ad-hoc
+// workers launched via `docker compose run -d` still show up under
+// `docker logs`, but not necessarily under `docker compose logs`).
+func (c *Client) LogsRaw(name string, follow bool) error {
+	args := []string{"logs"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, name)
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return runCmd(cmd)
 }
 
 // Clean runs `docker compose down -v` (removes volumes).
