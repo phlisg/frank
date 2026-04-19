@@ -1,0 +1,21 @@
+laravel.schedule:
+  image: "frank-{{.ProjectName}}-laravel.test"
+  depends_on:
+    laravel.test:
+      condition: service_started
+  volumes:
+    - .:/var/www/html
+  env_file:
+    - .env
+  working_dir: /var/www/html
+  restart: unless-stopped
+  networks:
+    - frank
+  labels:
+    frank.project: "{{.ProjectName}}"
+    frank.worker: declared
+    frank.worker.type: schedule
+  command:
+    - php
+    - artisan
+    - schedule:work

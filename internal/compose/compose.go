@@ -93,12 +93,17 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 		}
 	}
 
-	// 4. Validate host port uniqueness.
+	// 4. Emit declared worker services (schedule + queue pools).
+	if err := g.emitWorkers(services, cfg, projectName); err != nil {
+		return "", err
+	}
+
+	// 5. Validate host port uniqueness.
 	if err := validatePorts(services); err != nil {
 		return "", err
 	}
 
-	// 5. Assemble final structure.
+	// 6. Assemble final structure.
 	compose := map[string]interface{}{
 		"services": services,
 		"networks": map[string]interface{}{
@@ -130,6 +135,84 @@ func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
 		return fmt.Errorf("create .frank directory: %w", err)
 	}
 	return os.WriteFile(filepath.Join(frankDir, "compose.yaml"), []byte(content), 0644)
+}
+
+// emitWorkers renders and merges declared worker services (schedule + queue
+// pools) into the services map. When cfg.PHP.Runtime == "fpm", it also injects
+// `user: sail` on every declared worker so CLI commands drop root before
+// touching the bind mount (php-fpm's in-pool user drop doesn't apply to CLI).
+//
+// Keep worker fragment templates runtime-agnostic; the runtime coupling lives
+// here, parallel to the depends_on injection in Generate().
+func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Config, projectName string) error {
+	w := cfg.Workers
+	if !w.Schedule && len(w.Queue) == 0 {
+		return nil
+	}
+
+	isFPM := cfg.PHP.Runtime == "fpm"
+
+	if w.Schedule {
+		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{
+			ProjectName: projectName,
+		})
+		if err != nil {
+			return fmt.Errorf("schedule worker fragment: %w", err)
+		}
+		if err := mergeFragment(services, frag); err != nil {
+			return fmt.Errorf("merge schedule worker fragment: %w", err)
+		}
+		if isFPM {
+			injectSailUser(services, "laravel.schedule")
+		}
+	}
+
+	for _, pool := range w.Queue {
+		queuesCSV := strings.Join(pool.Queues, ",")
+		for i := 1; i <= pool.Count; i++ {
+			name := fmt.Sprintf("laravel.queue.%s.%d", pool.Name, i)
+			frag, err := g.engine.RenderWorker("queue", template.WorkerData{
+				ProjectName: projectName,
+				ServiceName: name,
+				PoolName:    pool.Name,
+				QueuesCSV:   queuesCSV,
+				Tries:       pool.Tries,
+				Timeout:     pool.Timeout,
+				Memory:      pool.Memory,
+				Sleep:       pool.Sleep,
+				Backoff:     pool.Backoff,
+			})
+			if err != nil {
+				return fmt.Errorf("queue worker fragment %q: %w", name, err)
+			}
+			if err := mergeFragment(services, frag); err != nil {
+				return fmt.Errorf("merge queue worker fragment %q: %w", name, err)
+			}
+			if isFPM {
+				injectSailUser(services, name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// injectSailUser sets `user: sail` on the named service if it is a declared
+// worker (label frank.worker == "declared"). No-op if the service is missing
+// or not a declared worker.
+func injectSailUser(services map[string]interface{}, name string) {
+	svc, ok := services[name].(map[string]interface{})
+	if !ok {
+		return
+	}
+	labels, ok := svc["labels"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if labels["frank.worker"] != "declared" {
+		return
+	}
+	svc["user"] = "sail"
 }
 
 // mergeFragment parses a YAML service fragment and merges it into services.

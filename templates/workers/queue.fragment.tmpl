@@ -1,0 +1,38 @@
+{{.ServiceName}}:
+  image: "frank-{{.ProjectName}}-laravel.test"
+  depends_on:
+    laravel.test:
+      condition: service_started
+  volumes:
+    - .:/var/www/html
+  env_file:
+    - .env
+  working_dir: /var/www/html
+  restart: unless-stopped
+  networks:
+    - frank
+  labels:
+    frank.project: "{{.ProjectName}}"
+    frank.worker: declared
+    frank.worker.type: queue
+    frank.worker.pool: "{{.PoolName}}"
+  command:
+    - php
+    - artisan
+    - queue:work
+    - "--queue={{.QueuesCSV}}"
+{{- if gt .Tries 0}}
+    - "--tries={{.Tries}}"
+{{- end}}
+{{- if gt .Timeout 0}}
+    - "--timeout={{.Timeout}}"
+{{- end}}
+{{- if gt .Memory 0}}
+    - "--memory={{.Memory}}"
+{{- end}}
+{{- if gt .Sleep 0}}
+    - "--sleep={{.Sleep}}"
+{{- end}}
+{{- if gt .Backoff 0}}
+    - "--backoff={{.Backoff}}"
+{{- end}}
