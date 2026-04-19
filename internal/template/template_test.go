@@ -237,6 +237,62 @@ func TestRenderRuntimeCompose_FPM_SailUser(t *testing.T) {
 	}
 }
 
+func TestRenderWorker_Schedule(t *testing.T) {
+	e := newTestEngine(t)
+	out, err := e.RenderWorker("schedule", WorkerData{ProjectName: "myapp"})
+	if err != nil {
+		t.Fatalf("RenderWorker error: %v", err)
+	}
+	checks := []string{
+		"laravel.schedule:",
+		"frank-myapp-laravel.test",
+		"frank.worker.type: schedule",
+		"schedule:work",
+		"unless-stopped",
+		"- .:/var/www/html",
+	}
+	for _, want := range checks {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in schedule worker, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "user:") {
+		t.Error("worker templates must stay runtime-agnostic (no user:)")
+	}
+}
+
+func TestRenderWorker_QueueWithFlags(t *testing.T) {
+	e := newTestEngine(t)
+	out, err := e.RenderWorker("queue", WorkerData{
+		ProjectName: "app",
+		ServiceName: "laravel.queue.high.1",
+		PoolName:    "high",
+		QueuesCSV:   "high,critical",
+		Tries:       3,
+		Timeout:     60,
+	})
+	if err != nil {
+		t.Fatalf("RenderWorker error: %v", err)
+	}
+	checks := []string{
+		"laravel.queue.high.1:",
+		"frank.worker.pool: \"high\"",
+		"--queue=high,critical",
+		"--tries=3",
+		"--timeout=60",
+	}
+	for _, want := range checks {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in queue worker, got:\n%s", want, out)
+		}
+	}
+	for _, forbid := range []string{"--memory=", "--sleep=", "--backoff="} {
+		if strings.Contains(out, forbid) {
+			t.Errorf("unexpected %q for zero-valued passthrough, got:\n%s", forbid, out)
+		}
+	}
+}
+
 func TestRenderRuntimeCompose_FrankenPHP_SailUser(t *testing.T) {
 	e := newTestEngine(t)
 	out, err := e.RenderRuntime("frankenphp", "compose.fragment.tmpl", Data{PHPVersion: "8.4"})

@@ -196,6 +196,216 @@ func TestValidatePorts_Conflict(t *testing.T) {
 	}
 }
 
+func TestGenerate_NoWorkers_Unchanged(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql", "mailpit"},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	if strings.Contains(out, "laravel.schedule") {
+		t.Error("no schedule worker expected when Workers.Schedule == false")
+	}
+	if strings.Contains(out, "laravel.queue.") {
+		t.Error("no queue workers expected when Workers.Queue is empty")
+	}
+}
+
+func TestGenerate_ScheduleOnly(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers:  config.Workers{Schedule: true},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	checks := []string{
+		"laravel.schedule:",
+		"frank-myapp-laravel.test",
+		"frank.worker: declared",
+		"frank.worker.type: schedule",
+		"schedule:work",
+		"unless-stopped",
+	}
+	for _, want := range checks {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "laravel.queue.") {
+		t.Error("unexpected queue worker when only schedule enabled")
+	}
+}
+
+func TestGenerate_QueuePoolCountThree(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers: config.Workers{
+			Queue: []config.QueuePool{
+				{Name: "default", Queues: []string{"default"}, Count: 3},
+			},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	for _, name := range []string{"laravel.queue.default.1:", "laravel.queue.default.2:", "laravel.queue.default.3:"} {
+		if !strings.Contains(out, name) {
+			t.Errorf("expected %q in output:\n%s", name, out)
+		}
+	}
+	if strings.Contains(out, "laravel.queue.default.4") {
+		t.Error("unexpected 4th queue worker for count=3")
+	}
+	if !strings.Contains(out, "frank.worker.pool: default") {
+		t.Error("expected pool label")
+	}
+	if !strings.Contains(out, "--queue=default") {
+		t.Error("expected --queue=default flag in command")
+	}
+}
+
+func TestGenerate_MultiplePoolsNamed(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers: config.Workers{
+			Queue: []config.QueuePool{
+				{Name: "high", Queues: []string{"high", "critical"}, Count: 2},
+				{Name: "default", Queues: []string{"default"}, Count: 1},
+			},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	for _, name := range []string{
+		"laravel.queue.high.1:",
+		"laravel.queue.high.2:",
+		"laravel.queue.default.1:",
+	} {
+		if !strings.Contains(out, name) {
+			t.Errorf("expected %q in output:\n%s", name, out)
+		}
+	}
+	if strings.Contains(out, "laravel.queue.high.3") {
+		t.Error("unexpected 3rd high worker for count=2")
+	}
+	if strings.Contains(out, "laravel.queue.default.2") {
+		t.Error("unexpected 2nd default worker for count=1")
+	}
+	if !strings.Contains(out, "--queue=high,critical") {
+		t.Error("expected CSV queue list for pool with multiple queues")
+	}
+}
+
+func TestGenerate_FrankenPHPWorkersNoUserKey(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers: config.Workers{
+			Schedule: true,
+			Queue:    []config.QueuePool{{Name: "default", Queues: []string{"default"}, Count: 1}},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	// frankenphp entrypoint does the gosu drop — no user: on workers.
+	if strings.Contains(out, "user: sail") {
+		t.Error("frankenphp runtime must not inject user: sail on workers")
+	}
+}
+
+func TestGenerate_FPMWorkersInjectSailUser(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.4", Runtime: "fpm"},
+		Services: []string{"mysql"},
+		Workers: config.Workers{
+			Schedule: true,
+			Queue:    []config.QueuePool{{Name: "default", Queues: []string{"default"}, Count: 2}},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	// Each declared worker (schedule + 2 queue) plus the laravel.migrate
+	// init helper needs user: sail → 4 occurrences.
+	n := strings.Count(out, "user: sail")
+	if n != 4 {
+		t.Errorf("expected 4 occurrences of 'user: sail' (schedule + 2 queue + migrate), got %d in:\n%s", n, out)
+	}
+}
+
+func TestGenerate_QueuePassthroughFlags(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers: config.Workers{
+			Queue: []config.QueuePool{
+				{
+					Name: "default", Queues: []string{"default"}, Count: 1,
+					Tries: 3, Timeout: 60, Memory: 128, Sleep: 5, Backoff: 2,
+				},
+			},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	for _, flag := range []string{"--tries=3", "--timeout=60", "--memory=128", "--sleep=5", "--backoff=2"} {
+		if !strings.Contains(out, flag) {
+			t.Errorf("expected passthrough flag %q in:\n%s", flag, out)
+		}
+	}
+}
+
+func TestGenerate_QueuePassthroughOmittedWhenZero(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql"},
+		Workers: config.Workers{
+			Queue: []config.QueuePool{
+				{Name: "default", Queues: []string{"default"}, Count: 1},
+			},
+		},
+	}
+	out, err := g.Generate(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	for _, flag := range []string{"--tries=", "--timeout=", "--memory=", "--sleep=", "--backoff="} {
+		if strings.Contains(out, flag) {
+			t.Errorf("unexpected passthrough flag %q with zero value in:\n%s", flag, out)
+		}
+	}
+}
+
 func TestValidatePorts_TCPUDPNoConflict(t *testing.T) {
 	// TCP and UDP on same port should not conflict
 	services := map[string]interface{}{

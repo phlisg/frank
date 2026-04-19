@@ -17,6 +17,8 @@ var flagPHP string
 var flagLaravel string
 var flagWith string
 var flagRuntime string
+var flagSchedule bool
+var flagQueueCount int
 
 func init() {
 	initCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
@@ -24,6 +26,8 @@ func init() {
 	initCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version, skips prompt (e.g. 12 or 12.*)")
 	initCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services, skips prompt (e.g. "pgsql,redis,mailpit")`)
 	initCmd.Flags().StringVar(&flagRuntime, "runtime", "", "runtime, skips prompt: frankenphp or fpm (ignored with --sail)")
+	initCmd.Flags().BoolVar(&flagSchedule, "schedule", false, "enable schedule:work worker, skips prompt")
+	initCmd.Flags().IntVar(&flagQueueCount, "queue-count", 0, "number of queue:work workers (0-4), skips prompt")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -132,7 +136,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if sailMode {
 		initErr = runSailInit(cfg, dir, existingCompose)
 	} else {
-		initErr = runFrankInit(cfg, dir, existingCompose)
+		initErr = runFrankInit(cmd, cfg, dir, existingCompose)
 	}
 
 	if initErr == nil && positionalArg != "" {
@@ -142,8 +146,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return initErr
 }
 
-func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
+func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose string) error {
 	selectedServices := []string{"pgsql", "mailpit"}
+	scheduleWorker := flagSchedule
+	queueCount := flagQueueCount
 
 	var groups []*huh.Group
 
@@ -213,13 +219,57 @@ func runFrankInit(cfg *config.Config, dir, existingCompose string) error {
 		))
 	}
 
+	if !cmd.Flags().Changed("schedule") {
+		groups = append(groups, huh.NewGroup(
+			huh.NewConfirm().
+				Title("Schedule worker").
+				Description("Run php artisan schedule:work in a dedicated container?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&scheduleWorker),
+		))
+	}
+
+	if !cmd.Flags().Changed("queue-count") {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[int]().
+				Title("Queue workers").
+				Description("How many php artisan queue:work containers to run on the default queue?").
+				Options(
+					huh.NewOption("None", 0),
+					huh.NewOption("1", 1),
+					huh.NewOption("2", 2),
+					huh.NewOption("3", 3),
+					huh.NewOption("4", 4),
+				).
+				Value(&queueCount),
+		))
+	}
+
 	if err := huh.NewForm(groups...).Run(); err != nil {
 		return err
 	}
 
 	cfg.Services = selectedServices
+	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
 
 	return writeConfigAndGenerate(cfg, dir, existingCompose)
+}
+
+// applyWorkersFromInit builds a cfg.Workers block from init answers.
+// queueCount of 0 means no queue pool; a single default pool is added otherwise.
+func applyWorkersFromInit(cfg *config.Config, schedule bool, queueCount int) {
+	cfg.Workers = config.Workers{}
+	if schedule {
+		cfg.Workers.Schedule = true
+	}
+	if queueCount > 0 {
+		cfg.Workers.Queue = []config.QueuePool{{
+			Name:   "default",
+			Queues: []string{"default"},
+			Count:  queueCount,
+		}}
+	}
 }
 
 func runSailInit(cfg *config.Config, dir, existingCompose string) error {
@@ -343,6 +393,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Laravel  config.Laravel                  `yaml:"laravel"`
 		Services []string                        `yaml:"services"`
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
+		Workers  *config.Workers                 `yaml:"workers,omitempty"`
 	}
 
 	out := configOutput{
@@ -351,6 +402,10 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Laravel:  cfg.Laravel,
 		Services: cfg.Services,
 		Config:   cfg.Config,
+	}
+	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
+		w := cfg.Workers
+		out.Workers = &w
 	}
 
 	b, err := yaml.Marshal(out)

@@ -8,6 +8,7 @@ redis:
     - redis_data:/data
   healthcheck:
     test: ["CMD", "redis-cli", "ping"]
-    interval: 5s
+    interval: 1s
     timeout: 3s
-    retries: 10
+    retries: 30
+    start_period: 30s

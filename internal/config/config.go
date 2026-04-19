@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"gopkg.in/yaml.v3"
@@ -54,12 +55,47 @@ var validServices = map[string]bool{
 
 var defaultServices = []string{"pgsql", "mailpit"}
 
+var workerPoolNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
+
+var knownWorkersKeys = map[string]bool{
+	"schedule": true,
+	"queue":    true,
+}
+
+var knownQueueItemKeys = map[string]bool{
+	"name":    true,
+	"queues":  true,
+	"count":   true,
+	"tries":   true,
+	"timeout": true,
+	"memory":  true,
+	"sleep":   true,
+	"backoff": true,
+}
+
 type Config struct {
 	Version  int                      `yaml:"version"`
 	PHP      PHP                      `yaml:"php"`
 	Laravel  Laravel                  `yaml:"laravel"`
 	Services []string                 `yaml:"services"`
 	Config   map[string]ServiceConfig `yaml:"config"`
+	Workers  Workers                  `yaml:"workers"`
+}
+
+type Workers struct {
+	Schedule bool        `yaml:"schedule,omitempty"`
+	Queue    []QueuePool `yaml:"queue,omitempty"`
+}
+
+type QueuePool struct {
+	Name    string   `yaml:"name"`
+	Queues  []string `yaml:"queues"`
+	Count   int      `yaml:"count"`
+	Tries   int      `yaml:"tries,omitempty"`
+	Timeout int      `yaml:"timeout,omitempty"`
+	Memory  int      `yaml:"memory,omitempty"`
+	Sleep   int      `yaml:"sleep,omitempty"`
+	Backoff int      `yaml:"backoff,omitempty"`
 }
 
 type PHP struct {
@@ -93,14 +129,27 @@ func Load(dir string) (*Config, error) {
 		return nil, fmt.Errorf("could not read %s: %w", ConfigFileName, err)
 	}
 
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
 		return nil, fmt.Errorf("could not parse %s: %w", ConfigFileName, err)
+	}
+
+	var cfg Config
+	if err := root.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("could not parse %s: %w", ConfigFileName, err)
+	}
+
+	warnUnknownWorkerKeys(&root)
+
+	// Capture explicit-empty-queues before defaulting overwrites.
+	explicitEmptyQueues := make([]bool, len(cfg.Workers.Queue))
+	for i, p := range cfg.Workers.Queue {
+		explicitEmptyQueues[i] = p.Queues != nil && len(p.Queues) == 0
 	}
 
 	applyDefaults(&cfg)
 
-	if err := validate(&cfg); err != nil {
+	if err := validate(&cfg, explicitEmptyQueues); err != nil {
 		return nil, err
 	}
 
@@ -127,9 +176,21 @@ func applyDefaults(cfg *Config) {
 	if len(cfg.Services) == 0 {
 		cfg.Services = append([]string{}, defaultServices...)
 	}
+	for i := range cfg.Workers.Queue {
+		p := &cfg.Workers.Queue[i]
+		if p.Queues == nil {
+			p.Queues = []string{"default"}
+		}
+		if p.Name == "" && len(p.Queues) > 0 {
+			p.Name = p.Queues[0]
+		}
+		if p.Count == 0 {
+			p.Count = 1
+		}
+	}
 }
 
-func validate(cfg *Config) error {
+func validate(cfg *Config, explicitEmptyQueues []bool) error {
 	if !validPHPVersions[cfg.PHP.Version] {
 		return fmt.Errorf("unsupported PHP version %q — valid options: 8.2, 8.3, 8.4, 8.5", cfg.PHP.Version)
 	}
@@ -153,6 +214,87 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("only one database service is allowed (pgsql, mysql, mariadb, sqlite) — found %d", dbCount)
 	}
 
+	if err := validateWorkers(&cfg.Workers, explicitEmptyQueues); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateWorkers(w *Workers, explicitEmptyQueues []bool) error {
+	names := make(map[string]int, len(w.Queue))
+	for i, p := range w.Queue {
+		if i < len(explicitEmptyQueues) && explicitEmptyQueues[i] {
+			return fmt.Errorf("workers.queue[%d]: queues must not be empty", i)
+		}
+		if p.Count < 1 {
+			return fmt.Errorf("workers.queue[%d] (%s): count must be ≥ 1", i, p.Name)
+		}
+		if !workerPoolNameRe.MatchString(p.Name) {
+			return fmt.Errorf("workers.queue[%d]: invalid pool name %q — must match [a-z0-9_-]+", i, p.Name)
+		}
+		if p.Tries < 0 || p.Timeout < 0 || p.Memory < 0 || p.Sleep < 0 || p.Backoff < 0 {
+			return fmt.Errorf("workers.queue[%d] (%s): passthrough values must be ≥ 0", i, p.Name)
+		}
+		for _, q := range p.Queues {
+			if q == "" {
+				return fmt.Errorf("workers.queue[%d] (%s): queue name must not be empty", i, p.Name)
+			}
+		}
+		if prev, ok := names[p.Name]; ok {
+			return fmt.Errorf("workers.queue[%d] and [%d]: duplicate pool name %q", prev, i, p.Name)
+		}
+		names[p.Name] = i
+	}
+	return nil
+}
+
+// warnUnknownWorkerKeys emits a warning for unknown keys under the workers
+// block or any queue item, for forward-compat with future fields.
+func warnUnknownWorkerKeys(root *yaml.Node) {
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return
+	}
+	top := root.Content[0]
+	if top.Kind != yaml.MappingNode {
+		return
+	}
+	workers := mapValue(top, "workers")
+	if workers == nil || workers.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(workers.Content); i += 2 {
+		key := workers.Content[i].Value
+		if !knownWorkersKeys[key] {
+			fmt.Fprintf(os.Stderr, "warning: unknown key %q under workers — ignored\n", key)
+		}
+	}
+	queue := mapValue(workers, "queue")
+	if queue == nil || queue.Kind != yaml.SequenceNode {
+		return
+	}
+	for idx, item := range queue.Content {
+		if item.Kind != yaml.MappingNode {
+			continue
+		}
+		for i := 0; i+1 < len(item.Content); i += 2 {
+			key := item.Content[i].Value
+			if !knownQueueItemKeys[key] {
+				fmt.Fprintf(os.Stderr, "warning: unknown key %q under workers.queue[%d] — ignored\n", key, idx)
+			}
+		}
+	}
+}
+
+func mapValue(m *yaml.Node, key string) *yaml.Node {
+	if m.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
 	return nil
 }
 

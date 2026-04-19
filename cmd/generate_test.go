@@ -54,6 +54,37 @@ var integrationFixtures = []integrationFixture{
 		},
 		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
 	},
+	{
+		name: "frankenphp-pgsql-workers",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+			Laravel:  config.Laravel{Version: "13.x"},
+			Services: []string{"pgsql", "mailpit"},
+			Workers: config.Workers{
+				Schedule: true,
+				Queue: []config.QueuePool{
+					{Name: "default", Queues: []string{"default"}, Count: 2},
+				},
+			},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
+	},
+	{
+		name: "fpm-mysql-redis-workers",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.4", Runtime: "fpm"},
+			Laravel:  config.Laravel{Version: "12.x"},
+			Services: []string{"mysql", "redis"},
+			Workers: config.Workers{
+				Schedule: false,
+				Queue: []config.QueuePool{
+					{Name: "high", Queues: []string{"high"}, Count: 1},
+					{Name: "default", Queues: []string{"default"}, Count: 2},
+				},
+			},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile"},
+	},
 }
 
 func TestGenerate_Integration(t *testing.T) {

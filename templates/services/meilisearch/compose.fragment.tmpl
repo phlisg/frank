@@ -10,6 +10,7 @@ meilisearch:
     MEILI_NO_ANALYTICS: "true"
   healthcheck:
     test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
-    interval: 5s
+    interval: 1s
     timeout: 3s
-    retries: 10
+    retries: 30
+    start_period: 30s

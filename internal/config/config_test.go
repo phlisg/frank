@@ -130,6 +130,224 @@ func TestProjectName(t *testing.T) {
 	}
 }
 
+func TestWorkersValid(t *testing.T) {
+	cases := map[string]string{
+		"schedule only": `
+version: 1
+workers:
+  schedule: true
+`,
+		"queue only": `
+version: 1
+workers:
+  queue:
+    - queues: [default]
+      count: 2
+`,
+		"both": `
+version: 1
+workers:
+  schedule: true
+  queue:
+    - queues: [default]
+      count: 1
+`,
+		"empty block": `
+version: 1
+workers: {}
+`,
+		"explicit name": `
+version: 1
+workers:
+  queue:
+    - name: fast
+      queues: [high, default]
+      count: 3
+`,
+		"derived name from queues": `
+version: 1
+workers:
+  queue:
+    - queues: [mail]
+      count: 1
+`,
+		"derived name default fallback": `
+version: 1
+workers:
+  queue:
+    - count: 1
+`,
+		"multiple pools": `
+version: 1
+workers:
+  queue:
+    - name: high
+      queues: [high]
+      count: 2
+    - name: low
+      queues: [low]
+      count: 1
+`,
+	}
+	for name, yamlBody := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, yamlBody)
+			if _, err := Load(dir); err != nil {
+				t.Fatalf("Load error: %v", err)
+			}
+		})
+	}
+}
+
+func TestWorkersDefaultingDerivesName(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+workers:
+  queue:
+    - queues: [mail]
+      count: 2
+    - count: 1
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if got := cfg.Workers.Queue[0].Name; got != "mail" {
+		t.Errorf("pool[0].Name = %q, want mail", got)
+	}
+	if got := cfg.Workers.Queue[1].Name; got != "default" {
+		t.Errorf("pool[1].Name = %q, want default (derived from queues default)", got)
+	}
+	if got := cfg.Workers.Queue[1].Queues; len(got) != 1 || got[0] != "default" {
+		t.Errorf("pool[1].Queues = %v, want [default]", got)
+	}
+}
+
+func TestWorkersCountDefaultsToOne(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+workers:
+  queue:
+    - queues: [default]
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if got := cfg.Workers.Queue[0].Count; got != 1 {
+		t.Errorf("Count = %d, want 1", got)
+	}
+}
+
+func TestWorkersInvalid(t *testing.T) {
+	cases := map[string]string{
+		"duplicate pool names": `
+version: 1
+workers:
+  queue:
+    - name: default
+      count: 1
+    - queues: [default]
+      count: 1
+`,
+		"bad name chars": `
+version: 1
+workers:
+  queue:
+    - name: Bad Name!
+      count: 1
+`,
+		"uppercase name": `
+version: 1
+workers:
+  queue:
+    - name: HighPriority
+      count: 1
+`,
+		"empty queues explicit": `
+version: 1
+workers:
+  queue:
+    - name: x
+      queues: []
+      count: 1
+`,
+		"negative tries": `
+version: 1
+workers:
+  queue:
+    - queues: [default]
+      count: 1
+      tries: -1
+`,
+		"negative timeout": `
+version: 1
+workers:
+  queue:
+    - queues: [default]
+      count: 1
+      timeout: -5
+`,
+	}
+	for name, yamlBody := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, yamlBody)
+			if _, err := Load(dir); err == nil {
+				t.Errorf("expected error for %s", name)
+			}
+		})
+	}
+}
+
+func TestWorkersUnknownKeyWarning(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+workers:
+  schedule: true
+  futureThing: yes
+  queue:
+    - queues: [default]
+      count: 1
+      unknownField: foo
+`)
+	r, w, _ := os.Pipe()
+	oldStderr := os.Stderr
+	os.Stderr = w
+	_, err := Load(dir)
+	w.Close()
+	os.Stderr = oldStderr
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	out := string(buf[:n])
+	if !containsAll(out, "futureThing", "unknownField") {
+		t.Errorf("expected warnings for unknown keys, got: %q", out)
+	}
+}
+
+func containsAll(s string, subs ...string) bool {
+	for _, sub := range subs {
+		found := false
+		for i := 0; i+len(sub) <= len(s); i++ {
+			if s[i:i+len(sub)] == sub {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 func TestHasService(t *testing.T) {
 	cfg := &Config{Services: []string{"pgsql", "mailpit"}}
 	if !cfg.HasService("pgsql") {
