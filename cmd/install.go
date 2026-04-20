@@ -47,27 +47,21 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Read the embedded laravel-init.sh script.
+	return installLaravel(dir, cfg, true)
+}
+
+func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 	scriptBytes, err := fs.ReadFile(TemplateFS, "templates/scripts/laravel-init.sh")
 	if err != nil {
 		return fmt.Errorf("read laravel-init.sh: %w", err)
 	}
 	script := string(scriptBytes)
 
-	// Build the laravel version argument for the script ($1).
-	// "latest" and "lts" are treated as unversioned (pass "" so composer picks latest stable).
 	laravelVersion := cfg.Laravel.Version
 	if laravelVersion == "latest" || laravelVersion == "lts" {
 		laravelVersion = ""
 	}
 
-	// Run a disposable composer:latest container with the project dir mounted.
-	// -i          : keep stdin open to pipe the script
-	// --rm        : remove container when done
-	// -u uid:gid  : run as current user to avoid root-owned files
-	// -v dir:/app : mount project dir
-	// -w /app     : set working dir inside container
-	// sh -s -- <version> : sh reads script from stdin (-s), version becomes $1
 	uid := os.Getuid()
 	gid := os.Getgid()
 
@@ -100,9 +94,11 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		output.Warning(fmt.Sprintf("could not patch composer.json: %v", err))
 	}
 
-	output.Detail("regenerating Docker files")
-	if err := generate(cfg, dir); err != nil {
-		return err
+	if regenerate {
+		output.Detail("regenerating Docker files")
+		if err := generate(cfg, dir); err != nil {
+			return err
+		}
 	}
 
 	if err := patchViteConfig(dir); err != nil {

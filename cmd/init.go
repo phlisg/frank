@@ -500,6 +500,11 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		return err
 	}
 
+	if err := installLaravel(dir, cfg, false); err != nil {
+		return err
+	}
+	output.Group("Installed Laravel", "")
+
 	if len(cfg.Tools) > 0 {
 		output.Detail("installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
@@ -508,11 +513,6 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		}
 		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
-
-	if err := runInstall(nil, nil); err != nil {
-		return err
-	}
-	output.Group("Installed Laravel", "")
 
 	return nil
 }
