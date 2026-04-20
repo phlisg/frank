@@ -35,7 +35,7 @@ func init() {
 	rootCmd.RegisterFlagCompletionFunc("dir", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterDirs
 	})
-	rootCmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "Show detailed output")
+	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress all output")
 	rootCmd.MarkFlagsMutuallyExclusive("verbose", "quiet")
 }
@@ -43,7 +43,6 @@ func init() {
 func Execute(fsys fs.FS, version string) {
 	TemplateFS = fsys
 	rootCmd.Version = version
-	rootCmd.Flags().Lookup("version").Shorthand = ""
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		switch {
