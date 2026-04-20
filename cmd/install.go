@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -83,8 +84,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+	}
 
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("laravel-init container: %w", err)
@@ -147,8 +153,13 @@ php artisan sail:install --with="$1" --php="$2"
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+	}
 
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("sail-install container: %w", err)
