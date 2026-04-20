@@ -9,7 +9,7 @@ Frank can scaffold preconfigured dev tooling for your Laravel project. Tools are
 | Tool | Category | What it does |
 | ---- | -------- | ------------ |
 | `pint` | PHP | Laravel code style fixer. Drops `pint.json` with the Laravel preset and IDE helper excludes |
-| `larastan` | PHP | Static analysis via PHPStan + Larastan. Drops `phpstan.neon` with level 5, app/ + routes/ paths |
+| `larastan` | PHP | Static analysis via PHPStan + Larastan. Drops `phpstan.neon` with level 2, app/ + routes/ paths |
 | `rector` | PHP | Automated refactoring. Drops `rector.php` with Laravel sets, conservative levels |
 | `lefthook` | Project | Git hooks manager. Assembles `lefthook.yml` with pre-commit and post-merge hooks |
 

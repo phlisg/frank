@@ -5,7 +5,7 @@ parameters:
     paths:
         - app/
         - routes/
-    level: 5
+    level: 2
     excludePaths:
         - .phpstorm.meta.php
         - _ide_helper.php
