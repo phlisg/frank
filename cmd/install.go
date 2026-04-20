@@ -51,6 +51,11 @@ func runInstall(cmd *cobra.Command, args []string) error {
 }
 
 func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve absolute path: %w", err)
+	}
+
 	scriptBytes, err := fs.ReadFile(TemplateFS, "templates/scripts/laravel-init.sh")
 	if err != nil {
 		return fmt.Errorf("read laravel-init.sh: %w", err)
