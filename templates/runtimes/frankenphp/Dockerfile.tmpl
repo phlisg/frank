@@ -103,6 +103,7 @@ RUN cat <<'SCRIPT' > /entrypoint.sh
 if [ -n "$WWWUSER" ]; then
     usermod -u "$WWWUSER" sail
 fi
+mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
 if [ -d "/var/www/html/storage" ]; then
     chown -R sail:sail /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
     chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
@@ -110,10 +111,6 @@ fi
 if [ -f "/var/www/html/.env.example" ] && [ ! -f "/var/www/html/.env" ]; then
     cp /var/www/html/.env.example /var/www/html/.env
     php artisan key:generate --no-interaction 2>/dev/null || true
-fi
-if [ ! -d /var/www/html/storage/psysh ]; then
-    mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
-    chown sail:sail /var/www/html/storage/psysh 2>/dev/null || true
 fi
 mkdir -p /config/caddy /data/caddy
 chown -R sail:sail /config/caddy /data/caddy
