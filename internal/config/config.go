@@ -92,6 +92,7 @@ type Config struct {
 	Config   map[string]ServiceConfig `yaml:"config"`
 	Workers  Workers                  `yaml:"workers"`
 	Node     Node                     `yaml:"node,omitempty"`
+	Tools    []string                 `yaml:"tools,omitempty"`
 }
 
 type Node struct {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +21,11 @@ var flagRuntime string
 var flagPM string
 var flagSchedule bool
 var flagQueueCount int
+var flagNoPint bool
+var flagNoLarastan bool
+var flagNoRector bool
+var flagNoLefthook bool
+var flagNoTools bool
 
 func init() {
 	initCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
@@ -30,6 +36,11 @@ func init() {
 	initCmd.Flags().StringVar(&flagPM, "pm", "", "package manager: npm, pnpm, bun")
 	initCmd.Flags().BoolVar(&flagSchedule, "schedule", false, "enable schedule:work worker, skips prompt")
 	initCmd.Flags().IntVar(&flagQueueCount, "queue-count", 0, "number of queue:work workers (0-4), skips prompt")
+	initCmd.Flags().BoolVar(&flagNoPint, "no-pint", false, "exclude pint from dev tools")
+	initCmd.Flags().BoolVar(&flagNoLarastan, "no-larastan", false, "exclude larastan from dev tools")
+	initCmd.Flags().BoolVar(&flagNoRector, "no-rector", false, "exclude rector from dev tools")
+	initCmd.Flags().BoolVar(&flagNoLefthook, "no-lefthook", false, "exclude lefthook from dev tools")
+	initCmd.Flags().BoolVar(&flagNoTools, "no-tools", false, "skip dev tools entirely")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -275,6 +286,57 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 	cfg.Services = selectedServices
 	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
 
+	// Tool selection
+	if !flagNoTools {
+		allTools := tool.AllNames()
+		// In non-interactive (flag) mode, start with all tools then remove --no-* ones
+		if flagPHP != "" || sailMode {
+			cfg.Tools = make([]string, 0)
+			for _, t := range allTools {
+				switch t {
+				case "pint":
+					if !flagNoPint {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "larastan":
+					if !flagNoLarastan {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "rector":
+					if !flagNoRector {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "lefthook":
+					if !flagNoLefthook {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				default:
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			}
+		} else {
+			// Interactive: multi-select with all pre-selected
+			selectedTools := make([]string, len(allTools))
+			copy(selectedTools, allTools)
+			options := make([]huh.Option[string], len(allTools))
+			for i, t := range allTools {
+				options[i] = huh.NewOption(t, t)
+			}
+			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewMultiSelect[string]().
+						Title("Dev tools").
+						Options(options...).
+						Value(&selectedTools),
+				),
+			).Run()
+			if err != nil {
+				return err
+			}
+			cfg.Tools = selectedTools
+		}
+	}
+
 	return writeConfigAndGenerate(cfg, dir, existingCompose)
 }
 
@@ -359,6 +421,34 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 
 	cfg.Services = selectedServices
 
+	// Tool selection (non-interactive: all tools unless --no-* flags)
+	if !flagNoTools {
+		allTools := tool.AllNames()
+		cfg.Tools = make([]string, 0)
+		for _, t := range allTools {
+			switch t {
+			case "pint":
+				if !flagNoPint {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "larastan":
+				if !flagNoLarastan {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "rector":
+				if !flagNoRector {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "lefthook":
+				if !flagNoLefthook {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			default:
+				cfg.Tools = append(cfg.Tools, t)
+			}
+		}
+	}
+
 	// Step 1: Write frank.yaml and generate .frank/
 	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
 		return err
@@ -402,7 +492,18 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	fmt.Println("\n  wrote  frank.yaml")
 
 	fmt.Println("\nGenerating Docker files...")
-	return generate(cfg, dir)
+	if err := generate(cfg, dir); err != nil {
+		return err
+	}
+
+	if len(cfg.Tools) > 0 {
+		fmt.Println("\nInstalling dev tools...")
+		if _, err := tool.Install(cfg.Tools, dir); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func marshalConfig(cfg *config.Config) (string, error) {
@@ -417,6 +518,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
 		Workers  *config.Workers                 `yaml:"workers,omitempty"`
 		Node     *config.Node                    `yaml:"node,omitempty"`
+		Tools    []string                        `yaml:"tools,omitempty"`
 	}
 
 	out := configOutput{
@@ -433,6 +535,9 @@ func marshalConfig(cfg *config.Config) (string, error) {
 	if cfg.Node.PackageManager != "" && cfg.Node.PackageManager != "npm" {
 		n := cfg.Node
 		out.Node = &n
+	}
+	if len(cfg.Tools) > 0 {
+		out.Tools = cfg.Tools
 	}
 
 	b, err := yaml.Marshal(out)
