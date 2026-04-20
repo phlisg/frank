@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+
+	"github.com/phlisg/frank/internal/output"
 )
 
 type InstallResult struct {
@@ -27,7 +29,7 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 		for dest, src := range t.ConfigFiles {
 			destPath := filepath.Join(dir, dest)
 			if _, err := os.Stat(destPath); err == nil {
-				fmt.Printf("  skipped    %s (already exists)\n", dest)
+				output.Detail(fmt.Sprintf("skipped %s (already exists)", dest))
 				res.Skipped = append(res.Skipped, dest)
 				continue
 			}
@@ -40,7 +42,7 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 			if err := os.WriteFile(destPath, data, 0644); err != nil {
 				return nil, fmt.Errorf("write %s: %w", dest, err)
 			}
-			fmt.Printf("  created    %s\n", dest)
+			output.Detail(fmt.Sprintf("created %s", dest))
 			res.Created = append(res.Created, dest)
 		}
 	}
@@ -50,14 +52,14 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 	if hasLefthook {
 		lefthookPath := filepath.Join(dir, "lefthook.yml")
 		if _, err := os.Stat(lefthookPath); err == nil {
-			fmt.Println("  skipped    lefthook.yml (already exists)")
+			output.Detail("skipped lefthook.yml (already exists)")
 			res.Skipped = append(res.Skipped, "lefthook.yml")
 		} else {
 			content := AssembleLefthook(tools)
 			if err := os.WriteFile(lefthookPath, []byte(content), 0644); err != nil {
 				return nil, fmt.Errorf("write lefthook.yml: %w", err)
 			}
-			fmt.Println("  created    lefthook.yml")
+			output.Detail("created lefthook.yml")
 			res.Created = append(res.Created, "lefthook.yml")
 		}
 	}
@@ -84,13 +86,13 @@ func runLefthookInstall(dir string) {
 		initCmd := exec.Command("git", "init")
 		initCmd.Dir = dir
 		if err := initCmd.Run(); err != nil {
-			fmt.Println("  hint       run `lefthook install` after git init")
+			output.Detail("hint: run `lefthook install` after git init")
 			return
 		}
 	}
 	path, err := exec.LookPath("lefthook")
 	if err != nil {
-		fmt.Println("  hint       install lefthook to enable git hooks: https://github.com/evilmartians/lefthook")
+		output.Detail("hint: install lefthook to enable git hooks: https://github.com/evilmartians/lefthook")
 		return
 	}
 	cmd := exec.Command(path, "install")
@@ -98,7 +100,7 @@ func runLefthookInstall(dir string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "  warning    lefthook install failed: %v\n", err)
+		output.Warning(fmt.Sprintf("lefthook install failed: %v", err))
 	}
 }
 

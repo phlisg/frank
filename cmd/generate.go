@@ -9,6 +9,7 @@ import (
 
 	"github.com/phlisg/frank/internal/compose"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/template"
 	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
@@ -35,12 +36,15 @@ var generateCmd = &cobra.Command{
 
 		// Phase 2: reconcile project-root tool config files
 		if len(cfg.Tools) > 0 {
-			fmt.Println("\nReconciling dev tools...")
-			if _, err := tool.Install(cfg.Tools, dir); err != nil {
+			output.Detail("reconciling dev tools")
+			res, err := tool.Install(cfg.Tools, dir)
+			if err != nil {
 				return err
 			}
+			output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 		}
 
+		output.NextSteps([]string{"frank up -d"})
 		return nil
 	},
 }
@@ -61,13 +65,13 @@ func generate(cfg *config.Config, dir string) error {
 	if err := gen.Write(cfg, projectName, dir); err != nil {
 		return fmt.Errorf("generate compose.yaml: %w", err)
 	}
-	fmt.Println("  wrote  .frank/compose.yaml")
+	output.Detail("wrote .frank/compose.yaml")
 
 	if err := gen.WriteEnv(cfg, projectName, dir); err != nil {
 		return fmt.Errorf("generate .env: %w", err)
 	}
-	fmt.Println("  wrote  .env")
-	fmt.Println("  wrote  .env.example")
+	output.Detail("wrote .env")
+	output.Detail("wrote .env.example")
 
 	data := template.Data{
 		PHPVersion:  cfg.PHP.Version,
@@ -81,7 +85,7 @@ func generate(cfg *config.Config, dir string) error {
 	if err := writeFile(filepath.Join(frankDir, "Dockerfile"), dockerfile); err != nil {
 		return err
 	}
-	fmt.Println("  wrote  .frank/Dockerfile")
+	output.Detail("wrote .frank/Dockerfile")
 
 	switch cfg.PHP.Runtime {
 	case "frankenphp":
@@ -92,7 +96,7 @@ func generate(cfg *config.Config, dir string) error {
 		if err := writeFile(filepath.Join(frankDir, "Caddyfile"), caddyfile); err != nil {
 			return err
 		}
-		fmt.Println("  wrote  .frank/Caddyfile")
+		output.Detail("wrote .frank/Caddyfile")
 
 	case "fpm":
 		nginxConf, err := engine.RenderRuntime("fpm", "nginx.conf.tmpl", data)
@@ -102,7 +106,7 @@ func generate(cfg *config.Config, dir string) error {
 		if err := writeFile(filepath.Join(frankDir, "nginx.conf"), nginxConf); err != nil {
 			return err
 		}
-		fmt.Println("  wrote  .frank/nginx.conf")
+		output.Detail("wrote .frank/nginx.conf")
 
 		nginxDockerfile, err := engine.RenderRuntime("fpm", "nginx.Dockerfile.tmpl", data)
 		if err != nil {
@@ -111,7 +115,7 @@ func generate(cfg *config.Config, dir string) error {
 		if err := writeFile(filepath.Join(frankDir, "nginx.Dockerfile"), nginxDockerfile); err != nil {
 			return err
 		}
-		fmt.Println("  wrote  .frank/nginx.Dockerfile")
+		output.Detail("wrote .frank/nginx.Dockerfile")
 	}
 
 	// Write .frank/.state JSON.
@@ -141,9 +145,19 @@ func generate(cfg *config.Config, dir string) error {
 	for _, name := range legacyFiles {
 		p := filepath.Join(dir, name)
 		if err := os.Remove(p); err == nil {
-			fmt.Printf("  removed  %s (moved to .frank/)\n", name)
+			output.Detail(fmt.Sprintf("removed %s (moved to .frank/)", name))
 		}
 	}
+
+	// Count generated files: compose.yaml + .env + .env.example + Dockerfile + .state + README.md = 6
+	fileCount := 6
+	switch cfg.PHP.Runtime {
+	case "frankenphp":
+		fileCount++ // Caddyfile
+	case "fpm":
+		fileCount += 2 // nginx.conf + nginx.Dockerfile
+	}
+	output.Group("Generated Docker files", fmt.Sprintf("%d files", fileCount))
 
 	return nil
 }
