@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -152,8 +153,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		initErr = runFrankInit(cmd, cfg, dir, existingCompose)
 	}
 
-	if initErr == nil && positionalArg != "" {
-		fmt.Printf("\nCreated %s — cd %s to get started\n", positionalArg, positionalArg)
+	if initErr == nil {
+		var steps []string
+		if positionalArg != "" {
+			steps = append(steps, fmt.Sprintf("cd %s", positionalArg))
+		}
+		steps = append(steps, "frank up -d")
+		output.NextSteps(steps)
 	}
 
 	return initErr
@@ -473,13 +479,13 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 		return fmt.Errorf("sail install: %w", err)
 	}
 
-	fmt.Println("\nSail project ready — run vendor/bin/sail up to start your project.")
+	output.NextSteps([]string{"vendor/bin/sail up"})
 	return nil
 }
 
 func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) error {
 	if existingCompose != "" {
-		fmt.Printf("\nNote: %s will be replaced by the generated compose.yaml.\n", existingCompose)
+		output.Detail(fmt.Sprintf("note: %s will be replaced by generated compose.yaml", existingCompose))
 	}
 
 	yamlBytes, err := marshalConfig(cfg)
@@ -489,18 +495,21 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	if err := writeFile(filepath.Join(dir, config.ConfigFileName), yamlBytes); err != nil {
 		return err
 	}
-	fmt.Println("\n  wrote  frank.yaml")
+	output.Detail("wrote frank.yaml")
+	output.Group("Wrote frank.yaml", "")
 
-	fmt.Println("\nGenerating Docker files...")
+	output.Detail("generating Docker files")
 	if err := generate(cfg, dir); err != nil {
 		return err
 	}
 
 	if len(cfg.Tools) > 0 {
-		fmt.Println("\nInstalling dev tools...")
-		if _, err := tool.Install(cfg.Tools, dir); err != nil {
+		output.Detail("installing dev tools")
+		res, err := tool.Install(cfg.Tools, dir)
+		if err != nil {
 			return err
 		}
+		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
 
 	return nil
