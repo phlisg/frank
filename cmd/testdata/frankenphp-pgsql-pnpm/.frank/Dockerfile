@@ -113,7 +113,7 @@ if [ -f "/var/www/html/.env.example" ] && [ ! -f "/var/www/html/.env" ]; then
 fi
 if [ ! -d /var/www/html/storage/psysh ]; then
     mkdir -p /var/www/html/storage/psysh 2>/dev/null || true
-    chmod 755 /var/www/html/storage/psysh 2>/dev/null || true
+    chown sail:sail /var/www/html/storage/psysh 2>/dev/null || true
 fi
 mkdir -p /config/caddy /data/caddy
 chown -R sail:sail /config/caddy /data/caddy
