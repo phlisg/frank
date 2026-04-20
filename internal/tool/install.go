@@ -13,7 +13,6 @@ import (
 type InstallResult struct {
 	Created []string
 	Skipped []string
-	Patched bool
 }
 
 func Install(tools []string, dir string) (*InstallResult, error) {
@@ -66,11 +65,9 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 
 	phpTools := PHPTools(tools)
 	if len(phpTools) > 0 {
-		patched, err := PatchComposer(dir, phpTools)
-		if err != nil {
+		if err := PatchComposerScripts(dir, phpTools); err != nil {
 			return nil, err
 		}
-		res.Patched = patched
 	}
 
 	if hasLefthook {

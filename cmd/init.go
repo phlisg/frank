@@ -506,6 +506,15 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	output.Group("Installed Laravel", "")
 
 	if len(cfg.Tools) > 0 {
+		// Install composer dev dependencies via docker (updates both json + lock).
+		phpTools := tool.PHPTools(cfg.Tools)
+		packages := tool.ComposerDevPackages(dir, phpTools)
+		if len(packages) > 0 {
+			if err := composerRequireDev(dir, packages); err != nil {
+				output.Warning(fmt.Sprintf("composer require --dev failed: %v", err))
+			}
+		}
+
 		output.Detail("installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
 		if err != nil {

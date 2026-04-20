@@ -117,6 +117,41 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 	return nil
 }
 
+// composerRequireDev runs `composer require --dev` in a disposable container,
+// updating both composer.json and composer.lock atomically.
+func composerRequireDev(dir string, packages []string) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+
+	uid := os.Getuid()
+	gid := os.Getgid()
+
+	args := []string{
+		"run", "--rm",
+		"-u", fmt.Sprintf("%d:%d", uid, gid),
+		"-v", absDir + ":/app",
+		"-w", "/app",
+		"composer:latest",
+		"composer", "require", "--dev", "--no-interaction", "--ignore-platform-reqs",
+	}
+	args = append(args, packages...)
+
+	output.Detail(fmt.Sprintf("composer require --dev %d packages", len(packages)))
+
+	c := exec.Command("docker", args...)
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+	}
+
+	return c.Run()
+}
+
 // runSailInstall runs composer require laravel/sail and php artisan sail:install
 // inside a disposable composer:latest container. Running these commands via
 // docker compose exec (inside a live container) causes inception problems that
