@@ -27,6 +27,18 @@ func TestDefaults(t *testing.T) {
 	if len(cfg.Services) != 2 || cfg.Services[0] != "pgsql" || cfg.Services[1] != "mailpit" {
 		t.Errorf("Services = %v, want [pgsql mailpit]", cfg.Services)
 	}
+	if !cfg.Workers.Schedule {
+		t.Error("Workers.Schedule should default to true")
+	}
+	if len(cfg.Workers.Queue) != 1 {
+		t.Fatalf("Workers.Queue len = %d, want 1", len(cfg.Workers.Queue))
+	}
+	if cfg.Workers.Queue[0].Name != "default" {
+		t.Errorf("Workers.Queue[0].Name = %q, want default", cfg.Workers.Queue[0].Name)
+	}
+	if cfg.Workers.Queue[0].Count != 1 {
+		t.Errorf("Workers.Queue[0].Count = %d, want 1", cfg.Workers.Queue[0].Count)
+	}
 }
 
 func TestLoadMinimal(t *testing.T) {
