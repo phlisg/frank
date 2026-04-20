@@ -79,6 +79,15 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 }
 
 func runLefthookInstall(dir string) {
+	gitDir := filepath.Join(dir, ".git")
+	if _, err := os.Stat(gitDir); err != nil {
+		initCmd := exec.Command("git", "init")
+		initCmd.Dir = dir
+		if err := initCmd.Run(); err != nil {
+			fmt.Println("  hint       run `lefthook install` after git init")
+			return
+		}
+	}
 	path, err := exec.LookPath("lefthook")
 	if err != nil {
 		fmt.Println("  hint       install lefthook to enable git hooks: https://github.com/evilmartians/lefthook")
