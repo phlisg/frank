@@ -13,6 +13,7 @@ import (
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/watch"
 	"github.com/spf13/cobra"
 )
@@ -97,7 +98,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		var err error
 		stopWatcher, err = startForegroundWatcher(dir, cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: watcher not started: %v\n", err)
+			output.Warning(fmt.Sprintf("watcher not started: %v", err))
 		}
 	}
 
@@ -105,7 +106,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	if stopWatcher != nil {
 		if err := stopWatcher(); err != nil && !errors.Is(err, context.Canceled) {
-			fmt.Fprintf(os.Stderr, "warning: watcher stopped with error: %v\n", err)
+			output.Warning(fmt.Sprintf("watcher stopped with error: %v", err))
 		}
 	}
 
@@ -113,48 +114,47 @@ func runUp(cmd *cobra.Command, args []string) error {
 		return upErr
 	}
 
+	output.Group("Containers started", "")
+
 	if upQuick {
 		return nil
 	}
 
-	// Wait for laravel.test to be ready before running post-start tasks.
-	// Only meaningful in detached mode; in foreground mode Up() never returns here.
-	fmt.Println("Waiting for laravel.test to be ready...")
+	output.Detail("waiting for laravel.test to be ready")
 	if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: %v — skipping post-start tasks\n", err)
+		output.Warning(fmt.Sprintf("%v — skipping post-start tasks", err))
 		return nil
 	}
 
-	// Post-start tasks — failures are logged but don't abort.
 	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
 		if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: composer install failed: %v\n", err)
+			output.Warning(fmt.Sprintf("composer install failed: %v", err))
 		}
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
 		if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: artisan migrate failed: %v\n", err)
+			output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
 		}
 	}
 
-	// npm install is intentionally not run automatically — it is memory-intensive
-	// and can OOM the container. Run it manually when needed:
-	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+	output.Group("Post-start tasks complete", "")
+
+	if detached {
+		var steps []string
 		pm := "npm"
 		if cfg != nil && cfg.Node.PackageManager != "" {
 			pm = cfg.Node.PackageManager
 		}
-		fmt.Printf("  %s install   # install frontend dependencies\n", pm)
-		fmt.Printf("  %s run dev   # start Vite dev server\n", pm)
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			steps = append(steps, fmt.Sprintf("%s install && %s run dev", pm, pm))
+		}
+		output.NextSteps(steps)
 	}
 
-	// -d mode: after laravel.test is healthy and post-start migrations
-	// have run, spawn a detached `frank watch` child. The child acquires
-	// .frank/watch.pid via its own Start — we don't pre-write it here.
 	if detached && wantWatcher {
 		if err := spawnDetachedWatcher(dir); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not start watcher: %v\n", err)
+			output.Warning(fmt.Sprintf("could not start watcher: %v", err))
 		}
 	}
 
@@ -218,7 +218,7 @@ func startForegroundWatcher(projectRoot string, cfg *config.Config) (func() erro
 	done := make(chan error, 1)
 	go func() { done <- w.Start(ctx) }()
 
-	fmt.Fprintf(os.Stderr, "frank watch: foreground (pid %d) armed with containers\n", os.Getpid())
+	output.Detail(fmt.Sprintf("frank watch: foreground (pid %d) armed", os.Getpid()))
 
 	return func() error {
 		signal.Stop(sigCh)
@@ -241,7 +241,6 @@ func spawnDetachedWatcher(projectRoot string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "frank watch: detached child started (pid %d) — logs at %s\n",
-		pid, watch.LogfilePath(projectRoot))
+	output.Detail(fmt.Sprintf("frank watch: detached child (pid %d)", pid))
 	return nil
 }
