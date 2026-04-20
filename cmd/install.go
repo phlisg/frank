@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +79,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		"sh", "-s", "--", laravelVersion,
 	}
 
-	fmt.Println("Installing Laravel (this may take a moment on first run while composer:latest is pulled)...")
+	output.Detail("installing Laravel (this may take a moment on first run while composer:latest is pulled)")
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
@@ -89,31 +90,23 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("laravel-init container: %w", err)
 	}
 
-	// Patch composer.json to use the PHP version the user selected.
-	// composer create-project always writes Laravel's own default (e.g. ^8.2)
-	// regardless of which PHP version was chosen during frank init.
 	if err := patchComposerPHPVersion(dir, cfg.PHP.Version); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not patch composer.json: %v\n", err)
+		output.Warning(fmt.Sprintf("could not patch composer.json: %v", err))
 	}
 
-	// Regenerate Docker files so .env/.env.example reflect Frank's service config.
-	fmt.Println("Regenerating Docker files...")
+	output.Detail("regenerating Docker files")
 	if err := generate(cfg, dir); err != nil {
 		return err
 	}
 
-	// Patch vite.config.js for Docker HMR.
 	if err := patchViteConfig(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not patch vite.config.js: %v\n", err)
+		output.Warning(fmt.Sprintf("could not patch vite.config.js: %v", err))
 	}
 
-	// Copy .psysh.php from embedded templates if not present.
 	if err := copyPsysh(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not copy .psysh.php: %v\n", err)
+		output.Warning(fmt.Sprintf("could not copy .psysh.php: %v", err))
 	}
 
-	fmt.Println("Laravel installed successfully.")
-	fmt.Println("Run 'frank up -d' to start your project.")
 	return nil
 }
 
@@ -150,7 +143,7 @@ php artisan sail:install --with="$1" --php="$2"
 		"sh", "-s", "--", withList, phpVersion,
 	}
 
-	fmt.Println("\nInstalling Sail...")
+	output.Detail("installing Sail")
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
@@ -197,7 +190,7 @@ func patchComposerPHPVersion(dir, phpVersion string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
-	fmt.Println("  patched  composer.json (php constraint →", "^"+phpVersion+")")
+	output.Detail(fmt.Sprintf("patched composer.json (php constraint → ^%s)", phpVersion))
 	return nil
 }
 
@@ -251,7 +244,7 @@ func patchViteConfig(dir string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
-	fmt.Println("  patched  vite.config.js (Docker HMR)")
+	output.Detail("patched vite.config.js (Docker HMR)")
 	return nil
 }
 
@@ -270,6 +263,6 @@ func copyPsysh(dir string) error {
 	if err := os.WriteFile(dst, content, 0644); err != nil {
 		return err
 	}
-	fmt.Println("  wrote  .psysh.php")
+	output.Detail("wrote .psysh.php")
 	return nil
 }

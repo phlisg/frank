@@ -457,17 +457,12 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 		}
 	}
 
-	// Step 1: Write frank.yaml and generate .frank/
+	// Step 1: Write frank.yaml, generate .frank/, and install Laravel.
 	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
 		return err
 	}
 
-	// Step 2: Install Laravel via disposable composer container.
-	if err := runInstall(nil, nil); err != nil {
-		return fmt.Errorf("frank install: %w", err)
-	}
-
-	// Step 3: Install Sail via a second disposable composer container.
+	// Step 2: Install Sail via a second disposable composer container.
 	// Running sail:install inside a live container causes inception problems
 	// (exit 137/OOM). sail:install only writes files so a disposable container works fine.
 	var sailServices []string
@@ -513,6 +508,11 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		}
 		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
+
+	if err := runInstall(nil, nil); err != nil {
+		return err
+	}
+	output.Group("Installed Laravel", "")
 
 	return nil
 }
