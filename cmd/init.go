@@ -157,6 +157,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		var steps []string
 		if positionalArg != "" {
 			steps = append(steps, fmt.Sprintf("cd %s", positionalArg))
+		} else if Dir != "" {
+			steps = append(steps, fmt.Sprintf("cd %s", Dir))
 		}
 		steps = append(steps, "frank up -d")
 		output.NextSteps(steps)
