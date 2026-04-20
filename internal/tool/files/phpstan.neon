@@ -1,0 +1,11 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+        - routes/
+    level: 5
+    excludePaths:
+        - .phpstorm.meta.php
+        - _ide_helper.php
