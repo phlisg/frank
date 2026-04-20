@@ -499,8 +499,9 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	if err := generate(cfg, dir); err != nil {
 		return err
 	}
+	output.Group("Generated Docker files", fmt.Sprintf("%d files", generatedFileCount(cfg)))
 
-	if err := installLaravel(dir, cfg, false); err != nil {
+	if err := installLaravel(dir, cfg, true); err != nil {
 		return err
 	}
 	output.Group("Installed Laravel", "")

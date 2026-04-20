@@ -33,6 +33,7 @@ var generateCmd = &cobra.Command{
 		if err := generate(cfg, dir); err != nil {
 			return err
 		}
+		output.Group("Generated Docker files", fmt.Sprintf("%d files", generatedFileCount(cfg)))
 
 		// Phase 2: reconcile project-root tool config files
 		if len(cfg.Tools) > 0 {
@@ -149,17 +150,18 @@ func generate(cfg *config.Config, dir string) error {
 		}
 	}
 
-	// Count generated files: compose.yaml + .env + .env.example + Dockerfile + .state + README.md = 6
-	fileCount := 6
+	return nil
+}
+
+func generatedFileCount(cfg *config.Config) int {
+	count := 6 // compose.yaml + .env + .env.example + Dockerfile + .state + README.md
 	switch cfg.PHP.Runtime {
 	case "frankenphp":
-		fileCount++ // Caddyfile
+		count++ // Caddyfile
 	case "fpm":
-		fileCount += 2 // nginx.conf + nginx.Dockerfile
+		count += 2 // nginx.conf + nginx.Dockerfile
 	}
-	output.Group("Generated Docker files", fmt.Sprintf("%d files", fileCount))
-
-	return nil
+	return count
 }
 
 func ensureGitignoreLine(path, line string) error {
