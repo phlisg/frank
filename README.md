@@ -241,6 +241,7 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 
 - Dev tools — [`docs/tools.md`](docs/tools.md)
 - Workers & code reload — [`docs/workers.md`](docs/workers.md)
+- Project and PHP tools — [`docs/tools.md`](docs/tools.md)
 - PHP runtimes — [`docs/runtimes.md`](docs/runtimes.md)
 - Shell aliases — [`docs/shell.md`](docs/shell.md)
 - Sail interop — [`docs/sail-interop.md`](docs/sail-interop.md)
