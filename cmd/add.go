@@ -66,6 +66,7 @@ func saveConfig(cfg *config.Config, dir string) error {
 		Laravel  config.Laravel                  `yaml:"laravel"`
 		Services []string                        `yaml:"services"`
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
+		Tools    []string                        `yaml:"tools,omitempty"`
 	}
 	out := configOutput{
 		Version:  cfg.Version,
@@ -73,6 +74,7 @@ func saveConfig(cfg *config.Config, dir string) error {
 		Laravel:  cfg.Laravel,
 		Services: cfg.Services,
 		Config:   cfg.Config,
+		Tools:    cfg.Tools,
 	}
 	b, err := yaml.Marshal(out)
 	if err != nil {

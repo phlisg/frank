@@ -10,6 +10,7 @@ import (
 	"github.com/phlisg/frank/internal/compose"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/template"
+	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,19 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return generate(cfg, dir)
+		if err := generate(cfg, dir); err != nil {
+			return err
+		}
+
+		// Phase 2: reconcile project-root tool config files
+		if len(cfg.Tools) > 0 {
+			fmt.Println("\nReconciling dev tools...")
+			if _, err := tool.Install(cfg.Tools, dir); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	},
 }
 

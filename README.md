@@ -26,6 +26,12 @@ teammate with `git clone` and `frank up`.
 - Host-side file watcher (`frank watch`) reloads workers on code change
 - Multi-pane CCTV view of every worker: `frank worker top`
 
+**Dev Tools**
+- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults
+- Lefthook pre-commit hooks: auto-fix on commit, analyse before push
+- `frank tool add <name>` to install tools on existing projects
+- `frank generate` reconciles tools for new devs cloning the repo
+
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
 - Hand off to Sail anytime (`frank eject`)
@@ -177,6 +183,7 @@ services:
 | `config.<service>.port` | integer | service default | Override the host-side port mapping |
 | `workers.schedule` | boolean | `false` | Run `php artisan schedule:work` in a dedicated container |
 | `workers.queue` | list — see [`docs/workers.md`](docs/workers.md) | `[]` | Declare long-running `queue:work` worker pools |
+| `tools` | list — `pint` `larastan` `rector` `lefthook` | `[]` | Dev tools installed by `frank init` or `frank tool add` — see [`docs/tools.md`](docs/tools.md) |
 
 After editing `frank.yaml`, run `frank generate` to regenerate Docker files — or simply `frank up`, which auto-regenerates when `frank.yaml` is newer than `compose.yaml`.
 
@@ -203,7 +210,8 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 
 | Command | Description |
 | ------- | ----------- |
-| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory. Flags `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count` skip the corresponding prompts for non-interactive use |
+| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory. Flags `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count`, `--no-pint`, `--no-larastan`, `--no-rector`, `--no-lefthook`, `--no-tools` skip the corresponding prompts for non-interactive use |
+| `frank tool add <tool>` | Add a dev tool to `frank.yaml` and install its config files |
 | `frank generate` | Regenerate Docker files from `frank.yaml` without prompting |
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
@@ -231,6 +239,7 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 
 ## Further Reading
 
+- Dev tools — [`docs/tools.md`](docs/tools.md)
 - Workers & code reload — [`docs/workers.md`](docs/workers.md)
 - PHP runtimes — [`docs/runtimes.md`](docs/runtimes.md)
 - Shell aliases — [`docs/shell.md`](docs/shell.md)
