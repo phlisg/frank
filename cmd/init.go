@@ -164,6 +164,14 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 	scheduleWorker := flagSchedule
 	queueCount := flagQueueCount
 
+	// Default workers on when prompts are shown (matches applyDefaults behaviour).
+	if !cmd.Flags().Changed("schedule") {
+		scheduleWorker = true
+	}
+	if !cmd.Flags().Changed("queue-count") {
+		queueCount = 1
+	}
+
 	var groups []*huh.Group
 
 	if flagPHP != "" {

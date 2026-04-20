@@ -197,6 +197,11 @@ func applyDefaults(cfg *Config) {
 	if cfg.Node.PackageManager == "" {
 		cfg.Node.PackageManager = DefaultPackageManager
 	}
+	// Default workers: schedule + 1 queue worker on the "default" queue.
+	if !cfg.Workers.Schedule && len(cfg.Workers.Queue) == 0 {
+		cfg.Workers.Schedule = true
+		cfg.Workers.Queue = []QueuePool{{Count: 1}}
+	}
 	for i := range cfg.Workers.Queue {
 		p := &cfg.Workers.Queue[i]
 		if p.Queues == nil {

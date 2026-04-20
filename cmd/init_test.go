@@ -60,12 +60,28 @@ func TestApplyWorkersFromInitBoth(t *testing.T) {
 
 func TestMarshalConfigOmitsEmptyWorkers(t *testing.T) {
 	cfg := config.New()
+	// Explicitly clear workers to test omission behaviour.
+	cfg.Workers = config.Workers{}
 	out, err := marshalConfig(cfg)
 	if err != nil {
 		t.Fatalf("marshalConfig: %v", err)
 	}
 	if strings.Contains(out, "workers:") {
 		t.Errorf("expected no workers key for empty workers, got:\n%s", out)
+	}
+}
+
+func TestMarshalConfigEmitsDefaultWorkers(t *testing.T) {
+	cfg := config.New()
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+	if !strings.Contains(out, "workers:") {
+		t.Errorf("expected workers key for default config, got:\n%s", out)
+	}
+	if !strings.Contains(out, "schedule: true") {
+		t.Errorf("expected schedule: true in default config, got:\n%s", out)
 	}
 }
 
