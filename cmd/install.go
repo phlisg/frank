@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -45,27 +47,26 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Read the embedded laravel-init.sh script.
+	return installLaravel(dir, cfg, true)
+}
+
+func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve absolute path: %w", err)
+	}
+
 	scriptBytes, err := fs.ReadFile(TemplateFS, "templates/scripts/laravel-init.sh")
 	if err != nil {
 		return fmt.Errorf("read laravel-init.sh: %w", err)
 	}
 	script := string(scriptBytes)
 
-	// Build the laravel version argument for the script ($1).
-	// "latest" and "lts" are treated as unversioned (pass "" so composer picks latest stable).
 	laravelVersion := cfg.Laravel.Version
 	if laravelVersion == "latest" || laravelVersion == "lts" {
 		laravelVersion = ""
 	}
 
-	// Run a disposable composer:latest container with the project dir mounted.
-	// -i          : keep stdin open to pipe the script
-	// --rm        : remove container when done
-	// -u uid:gid  : run as current user to avoid root-owned files
-	// -v dir:/app : mount project dir
-	// -w /app     : set working dir inside container
-	// sh -s -- <version> : sh reads script from stdin (-s), version becomes $1
 	uid := os.Getuid()
 	gid := os.Getgid()
 
@@ -78,43 +79,77 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		"sh", "-s", "--", laravelVersion,
 	}
 
-	fmt.Println("Installing Laravel (this may take a moment on first run while composer:latest is pulled)...")
+	output.Detail("installing Laravel (this may take a moment on first run while composer:latest is pulled)")
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+	}
 
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("laravel-init container: %w", err)
 	}
 
-	// Patch composer.json to use the PHP version the user selected.
-	// composer create-project always writes Laravel's own default (e.g. ^8.2)
-	// regardless of which PHP version was chosen during frank init.
 	if err := patchComposerPHPVersion(dir, cfg.PHP.Version); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not patch composer.json: %v\n", err)
+		output.Warning(fmt.Sprintf("could not patch composer.json: %v", err))
 	}
 
-	// Regenerate Docker files so .env/.env.example reflect Frank's service config.
-	fmt.Println("Regenerating Docker files...")
-	if err := generate(cfg, dir); err != nil {
+	if regenerate {
+		output.Detail("regenerating Docker files")
+		if err := generate(cfg, dir); err != nil {
+			return err
+		}
+	}
+
+	if err := patchViteConfig(dir); err != nil {
+		output.Warning(fmt.Sprintf("could not patch vite.config.js: %v", err))
+	}
+
+	if err := copyPsysh(dir); err != nil {
+		output.Warning(fmt.Sprintf("could not copy .psysh.php: %v", err))
+	}
+
+	return nil
+}
+
+// composerRequireDev runs `composer require --dev` in a disposable container,
+// updating both composer.json and composer.lock atomically.
+func composerRequireDev(dir string, packages []string) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
 		return err
 	}
 
-	// Patch vite.config.js for Docker HMR.
-	if err := patchViteConfig(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not patch vite.config.js: %v\n", err)
+	uid := os.Getuid()
+	gid := os.Getgid()
+
+	args := []string{
+		"run", "--rm",
+		"-u", fmt.Sprintf("%d:%d", uid, gid),
+		"-v", absDir + ":/app",
+		"-w", "/app",
+		"composer:latest",
+		"composer", "require", "--dev", "--no-interaction", "--ignore-platform-reqs",
+	}
+	args = append(args, packages...)
+
+	output.Detail(fmt.Sprintf("composer require --dev %d packages", len(packages)))
+
+	c := exec.Command("docker", args...)
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
 	}
 
-	// Copy .psysh.php from embedded templates if not present.
-	if err := copyPsysh(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not copy .psysh.php: %v\n", err)
-	}
-
-	fmt.Println("Laravel installed successfully.")
-	fmt.Println("Run 'frank up -d' to start your project.")
-	return nil
+	return c.Run()
 }
 
 // runSailInstall runs composer require laravel/sail and php artisan sail:install
@@ -150,12 +185,17 @@ php artisan sail:install --with="$1" --php="$2"
 		"sh", "-s", "--", withList, phpVersion,
 	}
 
-	fmt.Println("\nInstalling Sail...")
+	output.Detail("installing Sail")
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	if output.GetLevel() == output.Verbose {
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+	} else {
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+	}
 
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("sail-install container: %w", err)
@@ -197,7 +237,7 @@ func patchComposerPHPVersion(dir, phpVersion string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
-	fmt.Println("  patched  composer.json (php constraint →", "^"+phpVersion+")")
+	output.Detail(fmt.Sprintf("patched composer.json (php constraint → ^%s)", phpVersion))
 	return nil
 }
 
@@ -251,7 +291,7 @@ func patchViteConfig(dir string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
-	fmt.Println("  patched  vite.config.js (Docker HMR)")
+	output.Detail("patched vite.config.js (Docker HMR)")
 	return nil
 }
 
@@ -270,6 +310,6 @@ func copyPsysh(dir string) error {
 	if err := os.WriteFile(dst, content, 0644); err != nil {
 		return err
 	}
-	fmt.Println("  wrote  .psysh.php")
+	output.Detail("wrote .psysh.php")
 	return nil
 }

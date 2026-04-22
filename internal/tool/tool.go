@@ -37,7 +37,7 @@ var registry = []Tool{
 		Name:        "rector",
 		Category:    "php",
 		ConfigFiles: map[string]string{"rector.php": "rector.php"},
-		ComposerDev: []string{"rector/rector:^2.0", "dereuromark/rector-laravel:^2.0"},
+		ComposerDev: []string{"rector/rector:^2.0", "driftingly/rector-laravel:^2.0"},
 		ComposerScripts: map[string]string{
 			"refactor": "rector process --config rector.php",
 		},

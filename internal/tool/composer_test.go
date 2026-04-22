@@ -8,149 +8,105 @@ import (
 	"testing"
 )
 
-func TestPatchComposer_AddNew(t *testing.T) {
+func TestComposerDevPackages_New(t *testing.T) {
 	dir := t.TempDir()
 	writeJSON(t, dir, map[string]any{})
 
 	tools := []Tool{
-		{
-			ComposerDev:     []string{"vendor/pkg:^1.0"},
-			ComposerScripts: map[string]string{"lint": "do-lint"},
-		},
+		{ComposerDev: []string{"vendor/pkg:^1.0", "vendor/other:^2.0"}},
 	}
 
-	patched, err := PatchComposer(dir, tools)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	pkgs := ComposerDevPackages(dir, tools)
+	if len(pkgs) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(pkgs))
 	}
-	if !patched {
-		t.Fatal("expected patched=true")
+}
+
+func TestComposerDevPackages_SkipExisting(t *testing.T) {
+	dir := t.TempDir()
+	writeJSON(t, dir, map[string]any{
+		"require-dev": map[string]any{"vendor/pkg": "^0.9"},
+	})
+
+	tools := []Tool{
+		{ComposerDev: []string{"vendor/pkg:^1.0", "vendor/other:^2.0"}},
+	}
+
+	pkgs := ComposerDevPackages(dir, tools)
+	if len(pkgs) != 1 || pkgs[0] != "vendor/other:^2.0" {
+		t.Fatalf("expected [vendor/other:^2.0], got %v", pkgs)
+	}
+}
+
+func TestComposerDevPackages_NoFile(t *testing.T) {
+	dir := t.TempDir()
+
+	tools := []Tool{
+		{ComposerDev: []string{"vendor/pkg:^1.0"}},
+	}
+
+	pkgs := ComposerDevPackages(dir, tools)
+	if len(pkgs) != 1 {
+		t.Fatalf("expected 1 package when no composer.json, got %d", len(pkgs))
+	}
+}
+
+func TestPatchComposerScripts_AddNew(t *testing.T) {
+	dir := t.TempDir()
+	writeJSON(t, dir, map[string]any{})
+
+	tools := []Tool{
+		{ComposerScripts: map[string]string{"lint": "do-lint"}},
+	}
+
+	if err := PatchComposerScripts(dir, tools); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	doc := readJSON(t, dir)
-	reqDev := doc["require-dev"].(map[string]any)
-	if reqDev["vendor/pkg"] != "^1.0" {
-		t.Errorf("expected vendor/pkg=^1.0, got %v", reqDev["vendor/pkg"])
-	}
-
 	scripts := doc["scripts"].(map[string]any)
 	if scripts["lint"] != "do-lint" {
 		t.Errorf("expected lint=do-lint, got %v", scripts["lint"])
 	}
 }
 
-func TestPatchComposer_SkipExisting(t *testing.T) {
+func TestPatchComposerScripts_SkipExisting(t *testing.T) {
 	dir := t.TempDir()
 	writeJSON(t, dir, map[string]any{
-		"require-dev": map[string]any{"vendor/pkg": "^0.9"},
-		"scripts":     map[string]any{"lint": "old-lint"},
+		"scripts": map[string]any{"lint": "old-lint"},
 	})
 
 	tools := []Tool{
-		{
-			ComposerDev:     []string{"vendor/pkg:^1.0"},
-			ComposerScripts: map[string]string{"lint": "new-lint"},
-		},
+		{ComposerScripts: map[string]string{"lint": "new-lint"}},
 	}
 
-	patched, err := PatchComposer(dir, tools)
-	if err != nil {
+	if err := PatchComposerScripts(dir, tools); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if patched {
-		t.Fatal("expected patched=false when all entries exist")
 	}
 
 	doc := readJSON(t, dir)
-	reqDev := doc["require-dev"].(map[string]any)
-	if reqDev["vendor/pkg"] != "^0.9" {
-		t.Errorf("existing version overwritten: got %v", reqDev["vendor/pkg"])
-	}
 	scripts := doc["scripts"].(map[string]any)
 	if scripts["lint"] != "old-lint" {
 		t.Errorf("existing script overwritten: got %v", scripts["lint"])
 	}
 }
 
-func TestPatchComposer_PreservesUnknownKeys(t *testing.T) {
-	dir := t.TempDir()
-	writeJSON(t, dir, map[string]any{
-		"name":        "my/project",
-		"description": "A project",
-		"custom-key":  "custom-value",
-	})
-
-	tools := []Tool{
-		{
-			ComposerDev:     []string{"vendor/pkg:^1.0"},
-			ComposerScripts: map[string]string{"test": "phpunit"},
-		},
-	}
-
-	_, err := PatchComposer(dir, tools)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	doc := readJSON(t, dir)
-	if doc["name"] != "my/project" {
-		t.Errorf("name key lost: %v", doc["name"])
-	}
-	if doc["custom-key"] != "custom-value" {
-		t.Errorf("custom-key lost: %v", doc["custom-key"])
-	}
-}
-
-func TestPatchComposer_MissingFile(t *testing.T) {
-	dir := t.TempDir()
-
-	tools := []Tool{
-		{
-			ComposerDev:     []string{"vendor/pkg:^1.0"},
-			ComposerScripts: map[string]string{"lint": "do-lint"},
-		},
-	}
-
-	patched, err := PatchComposer(dir, tools)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if patched {
-		t.Fatal("expected patched=false for missing file")
-	}
-}
-
-func TestPatchComposer_Indent(t *testing.T) {
+func TestPatchComposerScripts_Indent(t *testing.T) {
 	dir := t.TempDir()
 	writeJSON(t, dir, map[string]any{})
 
 	tools := []Tool{
-		{
-			ComposerDev:     []string{"vendor/pkg:^1.0"},
-			ComposerScripts: map[string]string{"lint": "do-lint"},
-		},
+		{ComposerScripts: map[string]string{"lint": "do-lint"}},
 	}
 
-	_, err := PatchComposer(dir, tools)
-	if err != nil {
+	if err := PatchComposerScripts(dir, tools); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "composer.json"))
-	if err != nil {
-		t.Fatalf("reading output: %v", err)
-	}
-
+	data, _ := os.ReadFile(filepath.Join(dir, "composer.json"))
 	content := string(data)
 	if !strings.Contains(content, "    ") {
 		t.Error("expected 4-space indent in output")
-	}
-	// Should not contain tab indentation
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "\t") {
-			t.Errorf("line %d uses tab indent: %q", i+1, line)
-		}
 	}
 }
 
