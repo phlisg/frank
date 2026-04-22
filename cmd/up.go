@@ -56,10 +56,17 @@ func upFlagError(cmd *cobra.Command, err error) error {
 
 func runUp(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
-	client := docker.New(dir)
 
 	composeArgs := splitPassthrough(cmd, args)
-	if upDetach {
+
+	return doUp(dir, upDetach, upQuick, composeArgs)
+}
+
+func doUp(dir string, detach, quick bool, passthrough []string) error {
+	client := docker.New(dir)
+
+	composeArgs := passthrough
+	if detach {
 		composeArgs = append([]string{"-d"}, composeArgs...)
 	}
 
@@ -84,8 +91,6 @@ func runUp(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	detached := upDetach
-
 	// Resolve watcher intent once so fg + -d paths share the decision.
 	cfg, _ := config.Load(dir)
 	wantWatcher := shouldRunWatcher(cfg, client, dir)
@@ -94,7 +99,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	// edit during container boot still lands a reload trigger once the
 	// arm-suppression window clears. SIGINT/SIGTERM cancels both.
 	var stopWatcher func() error
-	if !detached && wantWatcher {
+	if !detach && wantWatcher {
 		var err error
 		stopWatcher, err = startForegroundWatcher(dir, cfg)
 		if err != nil {
@@ -116,7 +121,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	output.Group("Containers started", "")
 
-	if upQuick {
+	if quick {
 		return nil
 	}
 
@@ -140,7 +145,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	output.Group("Post-start tasks complete", "")
 
-	if detached {
+	if detach {
 		var steps []string
 		pm := "npm"
 		if cfg != nil && cfg.Node.PackageManager != "" {
@@ -152,7 +157,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		output.NextSteps(steps)
 	}
 
-	if detached && wantWatcher {
+	if detach && wantWatcher {
 		if err := spawnDetachedWatcher(dir); err != nil {
 			output.Warning(fmt.Sprintf("could not start watcher: %v", err))
 		}
