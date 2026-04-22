@@ -16,6 +16,7 @@ internal/
   compose/        generates .frank/compose.yaml by merging template fragments
   config/         frank.yaml schema, validation, defaults
   docker/         thin docker compose CLI wrapper (always uses -f .frank/compose.yaml)
+  output/         verbosity control (Quiet/Normal/Verbose) — Group, Detail, NextSteps, Warning
   shell/          alias table for frank activate/deactivate
   template/       template engine (renders from templates/ FS)
   watch/          host-side fsnotify watcher — feature-complete for v1 (walker, classifier, debouncer, dispatcher, first-run suppression, pidfile + already-running guard, orphan detection, Daemonize). frank watch CLI + frank up/down integration wired in cmd/.
@@ -50,6 +51,32 @@ Healthchecks present (use `service_healthy`): pgsql, mysql, mariadb, redis, meil
 No healthcheck (use `service_started`): memcached
 
 The `serviceDepends(cfg)` helper in `internal/compose/compose.go` owns the `depends_on` map construction. Reused for both `laravel.test` and the workers' `laravel.migrate` init service — if you add another service type, update that helper rather than duplicating.
+
+## Output Verbosity
+
+`internal/output` package. Three levels controlled by global persistent flags `--verbose`/`--quiet` on root cmd:
+
+- **Quiet** (`-q`): zero stdout, warnings still to stderr
+- **Normal** (default): phase ticks (`✓ label`) + NextSteps block
+- **Verbose** (`--verbose`): ticks + individual file ops + docker command output
+
+API: `output.Group(label, detail)`, `output.Detail(msg)`, `output.NextSteps(lines)`, `output.Warning(msg)`. Package-level var set in `PersistentPreRunE`.
+
+All `fmt.Println` in init/generate/up/install replaced with `output.*` calls. Docker container stdout/stderr piped to `io.Discard` unless Verbose.
+
+## Init Flow
+
+`frank init` runs the full pipeline: `writeConfigAndGenerate(cfg, dir, existingCompose)` which does:
+
+1. Write `frank.yaml`
+2. `generate()` — writes .frank/ files + .env
+3. `installLaravel(dir, cfg, true)` — docker composer container, then regenerates .env (Laravel's create-project overwrites it)
+4. `composerRequireDev(dir, packages)` — docker composer container, adds dev tool packages to both json + lock
+5. `tool.Install()` — writes config files (pint.json, phpstan.neon, etc.) + patches composer scripts
+
+`installLaravel` takes a `regenerate bool` — `true` from init (restores Frank's .env), `true` from standalone `frank install` command.
+
+`tool.ComposerDevPackages(dir, tools)` returns packages not yet in require-dev. `tool.PatchComposerScripts(dir, tools)` handles only the scripts key in composer.json (doesn't affect lock).
 
 ## Workers
 

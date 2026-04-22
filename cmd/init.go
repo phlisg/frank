@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -152,8 +153,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 		initErr = runFrankInit(cmd, cfg, dir, existingCompose)
 	}
 
-	if initErr == nil && positionalArg != "" {
-		fmt.Printf("\nCreated %s — cd %s to get started\n", positionalArg, positionalArg)
+	if initErr == nil {
+		var steps []string
+		if positionalArg != "" {
+			steps = append(steps, fmt.Sprintf("cd %s", positionalArg))
+		} else if Dir != "" {
+			steps = append(steps, fmt.Sprintf("cd %s", Dir))
+		}
+		steps = append(steps, "frank up -d")
+		output.NextSteps(steps)
 	}
 
 	return initErr
@@ -457,17 +465,12 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 		}
 	}
 
-	// Step 1: Write frank.yaml and generate .frank/
+	// Step 1: Write frank.yaml, generate .frank/, and install Laravel.
 	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
 		return err
 	}
 
-	// Step 2: Install Laravel via disposable composer container.
-	if err := runInstall(nil, nil); err != nil {
-		return fmt.Errorf("frank install: %w", err)
-	}
-
-	// Step 3: Install Sail via a second disposable composer container.
+	// Step 2: Install Sail via a second disposable composer container.
 	// Running sail:install inside a live container causes inception problems
 	// (exit 137/OOM). sail:install only writes files so a disposable container works fine.
 	var sailServices []string
@@ -481,13 +484,13 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 		return fmt.Errorf("sail install: %w", err)
 	}
 
-	fmt.Println("\nSail project ready — run vendor/bin/sail up to start your project.")
+	output.NextSteps([]string{"vendor/bin/sail up"})
 	return nil
 }
 
 func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) error {
 	if existingCompose != "" {
-		fmt.Printf("\nNote: %s will be replaced by the generated compose.yaml.\n", existingCompose)
+		output.Detail(fmt.Sprintf("note: %s will be replaced by generated compose.yaml", existingCompose))
 	}
 
 	yamlBytes, err := marshalConfig(cfg)
@@ -497,18 +500,36 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	if err := writeFile(filepath.Join(dir, config.ConfigFileName), yamlBytes); err != nil {
 		return err
 	}
-	fmt.Println("\n  wrote  frank.yaml")
+	output.Detail("wrote frank.yaml")
+	output.Group("Wrote frank.yaml", "")
 
-	fmt.Println("\nGenerating Docker files...")
+	output.Detail("generating Docker files")
 	if err := generate(cfg, dir); err != nil {
 		return err
 	}
+	output.Group("Generated Docker files", fmt.Sprintf("%d files", generatedFileCount(cfg)))
+
+	if err := installLaravel(dir, cfg, true); err != nil {
+		return err
+	}
+	output.Group("Installed Laravel", "")
 
 	if len(cfg.Tools) > 0 {
-		fmt.Println("\nInstalling dev tools...")
-		if _, err := tool.Install(cfg.Tools, dir); err != nil {
+		// Install composer dev dependencies via docker (updates both json + lock).
+		phpTools := tool.PHPTools(cfg.Tools)
+		packages := tool.ComposerDevPackages(dir, phpTools)
+		if len(packages) > 0 {
+			if err := composerRequireDev(dir, packages); err != nil {
+				output.Warning(fmt.Sprintf("composer require --dev failed: %v", err))
+			}
+		}
+
+		output.Detail("installing dev tools")
+		res, err := tool.Install(cfg.Tools, dir)
+		if err != nil {
 			return err
 		}
+		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
 
 	return nil

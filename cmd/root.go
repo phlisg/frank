@@ -9,6 +9,7 @@ import (
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,9 @@ var rootCmd = &cobra.Command{
 // Dir is the global --dir flag value (target project directory).
 var Dir string
 
+var flagVerbose bool
+var flagQuiet bool
+
 // TemplateFS holds the embedded templates FS passed from main.
 var TemplateFS fs.FS
 
@@ -31,11 +35,27 @@ func init() {
 	rootCmd.RegisterFlagCompletionFunc("dir", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterDirs
 	})
+	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Show detailed output")
+	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress all output")
+	rootCmd.MarkFlagsMutuallyExclusive("verbose", "quiet")
 }
 
 func Execute(fsys fs.FS, version string) {
 	TemplateFS = fsys
 	rootCmd.Version = version
+
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		switch {
+		case flagVerbose:
+			output.SetLevel(output.Verbose)
+		case flagQuiet:
+			output.SetLevel(output.Quiet)
+		default:
+			output.SetLevel(output.Normal)
+		}
+		return nil
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
