@@ -94,8 +94,10 @@ func runLefthookInstall(dir string) {
 	}
 	cmd := exec.Command(path, "install")
 	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if output.GetLevel() == output.Verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	if err := cmd.Run(); err != nil {
 		output.Warning(fmt.Sprintf("lefthook install failed: %v", err))
 	}
