@@ -29,12 +29,12 @@ Omitting `queues` defaults to `[default]`; omitting `name` derives it from `queu
 
 Declared workers are ordinary compose services — start with `frank up`, stop with `frank down`, tail with `frank worker logs`.
 
-## Bootstrapping via `frank init`
+## Bootstrapping via `frank new`
 
 The interactive wizard now includes a "Schedule worker" yes/no prompt and a "Queue workers" 0–4 prompt. Answer them and Frank writes the corresponding `workers:` block into `frank.yaml`. Prefer flags? Skip those prompts:
 
 ```bash
-frank init --php 8.4 --laravel 12 --runtime frankenphp \
+frank new --php 8.4 --laravel 12 --runtime frankenphp \
   --with="pgsql,redis,mailpit" --schedule --queue-count 2 my-app
 ```
 

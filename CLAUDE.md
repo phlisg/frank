@@ -11,7 +11,7 @@ Frank is a Go CLI that scaffolds and manages Laravel Docker environments. It rea
 ## Architecture
 
 ```
-cmd/              cobra commands (activate, init, generate, up, down, add, remove, worker, watch, ps, …)
+cmd/              cobra commands (activate, new, setup, generate, up, down, add, remove, worker, watch, ps, …)
 internal/
   compose/        generates .frank/compose.yaml by merging template fragments
   config/         frank.yaml schema, validation, defaults
@@ -62,11 +62,15 @@ The `serviceDepends(cfg)` helper in `internal/compose/compose.go` owns the `depe
 
 API: `output.Group(label, detail)`, `output.Detail(msg)`, `output.NextSteps(lines)`, `output.Warning(msg)`. Package-level var set in `PersistentPreRunE`.
 
-All `fmt.Println` in init/generate/up/install replaced with `output.*` calls. Docker container stdout/stderr piped to `io.Discard` unless Verbose.
+All `fmt.Println` in new/setup/generate/up/install replaced with `output.*` calls. Docker container stdout/stderr piped to `io.Discard` unless Verbose.
 
-## Init Flow
+## Commands: frank new + frank setup
 
-`frank init` runs the full pipeline: `writeConfigAndGenerate(cfg, dir, existingCompose)` which does:
+`frank new <project>` — zero-to-localhost. Non-interactive by default, `--interactive` for wizard. Pipeline: pre-flight → mkdir → `writeConfigAndGenerate` → `doUp` → npm install.
+
+`frank setup` — configure Frank in existing Laravel project (requires `artisan`). Always interactive wizard. After generating, prompts to rebuild containers.
+
+`writeConfigAndGenerate(cfg, dir, existingCompose)` does:
 
 1. Write `frank.yaml`
 2. `generate()` — writes .frank/ files + .env
@@ -74,7 +78,9 @@ All `fmt.Println` in init/generate/up/install replaced with `output.*` calls. Do
 4. `composerRequireDev(dir, packages)` — docker composer container, adds dev tool packages to both json + lock
 5. `tool.Install()` — writes config files (pint.json, phpstan.neon, etc.) + patches composer scripts
 
-`installLaravel` takes a `regenerate bool` — `true` from init (restores Frank's .env), `true` from standalone `frank install` command.
+`frank setup` uses `setupWriteAndGenerate` instead — steps 1-2 + 5 only (no Laravel install, no composerRequireDev).
+
+`installLaravel` takes a `regenerate bool` — `true` from `frank new` (restores Frank's .env), `true` from standalone `frank install` command.
 
 `tool.ComposerDevPackages(dir, tools)` returns packages not yet in require-dev. `tool.PatchComposerScripts(dir, tools)` handles only the scripts key in composer.json (doesn't affect lock).
 

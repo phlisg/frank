@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
@@ -315,6 +316,303 @@ func printNewNextSteps(projectName string, containersStarted bool) {
 	steps = append(steps, "")
 	steps = append(steps, "Tip: run `frank activate` to load shell aliases (up, down, artisan, etc.)")
 	output.NextSteps(steps)
+}
+
+// --- Interactive wizard (used by frank new --interactive) ---
+
+func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose string) error {
+	selectedServices := []string{"pgsql", "mailpit"}
+	scheduleWorker := flagSchedule
+	queueCount := flagQueueCount
+
+	if !cmd.Flags().Changed("schedule") {
+		scheduleWorker = true
+	}
+	if !cmd.Flags().Changed("queue-count") {
+		queueCount = 1
+	}
+
+	var groups []*huh.Group
+
+	if flagPHP != "" {
+		cfg.PHP.Version = flagPHP
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("PHP Version").
+				Options(
+					huh.NewOption("8.5 (latest)", "8.5"),
+					huh.NewOption("8.4", "8.4"),
+					huh.NewOption("8.3", "8.3"),
+					huh.NewOption("8.2", "8.2"),
+				).
+				Value(&cfg.PHP.Version),
+		))
+	}
+
+	if flagLaravel != "" {
+		cfg.Laravel.Version = normalizeLaravelVersion(flagLaravel)
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Laravel Version").
+				Options(
+					huh.NewOption("13.x (latest)", "13.*"),
+					huh.NewOption("12.x (LTS)", "12.*"),
+				).
+				Value(&cfg.Laravel.Version),
+		))
+	}
+
+	if flagRuntime != "" {
+		cfg.PHP.Runtime = flagRuntime
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Runtime").
+				Description("FrankenPHP is an all-in-one server; FPM uses a separate Nginx container.").
+				Options(
+					huh.NewOption("FrankenPHP (recommended)", "frankenphp"),
+					huh.NewOption("PHP-FPM + Nginx", "fpm"),
+				).
+				Value(&cfg.PHP.Runtime),
+		))
+	}
+
+	if flagPM != "" {
+		switch flagPM {
+		case "npm", "pnpm", "bun":
+			cfg.Node.PackageManager = flagPM
+		default:
+			return fmt.Errorf("invalid --pm %q: valid options are npm, pnpm, bun", flagPM)
+		}
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Package Manager").
+				Options(
+					huh.NewOption("npm (default)", "npm"),
+					huh.NewOption("pnpm", "pnpm"),
+					huh.NewOption("bun", "bun"),
+				).
+				Value(&cfg.Node.PackageManager),
+		))
+	}
+
+	if flagWith != "" {
+		selectedServices = parseServices(flagWith)
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Services").
+				Description("Select the services your project needs. Only one database may be chosen.").
+				Options(
+					huh.NewOption("PostgreSQL", "pgsql"),
+					huh.NewOption("MySQL", "mysql"),
+					huh.NewOption("MariaDB", "mariadb"),
+					huh.NewOption("SQLite", "sqlite"),
+					huh.NewOption("Redis", "redis"),
+					huh.NewOption("Memcached", "memcached"),
+					huh.NewOption("Meilisearch", "meilisearch"),
+					huh.NewOption("Mailpit", "mailpit"),
+				).
+				Value(&selectedServices),
+		))
+	}
+
+	if !cmd.Flags().Changed("schedule") {
+		groups = append(groups, huh.NewGroup(
+			huh.NewConfirm().
+				Title("Schedule worker").
+				Description("Run php artisan schedule:work in a dedicated container?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&scheduleWorker),
+		))
+	}
+
+	if !cmd.Flags().Changed("queue-count") {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[int]().
+				Title("Queue workers").
+				Description("How many php artisan queue:work containers to run on the default queue?").
+				Options(
+					huh.NewOption("None", 0),
+					huh.NewOption("1", 1),
+					huh.NewOption("2", 2),
+					huh.NewOption("3", 3),
+					huh.NewOption("4", 4),
+				).
+				Value(&queueCount),
+		))
+	}
+
+	if err := huh.NewForm(groups...).Run(); err != nil {
+		return err
+	}
+
+	cfg.Services = selectedServices
+	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
+
+	if !flagNoTools {
+		allTools := tool.AllNames()
+		if flagPHP != "" || sailMode {
+			cfg.Tools = make([]string, 0)
+			for _, t := range allTools {
+				switch t {
+				case "pint":
+					if !flagNoPint {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "larastan":
+					if !flagNoLarastan {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "rector":
+					if !flagNoRector {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				case "lefthook":
+					if !flagNoLefthook {
+						cfg.Tools = append(cfg.Tools, t)
+					}
+				default:
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			}
+		} else {
+			selectedTools := make([]string, len(allTools))
+			copy(selectedTools, allTools)
+			options := make([]huh.Option[string], len(allTools))
+			for i, t := range allTools {
+				options[i] = huh.NewOption(t, t)
+			}
+			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewMultiSelect[string]().
+						Title("Dev tools").
+						Options(options...).
+						Value(&selectedTools),
+				),
+			).Run()
+			if err != nil {
+				return err
+			}
+			cfg.Tools = selectedTools
+		}
+	}
+
+	return writeConfigAndGenerate(cfg, dir, existingCompose)
+}
+
+func runSailInit(cfg *config.Config, dir, existingCompose string) error {
+	cfg.PHP.Runtime = "fpm"
+	selectedServices := []string{"pgsql", "mailpit"}
+
+	var groups []*huh.Group
+
+	if flagPHP != "" {
+		cfg.PHP.Version = flagPHP
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("PHP Version").
+				Options(
+					huh.NewOption("8.5 (latest)", "8.5"),
+					huh.NewOption("8.4", "8.4"),
+					huh.NewOption("8.3", "8.3"),
+					huh.NewOption("8.2", "8.2"),
+				).
+				Value(&cfg.PHP.Version),
+		))
+	}
+
+	if flagLaravel != "" {
+		cfg.Laravel.Version = normalizeLaravelVersion(flagLaravel)
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Laravel Version").
+				Options(
+					huh.NewOption("13.x (latest)", "13.*"),
+					huh.NewOption("12.x (LTS)", "12.*"),
+				).
+				Value(&cfg.Laravel.Version),
+		))
+	}
+
+	if flagWith != "" {
+		selectedServices = parseServices(flagWith)
+	} else {
+		groups = append(groups, huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Services").
+				Description("Which services would you like to install?").
+				Options(
+					huh.NewOption("pgsql", "pgsql"),
+					huh.NewOption("mysql", "mysql"),
+					huh.NewOption("mariadb", "mariadb"),
+					huh.NewOption("redis", "redis"),
+					huh.NewOption("memcached", "memcached"),
+					huh.NewOption("meilisearch", "meilisearch"),
+					huh.NewOption("mailpit", "mailpit"),
+				).
+				Value(&selectedServices),
+		))
+	}
+
+	if len(groups) > 0 {
+		if err := huh.NewForm(groups...).Run(); err != nil {
+			return err
+		}
+	}
+
+	cfg.Services = selectedServices
+
+	if !flagNoTools {
+		allTools := tool.AllNames()
+		cfg.Tools = make([]string, 0)
+		for _, t := range allTools {
+			switch t {
+			case "pint":
+				if !flagNoPint {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "larastan":
+				if !flagNoLarastan {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "rector":
+				if !flagNoRector {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "lefthook":
+				if !flagNoLefthook {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			default:
+				cfg.Tools = append(cfg.Tools, t)
+			}
+		}
+	}
+
+	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
+		return err
+	}
+
+	var sailServices []string
+	for _, svc := range cfg.Services {
+		if svc == "sqlite" {
+			continue
+		}
+		sailServices = append(sailServices, svc)
+	}
+	if err := runSailInstall(dir, sailServices, cfg.PHP.Version); err != nil {
+		return fmt.Errorf("sail install: %w", err)
+	}
+
+	output.NextSteps([]string{"vendor/bin/sail up"})
+	return nil
 }
 
 // --- Shared helpers (moved from init.go, used by both new.go and setup.go) ---

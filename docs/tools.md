@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md)
 
-Frank can scaffold preconfigured dev tooling for your Laravel project. Tools are selected during `frank init` (all enabled by default) or added later with `frank tool add`. Config files are dropped once and owned by you — Frank never overwrites them.
+Frank can scaffold preconfigured dev tooling for your Laravel project. Tools are selected during `frank new` (all enabled by default) or added later with `frank tool add`. Config files are dropped once and owned by you — Frank never overwrites them.
 
 ## Available Tools
 
@@ -15,13 +15,13 @@ Frank can scaffold preconfigured dev tooling for your Laravel project. Tools are
 
 ## How It Works
 
-### During `frank init`
+### During `frank new`
 
 The wizard presents a multi-select for dev tools (all pre-selected). In non-interactive mode, all tools are included unless excluded with flags:
 
 ```bash
-frank init --no-rector my-app       # everything except rector
-frank init --no-tools my-app        # no dev tools at all
+frank new --no-rector my-app       # everything except rector
+frank new --no-tools my-app        # no dev tools at all
 ```
 
 Frank drops config files into the project root, patches `composer.json` with `require-dev` entries and scripts, assembles `lefthook.yml`, and runs `lefthook install` if the binary is available.

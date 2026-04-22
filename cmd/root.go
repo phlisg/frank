@@ -69,7 +69,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		fmt.Println("No frank.yaml found")
 		fmt.Println()
-		fmt.Println("  Run frank init to set up your project.")
+		fmt.Println("  Run frank new or frank setup to get started.")
 		fmt.Println()
 		printCommands(cmd)
 		return nil
