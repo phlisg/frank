@@ -45,7 +45,7 @@ func TestGroup_Normal(t *testing.T) {
 	out := captureStdout(func() {
 		Group("config", "frank.yaml")
 	})
-	if !strings.Contains(out, "✓ config (frank.yaml)") {
+	if !strings.Contains(out, "✓") || !strings.Contains(out, "config (frank.yaml)") {
 		t.Fatalf("expected group output, got: %q", out)
 	}
 }
@@ -57,7 +57,7 @@ func TestGroup_NoDetail(t *testing.T) {
 	out := captureStdout(func() {
 		Group("done", "")
 	})
-	if !strings.Contains(out, "✓ done\n") {
+	if !strings.Contains(out, "✓") || !strings.Contains(out, "done") {
 		t.Fatalf("expected group without detail, got: %q", out)
 	}
 }
@@ -122,6 +122,45 @@ func TestNextSteps_Normal(t *testing.T) {
 	}
 	if !strings.Contains(out, "  run frank up") {
 		t.Fatalf("expected indented line, got: %q", out)
+	}
+}
+
+func TestSpin_Success(t *testing.T) {
+	SetLevel(Normal)
+	defer SetLevel(Normal)
+
+	out := captureStdout(func() {
+		stop := Spin("Building image")
+		stop(nil)
+	})
+	if !strings.Contains(out, "✓") || !strings.Contains(out, "Building image") {
+		t.Fatalf("expected green tick + label, got: %q", out)
+	}
+}
+
+func TestSpin_Error(t *testing.T) {
+	SetLevel(Normal)
+	defer SetLevel(Normal)
+
+	out := captureStdout(func() {
+		stop := Spin("Building image")
+		stop(io.ErrUnexpectedEOF)
+	})
+	if !strings.Contains(out, "✗") || !strings.Contains(out, "Building image") {
+		t.Fatalf("expected red cross + label, got: %q", out)
+	}
+}
+
+func TestSpin_Quiet(t *testing.T) {
+	SetLevel(Quiet)
+	defer SetLevel(Normal)
+
+	out := captureStdout(func() {
+		stop := Spin("Building image")
+		stop(nil)
+	})
+	if out != "" {
+		t.Fatalf("expected no output in quiet mode, got: %q", out)
 	}
 }
 

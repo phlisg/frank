@@ -59,10 +59,10 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	composeArgs := splitPassthrough(cmd, args)
 
-	return doUp(dir, upDetach, upQuick, composeArgs)
+	return doUp(dir, upDetach, upQuick, composeArgs, true)
 }
 
-func doUp(dir string, detach, quick bool, passthrough []string) error {
+func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bool) error {
 	client := docker.New(dir)
 
 	composeArgs := passthrough
@@ -107,7 +107,13 @@ func doUp(dir string, detach, quick bool, passthrough []string) error {
 		}
 	}
 
-	upErr := client.Up(composeArgs...)
+	stopSpin := output.Spin("Starting containers")
+	var upErr error
+	if output.GetLevel() == output.Verbose {
+		upErr = client.Up(composeArgs...)
+	} else {
+		_, upErr = client.RunQuiet(append([]string{"up"}, composeArgs...)...)
+	}
 
 	if stopWatcher != nil {
 		if err := stopWatcher(); err != nil && !errors.Is(err, context.Canceled) {
@@ -115,37 +121,50 @@ func doUp(dir string, detach, quick bool, passthrough []string) error {
 		}
 	}
 
+	stopSpin(upErr)
 	if upErr != nil {
 		return upErr
 	}
-
-	output.Group("Containers started", "")
 
 	if quick {
 		return nil
 	}
 
+	stopPost := output.Spin("Running post-start tasks")
 	output.Detail("waiting for laravel.test to be ready")
 	if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
 		output.Warning(fmt.Sprintf("%v — skipping post-start tasks", err))
+		stopPost(nil)
 		return nil
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
-		if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-			output.Warning(fmt.Sprintf("composer install failed: %v", err))
+		if output.GetLevel() == output.Verbose {
+			if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
+				output.Warning(fmt.Sprintf("composer install failed: %v", err))
+			}
+		} else {
+			if _, err := client.ExecQuiet("laravel.test", "composer", "install", "--no-interaction"); err != nil {
+				output.Warning(fmt.Sprintf("composer install failed: %v", err))
+			}
 		}
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
-		if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-			output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
+		if output.GetLevel() == output.Verbose {
+			if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
+				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
+			}
+		} else {
+			if _, err := client.ExecQuiet("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
+				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
+			}
 		}
 	}
 
-	output.Group("Post-start tasks complete", "")
+	stopPost(nil)
 
-	if detach {
+	if detach && showNextSteps {
 		var steps []string
 		pm := "npm"
 		if cfg != nil && cfg.Node.PackageManager != "" {

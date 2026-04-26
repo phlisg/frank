@@ -274,19 +274,22 @@ func setupWriteAndGenerate(cfg *config.Config, dir string) error {
 	output.Detail("wrote frank.yaml")
 	output.Group("Wrote frank.yaml", "")
 
-	output.Detail("generating Docker files")
+	stopGen := output.Spin("Generating Docker files")
 	if err := generate(cfg, dir); err != nil {
+		stopGen(err)
 		return err
 	}
-	output.Group("Generated Docker files", fmt.Sprintf("%d files", generatedFileCount(cfg)))
+	stopGen(nil)
 
 	if len(cfg.Tools) > 0 {
-		output.Detail("installing dev tools")
+		stopTools := output.Spin("Installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
 		if err != nil {
+			stopTools(err)
 			return err
 		}
-		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
+		stopTools(nil)
+		output.Detail(fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
 
 	return nil
