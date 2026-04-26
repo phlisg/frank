@@ -429,3 +429,142 @@ func TestHasService(t *testing.T) {
 		t.Error("HasService(redis) = true")
 	}
 }
+
+func TestAlias_UnmarshalYAML_String(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  lint: "vendor/bin/pint"
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	a, ok := cfg.Aliases["lint"]
+	if !ok {
+		t.Fatal("alias 'lint' not found")
+	}
+	if a.Cmd != "vendor/bin/pint" {
+		t.Errorf("Cmd = %q, want %q", a.Cmd, "vendor/bin/pint")
+	}
+	if a.Host {
+		t.Error("Host should be false for string shorthand")
+	}
+}
+
+func TestAlias_UnmarshalYAML_Map(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  code:
+    cmd: "code ."
+    host: true
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	a, ok := cfg.Aliases["code"]
+	if !ok {
+		t.Fatal("alias 'code' not found")
+	}
+	if a.Cmd != "code ." {
+		t.Errorf("Cmd = %q, want %q", a.Cmd, "code .")
+	}
+	if !a.Host {
+		t.Error("Host should be true for map form with host: true")
+	}
+}
+
+func TestValidateAliases_BuiltinCollision(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  artisan: "php artisan"
+`)
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error for builtin collision with 'artisan'")
+	}
+}
+
+func TestValidateAliases_CaseInsensitive(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  Artisan: "php artisan"
+`)
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error for case-insensitive collision with builtin 'artisan'")
+	}
+}
+
+func TestValidateAliases_InvalidName(t *testing.T) {
+	cases := map[string]string{
+		"starts with digit": `
+version: 1
+aliases:
+  1bad: "echo hi"
+`,
+		"special chars": `
+version: 1
+aliases:
+  "no spaces": "echo hi"
+`,
+		"dot in name": `
+version: 1
+aliases:
+  "bad.name": "echo hi"
+`,
+	}
+	for name, yamlBody := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, yamlBody)
+			if _, err := Load(dir); err == nil {
+				t.Errorf("expected error for invalid alias name: %s", name)
+			}
+		})
+	}
+}
+
+func TestValidateAliases_EmptyCmd(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  lint:
+    cmd: ""
+`)
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error for empty cmd")
+	}
+}
+
+func TestValidateAliases_Valid(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+aliases:
+  lint: "vendor/bin/pint"
+  analyse:
+    cmd: "vendor/bin/phpstan analyse"
+  open-browser:
+    cmd: "open http://localhost"
+    host: true
+  _internal: "some-cmd"
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if len(cfg.Aliases) != 4 {
+		t.Errorf("Aliases count = %d, want 4", len(cfg.Aliases))
+	}
+}
