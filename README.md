@@ -2,35 +2,21 @@
 
 > A config-driven Docker environment for Laravel development.
 
-Frank gives you a full Laravel dev environment from a single `frank.yaml` —
-no local PHP, Composer, or Node required. Queue workers and the scheduler
-run as dedicated containers with auto-reload on code change. Onboard a
-teammate with `git clone` and `frank up`.
+Frank gives you a full Laravel dev environment from a single `frank.yaml` — no local PHP, Composer, or Node required. Queue workers and the scheduler run as dedicated containers with auto-reload on code change. Onboard a teammate with `git clone` and `frank up`.
 
 ### Features
 
 **Environment**
-- One-file config (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx
-- Two runtimes: FrankenPHP (default) or PHP-FPM + Nginx
-- Services: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit
+- One-file config (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx - Two runtimes: FrankenPHP (default) or PHP-FPM + Nginx - Services: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit
 
 **Workflow**
-- `frank new` scaffolds a project (interactive or flag-driven)
-- `frank install` bootstraps Laravel inside the container
-- Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd`
-- Shell completion for zsh / bash / fish / powershell
+- `frank new` scaffolds a project (interactive or flag-driven) - `frank install` bootstraps Laravel inside the container - Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd` - Shell completion for zsh / bash / fish / powershell
 
 **Workers**
-- Declared `schedule:work` + `queue:work` pools in `frank.yaml`
-- Ad-hoc workers via `frank worker queue|schedule`
-- Host-side file watcher (`frank watch`) reloads workers on code change
-- Multi-pane CCTV view of every worker: `frank worker top`
+- Declared `schedule:work` + `queue:work` pools in `frank.yaml` - Ad-hoc workers via `frank worker queue|schedule` - Host-side file watcher (`frank watch`) reloads workers on code change - Multi-pane CCTV view of every worker: `frank worker top`
 
 **Dev Tools**
-- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults
-- Lefthook pre-commit hooks: auto-fix on commit, analyse before push
-- `frank tool add <name>` to install tools on existing projects
-- `frank generate` reconciles tools for new devs cloning the repo
+- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults - Lefthook pre-commit hooks: auto-fix on commit, analyze before push - `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo
 
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
