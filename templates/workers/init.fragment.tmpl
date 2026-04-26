@@ -16,8 +16,9 @@ laravel.migrate:
   labels:
     frank.project: "{{.ProjectName}}"
     frank.init: migrate
-  entrypoint: ["/bin/bash", "-lc"]
   command:
+    - /bin/bash
+    - -lc
     - |
       set -e
       if [ ! -d vendor ]; then

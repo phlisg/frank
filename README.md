@@ -2,35 +2,21 @@
 
 > A config-driven Docker environment for Laravel development.
 
-Frank gives you a full Laravel dev environment from a single `frank.yaml` —
-no local PHP, Composer, or Node required. Queue workers and the scheduler
-run as dedicated containers with auto-reload on code change. Onboard a
-teammate with `git clone` and `frank up`.
+Frank gives you a full Laravel dev environment from a single `frank.yaml` — no local PHP, Composer, or Node required. Queue workers and the scheduler run as dedicated containers with auto-reload on code change. Onboard a teammate with `git clone` and `frank up`.
 
 ### Features
 
 **Environment**
-- One-file config (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx
-- Two runtimes: FrankenPHP (default) or PHP-FPM + Nginx
-- Services: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit
+- One-file config (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx - Two runtimes: FrankenPHP (default) or PHP-FPM + Nginx - Services: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit
 
 **Workflow**
-- `frank init` scaffolds a project (interactive or flag-driven)
-- `frank install` bootstraps Laravel inside the container
-- Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd`
-- Shell completion for zsh / bash / fish / powershell
+- `frank new` scaffolds a project (interactive or flag-driven) - `frank install` bootstraps Laravel inside the container - Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd` - Shell completion for zsh / bash / fish / powershell
 
 **Workers**
-- Declared `schedule:work` + `queue:work` pools in `frank.yaml`
-- Ad-hoc workers via `frank worker queue|schedule`
-- Host-side file watcher (`frank watch`) reloads workers on code change
-- Multi-pane CCTV view of every worker: `frank worker top`
+- Declared `schedule:work` + `queue:work` pools in `frank.yaml` - Ad-hoc workers via `frank worker queue|schedule` - Host-side file watcher (`frank watch`) reloads workers on code change - Multi-pane CCTV view of every worker: `frank worker top`
 
 **Dev Tools**
-- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults
-- Lefthook pre-commit hooks: auto-fix on commit, analyse before push
-- `frank tool add <name>` to install tools on existing projects
-- `frank generate` reconciles tools for new devs cloning the repo
+- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults - Lefthook pre-commit hooks: auto-fix on commit, analyze before push - `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo
 
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
@@ -86,14 +72,14 @@ A full walkthrough from zero to a running Laravel app. Scenario: new project wit
 **1. Scaffold the project**
 
 ```bash
-frank init my-app
+frank new my-app
 cd my-app
 ```
 
 The wizard asks for PHP version, Laravel version, runtime, and services. Prefer flags? Skip every prompt in one shot:
 
 ```bash
-frank init --php 8.4 --laravel 12 --runtime frankenphp --with="pgsql,redis,mailpit" my-app
+frank new --php 8.4 --laravel 12 --runtime frankenphp --with="pgsql,redis,mailpit" my-app
 ```
 
 Either way, Frank writes `frank.yaml` and generates `compose.yaml`, `Dockerfile`, `Caddyfile`, `.env`, and `.env.example`.
@@ -148,7 +134,7 @@ No local PHP, no Composer, no version conflicts.
 Declare them at init time:
 
 ```bash
-frank init --schedule --queue-count 2 my-app
+frank new --schedule --queue-count 2 my-app
 ```
 
 `frank up` auto-spawns `frank watch` so edits to `app/`, `config/`, `routes/`, etc. reload workers automatically. Details: [`docs/workers.md`](docs/workers.md).
@@ -183,7 +169,7 @@ services:
 | `config.<service>.port` | integer | service default | Override the host-side port mapping |
 | `workers.schedule` | boolean | `false` | Run `php artisan schedule:work` in a dedicated container |
 | `workers.queue` | list — see [`docs/workers.md`](docs/workers.md) | `[]` | Declare long-running `queue:work` worker pools |
-| `tools` | list — `pint` `larastan` `rector` `lefthook` | `[]` | Dev tools installed by `frank init` or `frank tool add` — see [`docs/tools.md`](docs/tools.md) |
+| `tools` | list — `pint` `larastan` `rector` `lefthook` | `[]` | Dev tools installed by `frank new` or `frank tool add` — see [`docs/tools.md`](docs/tools.md) |
 
 After editing `frank.yaml`, run `frank generate` to regenerate Docker files — or simply `frank up`, which auto-regenerates when `frank.yaml` is newer than `compose.yaml`.
 
@@ -210,7 +196,8 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 
 | Command | Description |
 | ------- | ----------- |
-| `frank init [dir]` | Interactive wizard — creates `frank.yaml` and generates Docker files; if `dir` is given, creates and targets that directory. Flags `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count`, `--no-pint`, `--no-larastan`, `--no-rector`, `--no-lefthook`, `--no-tools` skip the corresponding prompts for non-interactive use |
+| `frank new <project>` | Create a new Laravel project — zero to localhost in one command. Non-interactive by default; use `--interactive` for wizard. Flags: `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count`, `--no-pint`, `--no-larastan`, `--no-rector`, `--no-lefthook`, `--no-tools`, `--no-up`, `--sail` |
+| `frank setup` | Configure Frank in an existing Laravel project (interactive wizard). Supports `--sail` and `--dir` |
 | `frank tool add <tool>` | Add a dev tool to `frank.yaml` and install its config files |
 | `frank generate` | Regenerate Docker files from `frank.yaml` without prompting |
 | `frank install` | Install Laravel into the project directory |

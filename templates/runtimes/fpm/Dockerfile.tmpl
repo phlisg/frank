@@ -97,7 +97,11 @@ if [ -f "/var/www/html/.env.example" ] && [ ! -f "/var/www/html/.env" ]; then
     cp /var/www/html/.env.example /var/www/html/.env
     php artisan key:generate --no-interaction 2>/dev/null || true
 fi
-exec "$@"
+if [[ "$1" == php-fpm* ]]; then
+    exec "$@"
+else
+    exec gosu sail "$@"
+fi
 SCRIPT
 RUN chmod +x /entrypoint.sh
 

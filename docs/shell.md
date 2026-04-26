@@ -38,7 +38,7 @@ eval "$(frank shell-setup)"   # add once to ~/.zshrc or ~/.bashrc
 
 This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that watches for `frank.yaml` as you navigate directories. Step into a Frank project and aliases activate automatically. Step out and they're gone. No manual `eval` needed, no aliases leaking between projects.
 
-Shell completion is wired up at the same time — `frank <tab>`, `frank init --dir <tab>`, and subcommand completion all work out of the box once `shell-setup` is in your profile. If you want completion without the auto-activation hook, you can add it separately:
+Shell completion is wired up at the same time — `frank <tab>`, `frank new <tab>`, and subcommand completion all work out of the box once `shell-setup` is in your profile. If you want completion without the auto-activation hook, you can add it separately:
 
 ```bash
 eval "$(frank completion zsh)"   # or bash / fish / powershell
