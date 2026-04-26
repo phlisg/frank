@@ -43,6 +43,7 @@ func init() {
 func Execute(fsys fs.FS, version string) {
 	TemplateFS = fsys
 	rootCmd.Version = version
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		switch {
