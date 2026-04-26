@@ -274,7 +274,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 // runNewUp runs doUp then npm install inside the container.
 func runNewUp(dir string, cfg *config.Config) error {
-	if err := doUp(dir, true, false, nil); err != nil {
+	if err := doUp(dir, true, false, nil, false); err != nil {
 		output.Warning(fmt.Sprintf("containers failed to start: %v", err))
 		return err
 	}
@@ -287,18 +287,25 @@ func runNewUp(dir string, cfg *config.Config) error {
 			pm = cfg.Node.PackageManager
 		}
 
-		output.Detail(fmt.Sprintf("running %s install", pm))
+		stopNpm := output.Spin(fmt.Sprintf("Installing %s dependencies", pm))
 
 		// Wait for container to be ready
 		if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
 			output.Warning(fmt.Sprintf("container not ready for %s install: %v", pm, err))
+			stopNpm(nil)
 			return nil
 		}
 
-		if err := client.Exec("laravel.test", pm, "install"); err != nil {
-			output.Warning(fmt.Sprintf("%s install failed: %v", pm, err))
+		var npmErr error
+		if output.GetLevel() == output.Verbose {
+			npmErr = client.Exec("laravel.test", pm, "install")
 		} else {
-			output.Group("Installed npm dependencies", "")
+			_, npmErr = client.ExecQuiet("laravel.test", pm, "install")
+		}
+		if npmErr != nil {
+			stopNpm(fmt.Errorf("%s install failed: %w", pm, npmErr))
+		} else {
+			stopNpm(nil)
 		}
 	}
 
@@ -668,33 +675,41 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	output.Detail("wrote frank.yaml")
 	output.Group("Wrote frank.yaml", "")
 
-	output.Detail("generating Docker files")
+	stopGen := output.Spin("Generating Docker files")
 	if err := generate(cfg, dir); err != nil {
+		stopGen(err)
 		return err
 	}
-	output.Group("Generated Docker files", fmt.Sprintf("%d files", generatedFileCount(cfg)))
+	stopGen(nil)
 
+	stopLaravel := output.Spin("Installing Laravel")
 	if err := installLaravel(dir, cfg, true); err != nil {
+		stopLaravel(err)
 		return err
 	}
-	output.Group("Installed Laravel", "")
+	stopLaravel(nil)
 
 	if len(cfg.Tools) > 0 {
-		// Install composer dev dependencies via docker (updates both json + lock).
 		phpTools := tool.PHPTools(cfg.Tools)
 		packages := tool.ComposerDevPackages(dir, phpTools)
 		if len(packages) > 0 {
+			stopReq := output.Spin("Installing dev dependencies")
 			if err := composerRequireDev(dir, packages); err != nil {
+				stopReq(err)
 				output.Warning(fmt.Sprintf("composer require --dev failed: %v", err))
+			} else {
+				stopReq(nil)
 			}
 		}
 
-		output.Detail("installing dev tools")
+		stopTools := output.Spin("Installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
 		if err != nil {
+			stopTools(err)
 			return err
 		}
-		output.Group("Installed dev tools", fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
+		stopTools(nil)
+		output.Detail(fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
 
 	return nil
