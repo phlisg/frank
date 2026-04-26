@@ -103,7 +103,7 @@ Starts all services in the background, runs `composer install`, and runs `php ar
 **4. Enable shell aliases (once)**
 
 ```bash
-eval "$(frank config shell setup)" >> ~/.zshrc   # or ~/.bashrc
+echo 'eval "$(frank config shell setup)"' >> ~/.zshrc   # or ~/.bashrc
 source ~/.zshrc
 ```
 

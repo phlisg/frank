@@ -33,7 +33,7 @@ The database aliases are only added when the matching service is configured, so 
 **Auto-activation** — the recommended setup for day-to-day use:
 
 ```bash
-eval "$(frank config shell setup)"   # add once to ~/.zshrc or ~/.bashrc
+echo 'eval "$(frank config shell setup)"' >> ~/.zshrc   # or ~/.bashrc
 ```
 
 This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that watches for `frank.yaml` as you navigate directories. Step into a Frank project and aliases activate automatically. Step out and they're gone. No manual `eval` needed, no aliases leaking between projects.
@@ -41,5 +41,5 @@ This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that watches for `fran
 Shell completion is wired up at the same time — `frank <tab>`, `frank new <tab>`, and subcommand completion all work out of the box once `shell-setup` is in your profile. If you want completion without the auto-activation hook, you can add it separately:
 
 ```bash
-eval "$(frank config shell completion zsh)"   # or bash / fish / powershell
+echo 'eval "$(frank config shell completion zsh)"' >> ~/.zshrc   # or bash / fish / powershell
 ```
