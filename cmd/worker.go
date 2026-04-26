@@ -76,8 +76,9 @@ var workerScheduleCmd = &cobra.Command{
 }
 
 var workerListCmd = &cobra.Command{
-	Use:               "list",
-	Short:             "List worker containers (declared + ad-hoc)",
+	Use:               "ps",
+	Aliases:           []string{"list"},
+	Short:             "Show worker containers (declared + ad-hoc)",
 	SilenceUsage:      true,
 	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE:              runWorkerList,

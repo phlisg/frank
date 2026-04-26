@@ -85,7 +85,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	case docker.StateRunning, docker.StatePartial:
 		fmt.Printf("%-12s %d/%d running\n", "Status", running, total)
 		fmt.Println()
-		fmt.Println("  frank ps     view running services")
+		fmt.Println("  frank compose ps   view running services")
 		fmt.Println("  frank down   stop containers")
 	default:
 		fmt.Printf("%-12s stopped\n", "Status")

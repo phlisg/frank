@@ -204,12 +204,12 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
 | `frank remove <service>` | Remove a service from `frank.yaml` and regenerate |
 | `frank up [-d] [--quick] [-- <compose args>]` | Start containers. Frank owns `-d/--detach` and `--quick`; all other docker compose flags must come after a literal `--` (e.g. `frank up -- --build`). Auto-spawns the watcher when workers are declared |
-| `frank down` | Stop containers and the watcher |
-| `frank ps` | Show running containers |
-| `frank clean` | Stop containers and delete volumes |
+| `frank down` | Stop containers and the watcher. Use `frank down -- -v` to also remove volumes |
+| `frank exec <cmd> [args...]` | Run a command inside the app container as sail (e.g. `frank exec bash`, `frank exec php vendor/bin/pint`) |
+| `frank compose [--] <args>` | Pass-through to `docker compose` (e.g. `frank compose ps`, `frank compose logs`) |
 | `frank worker queue [--count N] [--queue …] [--tries …] [-- <artisan flags>]` | Spawn ad-hoc `queue:work` workers |
 | `frank worker schedule` | Spawn an ad-hoc `schedule:work` container |
-| `frank worker list` | List declared + ad-hoc worker containers |
+| `frank worker ps` | Show declared + ad-hoc worker containers |
 | `frank worker stop [--all]` | Stop ad-hoc workers; `--all` also stops declared ones |
 | `frank worker logs [name] [-f]` | Tail logs for one or all workers |
 | `frank worker top [--live] [--min-pane-width N]` | Live multi-pane CCTV view of every worker; `--live` reconciles ad-hoc churn |
