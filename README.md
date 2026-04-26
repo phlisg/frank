@@ -103,7 +103,7 @@ Starts all services in the background, runs `composer install`, and runs `php ar
 **4. Enable shell aliases (once)**
 
 ```bash
-eval "$(frank shell-setup)" >> ~/.zshrc   # or ~/.bashrc
+eval "$(frank config shell setup)" >> ~/.zshrc   # or ~/.bashrc
 source ~/.zshrc
 ```
 
@@ -170,6 +170,8 @@ services:
 | `workers.schedule` | boolean | `false` | Run `php artisan schedule:work` in a dedicated container |
 | `workers.queue` | list — see [`docs/workers.md`](docs/workers.md) | `[]` | Declare long-running `queue:work` worker pools |
 | `tools` | list — `pint` `larastan` `rector` `lefthook` | `[]` | Dev tools installed by `frank new` or `frank tool add` — see [`docs/tools.md`](docs/tools.md) |
+| `aliases` | map | `{}` | Custom shell aliases activated by `frank config shell activate` |
+| `aliases.<name>` | string or `{cmd, host}` | — | String = container command; map with `host: true` = host-side |
 
 After editing `frank.yaml`, run `frank generate` to regenerate Docker files — or simply `frank up`, which auto-regenerates when `frank.yaml` is newer than `compose.yaml`.
 
@@ -214,10 +216,13 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 | `frank worker logs [name] [-f]` | Tail logs for one or all workers |
 | `frank worker top [--live] [--min-pane-width N]` | Live multi-pane CCTV view of every worker; `--live` reconciles ad-hoc churn |
 | `frank watch [--status\|--stop]` | Run the code-reload watcher in the foreground, or inspect/stop the detached one |
-| `frank activate` | Output eval-able shell aliases for the current project |
-| `frank deactivate` | Output eval-able shell commands to remove all frank aliases |
-| `frank shell-setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
-| `frank completion [bash\|zsh\|fish\|powershell]` | Output shell completion script for the given shell |
+| `frank config show` | Show resolved configuration |
+| `frank config edit` | Open frank.yaml in editor |
+| `frank config set` | Set a configuration value |
+| `frank config shell activate` | Output eval-able shell aliases for the current project |
+| `frank config shell deactivate` | Output eval-able shell commands to remove all frank aliases |
+| `frank config shell setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
+| `frank config shell completion [bash\|zsh\|fish\|powershell]` | Output shell completion script for the given shell |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
 | `frank version` | Print the frank binary version |

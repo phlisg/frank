@@ -17,7 +17,7 @@ internal/
   config/         frank.yaml schema, validation, defaults
   docker/         thin docker compose CLI wrapper (always uses -f .frank/compose.yaml)
   output/         verbosity control (Quiet/Normal/Verbose) — Group, Detail, NextSteps, Warning
-  shell/          alias table for frank activate/deactivate
+  shell/          alias table for frank config shell activate/deactivate
   template/       template engine (renders from templates/ FS)
   watch/          host-side fsnotify watcher — feature-complete for v1 (walker, classifier, debouncer, dispatcher, first-run suppression, pidfile + already-running guard, orphan detection, Daemonize). frank watch CLI + frank up/down integration wired in cmd/.
 templates/
