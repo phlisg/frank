@@ -2,6 +2,7 @@ package shell
 
 import (
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
@@ -37,26 +38,57 @@ var aliasTable = []struct {
 
 // Activate returns eval-able shell aliases for the current project.
 // Core aliases always present; service aliases added based on cfg.
+// Custom aliases from cfg.Aliases are appended in sorted key order.
 func Activate(cfg *config.Config) string {
 	var sb strings.Builder
+	var names []string
+
+	for _, a := range aliasTable {
+		if a.service != "" && !cfg.HasService(a.service) {
+			continue
+		}
+		names = append(names, a.name)
+	}
+
+	// Collect custom alias names in sorted order
+	var customNames []string
+	for name := range cfg.Aliases {
+		customNames = append(customNames, name)
+	}
+	sort.Strings(customNames)
+	names = append(names, customNames...)
+
+	// Emit _FRANK_ALIASES variable
+	sb.WriteString("_FRANK_ALIASES=\"")
+	sb.WriteString(strings.Join(names, " "))
+	sb.WriteString("\"\n")
+
+	// Emit built-in aliases
 	for _, a := range aliasTable {
 		if a.service != "" && !cfg.HasService(a.service) {
 			continue
 		}
 		alias(&sb, a.name, a.cmd)
 	}
+
+	// Emit custom aliases
+	for _, name := range customNames {
+		a := cfg.Aliases[name]
+		if a.Host {
+			alias(&sb, name, a.Cmd)
+		} else {
+			alias(&sb, name, execSail+" "+a.Cmd)
+		}
+	}
+
 	return sb.String()
 }
 
-// Deactivate returns unalias commands for all aliases frank can ever set.
+// Deactivate returns shell commands to remove all frank-managed aliases.
 func Deactivate() string {
-	var sb strings.Builder
-	for _, a := range aliasTable {
-		sb.WriteString("unalias ")
-		sb.WriteString(a.name)
-		sb.WriteString(" 2>/dev/null || true\n")
-	}
-	return sb.String()
+	return `for _a in $_FRANK_ALIASES; do unalias $_a 2>/dev/null; done
+unset _FRANK_ALIASES
+`
 }
 
 // ShellSetup returns eval-able shell hooks for auto-activating on directory change.
@@ -77,7 +109,7 @@ func alias(builder *strings.Builder, name, cmd string) {
 	builder.WriteString("alias ")
 	builder.WriteString(name)
 	builder.WriteString("='")
-	builder.WriteString(cmd)
+	builder.WriteString(strings.ReplaceAll(cmd, "'", `'\''`))
 	builder.WriteString("'\n")
 }
 
@@ -91,14 +123,14 @@ func detectShell() string {
 func zshHook() string {
 	return `_frank_setup() {
   chpwd_functions+=(frank_chpwd)
-  eval "$(frank completion zsh)"
+  eval "$(frank config shell completion zsh)"
   frank_chpwd
 }
 frank_chpwd() {
   if [[ -f frank.yaml ]]; then
-    eval "$(frank activate)"
+    eval "$(frank config shell activate)"
   else
-    eval "$(frank deactivate)"
+    eval "$(frank config shell deactivate)"
   fi
 }
 _frank_precmd_init() {
@@ -122,14 +154,14 @@ func bashHook() string {
   else
     PROMPT_COMMAND="frank_chpwd"
   fi
-  eval "$(frank completion bash)"
+  eval "$(frank config shell completion bash)"
   frank_chpwd
 }
 frank_chpwd() {
   if [[ -f frank.yaml ]]; then
-    eval "$(frank activate)"
+    eval "$(frank config shell activate)"
   else
-    eval "$(frank deactivate)"
+    eval "$(frank config shell deactivate)"
   fi
 }
 _frank_prompt_init() {
