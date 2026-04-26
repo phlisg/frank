@@ -11,6 +11,8 @@ services:
             context: .
             dockerfile: .frank/Dockerfile
         command:
+            - /bin/bash
+            - -lc
             - |
               set -e
               if [ ! -d vendor ]; then
@@ -25,9 +27,6 @@ services:
                 condition: service_healthy
             pgsql:
                 condition: service_healthy
-        entrypoint:
-            - /bin/bash
-            - -lc
         env_file:
             - .env
         environment:
