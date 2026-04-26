@@ -216,13 +216,10 @@ Only one database can be active at a time. Frank enforces this — `frank add my
 | `frank worker logs [name] [-f]` | Tail logs for one or all workers |
 | `frank worker top [--live] [--min-pane-width N]` | Live multi-pane CCTV view of every worker; `--live` reconciles ad-hoc churn |
 | `frank watch [--status\|--stop]` | Run the code-reload watcher in the foreground, or inspect/stop the detached one |
-| `frank config show` | Show resolved configuration |
-| `frank config edit` | Open frank.yaml in editor |
-| `frank config set` | Set a configuration value |
-| `frank config shell activate` | Output eval-able shell aliases for the current project |
-| `frank config shell deactivate` | Output eval-able shell commands to remove all frank aliases |
-| `frank config shell setup [--shell zsh\|bash]` | Output eval-able shell hook for auto-activation (includes completion) |
-| `frank config shell completion [bash\|zsh\|fish\|powershell]` | Output shell completion script for the given shell |
+| `frank config show` | Show resolved configuration — see [`docs/config.md`](docs/config.md) |
+| `frank config edit` | Open frank.yaml in your editor — see [`docs/config.md`](docs/config.md) |
+| `frank config set <key> <value>` | Set a config value (e.g. `frank config set php.version 8.4`) — see [`docs/config.md`](docs/config.md) |
+| `frank config shell ...` | Shell integration (aliases, hooks, completion) — see [`docs/shell.md`](docs/shell.md) |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
 | `frank version` | Print the frank binary version |
