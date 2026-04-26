@@ -30,6 +30,69 @@ Your prompt gains a `(frank)` prefix so you always know aliases are active. Run 
 
 The database aliases are only added when the matching service is configured, so `psql` won't appear in a MySQL project and vice versa.
 
+## Custom Aliases
+
+You can define your own aliases in `frank.yaml` under the `aliases` key. Two forms are supported:
+
+**String form** — runs inside the container (most common):
+
+```yaml
+aliases:
+  fresh: "php artisan migrate:fresh --seed"
+  seed: "php artisan db:seed"
+  logr: "truncate -s 0 storage/logs/laravel.log"
+  stan: "php vendor/bin/phpstan analyse"
+```
+
+These are automatically prefixed with `docker compose exec --user sail laravel.test`, so `fresh` becomes:
+
+```bash
+docker compose --project-directory . -f .frank/compose.yaml exec --user sail laravel.test php artisan migrate:fresh --seed
+```
+
+**Map form** — runs on the host (for commands that don't belong in a container):
+
+```yaml
+aliases:
+  open:
+    cmd: "open http://localhost"
+    host: true
+  logs:
+    cmd: "frank compose logs -f laravel.test"
+    host: true
+```
+
+Host aliases run the command directly on your machine, no Docker wrapping.
+
+**Mixing both forms:**
+
+```yaml
+aliases:
+  # Container commands (string shorthand)
+  fresh: "php artisan migrate:fresh --seed"
+  seed: "php artisan db:seed"
+  logr: "truncate -s 0 storage/logs/laravel.log"
+
+  # Host commands (map form)
+  open:
+    cmd: "open http://localhost"
+    host: true
+```
+
+**Rules:**
+
+- Alias names must be valid shell identifiers: letters, numbers, underscores, hyphens (must start with a letter or underscore)
+- Names are checked case-insensitively — `Fresh` collides with `fresh`
+- Can't shadow built-in aliases (`artisan`, `composer`, `php`, `npm`, etc.)
+- Aliases that shadow common shell builtins (`cd`, `ls`, `echo`) produce a warning but are allowed
+
+Custom aliases activate alongside built-ins when you run `frank config shell activate` or when auto-activation triggers via `frank config shell setup`.
+
+**After editing aliases in frank.yaml**, reload them by either:
+
+- `cd .` (if auto-activation is set up — the chpwd hook re-reads `frank.yaml`)
+- `eval "$(frank config shell activate)"` (manual reload)
+
 **Auto-activation** — the recommended setup for day-to-day use:
 
 ```bash
