@@ -11,15 +11,17 @@ func init() {
 
 var execCmd = &cobra.Command{
 	Use:   "exec <command> [args...]",
-	Short: "Run a command in the laravel.test container as sail",
-	Long: `Run a command inside the laravel.test container as the sail user.
-Equivalent to: frank compose exec --user sail laravel.test <command> [args...]
+	Short: "Run a command inside the app container",
+	Long: `Run an arbitrary command inside the laravel.test container as the sail user.
+Useful for one-off commands that don't have a shell alias.
 
 Examples:
-  frank exec php vendor/bin/pint
-  frank exec php vendor/bin/rector process
-  frank exec php vendor/bin/phpstan analyse
-  frank exec bash`,
+  frank exec bash                           # interactive shell
+  frank exec php vendor/bin/pint            # run Pint code fixer
+  frank exec php vendor/bin/rector process  # run Rector refactoring
+  frank exec php vendor/bin/phpstan analyse # run static analysis
+  frank exec cat .env                       # inspect container env
+  frank exec yarn add lodash                # install a JS package`,
 	DisableFlagParsing: true,
 	SilenceUsage:       true,
 	ValidArgsFunction:  cobra.NoFileCompletions,

@@ -11,7 +11,7 @@ Frank is a Go CLI that scaffolds and manages Laravel Docker environments. It rea
 ## Architecture
 
 ```
-cmd/              cobra commands (activate, new, setup, generate, up, down, add, remove, worker, watch, ps, …)
+cmd/              cobra commands (activate, new, setup, generate, up, down, add, remove, worker, watch, exec, compose, …)
 internal/
   compose/        generates .frank/compose.yaml by merging template fragments
   config/         frank.yaml schema, validation, defaults

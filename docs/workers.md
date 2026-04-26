@@ -50,7 +50,7 @@ frank worker queue --count 3 --queue media   # three workers on "media"
 frank worker queue --tries 3 --timeout 120   # tune per invocation
 frank worker queue -- --once                 # pass extra artisan flags after `--`
 frank worker schedule                        # ad-hoc schedule:work
-frank worker list                            # show declared + ad-hoc workers
+frank worker ps                              # show declared + ad-hoc workers
 frank worker logs                            # tail all workers
 frank worker logs laravel.queue.default.1    # tail a single worker
 frank worker stop                            # stop ad-hoc workers
