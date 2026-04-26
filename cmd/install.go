@@ -204,7 +204,7 @@ php artisan sail:install --with="$1" --php="$2"
 }
 
 // patchComposerPHPVersion updates the "php" version constraint in the require block
-// of composer.json to match the PHP version chosen during frank init.
+// of composer.json to match the PHP version chosen during frank new.
 //
 // composer create-project always writes Laravel's own default constraint (e.g. ^8.2)
 // regardless of which PHP version was selected. This patches the constraint so that

@@ -335,7 +335,7 @@ func TestGenerate_FrankenPHPWorkersNoUserKey(t *testing.T) {
 	}
 }
 
-func TestGenerate_FPMWorkersInjectSailUser(t *testing.T) {
+func TestGenerate_FPMWorkersNoSailUser(t *testing.T) {
 	g := newTestGenerator(t)
 	cfg := &config.Config{
 		PHP:      config.PHP{Version: "8.4", Runtime: "fpm"},
@@ -349,11 +349,11 @@ func TestGenerate_FPMWorkersInjectSailUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
-	// Each declared worker (schedule + 2 queue) plus the laravel.migrate
-	// init helper needs user: sail → 4 occurrences.
+	// user: sail is no longer injected in compose — the image entrypoint
+	// handles UID remap + gosu drop for non-fpm commands.
 	n := strings.Count(out, "user: sail")
-	if n != 4 {
-		t.Errorf("expected 4 occurrences of 'user: sail' (schedule + 2 queue + migrate), got %d in:\n%s", n, out)
+	if n != 0 {
+		t.Errorf("expected 0 occurrences of 'user: sail', got %d in:\n%s", n, out)
 	}
 }
 

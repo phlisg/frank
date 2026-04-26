@@ -11,6 +11,8 @@ services:
             context: .
             dockerfile: .frank/Dockerfile
         command:
+            - /bin/bash
+            - -lc
             - |
               set -e
               if [ ! -d vendor ]; then
@@ -25,9 +27,6 @@ services:
                 condition: service_healthy
             redis:
                 condition: service_healthy
-        entrypoint:
-            - /bin/bash
-            - -lc
         env_file:
             - .env
         environment:
@@ -41,7 +40,6 @@ services:
         networks:
             - frank
         restart: "no"
-        user: sail
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -78,7 +76,6 @@ services:
             - frank
         restart: unless-stopped
         tty: true
-        user: sail
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -115,7 +112,6 @@ services:
             - frank
         restart: unless-stopped
         tty: true
-        user: sail
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -152,7 +148,6 @@ services:
             - frank
         restart: unless-stopped
         tty: true
-        user: sail
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html

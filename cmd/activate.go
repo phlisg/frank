@@ -21,7 +21,7 @@ var activateCmd = &cobra.Command{
 		dir := resolveDir()
 		cfg, err := config.Load(dir)
 		if err != nil {
-			return fmt.Errorf("no frank.yaml found — run frank init first")
+			return fmt.Errorf("no frank.yaml found — run frank new or frank setup first")
 		}
 		fmt.Print(shell.Activate(cfg))
 		return nil

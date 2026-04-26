@@ -166,8 +166,6 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 		return nil
 	}
 
-	isFPM := cfg.PHP.Runtime == "fpm"
-
 	// Copy laravel.test's build block into every declared worker so compose
 	// builds the image once (dedup by tag) and workers stop triggering a
 	// registry pull attempt when the image is not yet present. Using image:
@@ -191,12 +189,6 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 			svc["depends_on"] = migrateDeps
 		}
 	}
-	if isFPM {
-		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
-			svc["user"] = "sail"
-		}
-	}
-
 	if w.Schedule {
 		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{
 			ProjectName: projectName,
@@ -208,9 +200,6 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 			return fmt.Errorf("merge schedule worker fragment: %w", err)
 		}
 		injectBuild(services, "laravel.schedule", laravelBuild)
-		if isFPM {
-			injectSailUser(services, "laravel.schedule")
-		}
 	}
 
 	for _, pool := range w.Queue {
@@ -235,9 +224,6 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 				return fmt.Errorf("merge queue worker fragment %q: %w", name, err)
 			}
 			injectBuild(services, name, laravelBuild)
-			if isFPM {
-				injectSailUser(services, name)
-			}
 		}
 	}
 
@@ -269,23 +255,6 @@ func injectBuild(services map[string]interface{}, name string, laravelBuild inte
 	svc["build"] = laravelBuild
 }
 
-// injectSailUser sets `user: sail` on the named service if it is a declared
-// worker (label frank.worker == "declared"). No-op if the service is missing
-// or not a declared worker.
-func injectSailUser(services map[string]interface{}, name string) {
-	svc, ok := services[name].(map[string]interface{})
-	if !ok {
-		return
-	}
-	labels, ok := svc["labels"].(map[string]interface{})
-	if !ok {
-		return
-	}
-	if labels["frank.worker"] != "declared" {
-		return
-	}
-	svc["user"] = "sail"
-}
 
 // mergeFragment parses a YAML service fragment and merges it into services.
 // Each fragment is a map of service-name → service-definition.

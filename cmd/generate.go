@@ -51,7 +51,7 @@ var generateCmd = &cobra.Command{
 }
 
 // generate runs the full file generation pipeline for cfg into dir.
-// Called by both `frank generate` and at the end of `frank init`.
+// Called by both `frank generate` and at the end of `frank new`.
 func generate(cfg *config.Config, dir string) error {
 	projectName := config.ProjectName(dir)
 	engine := template.New(TemplateFS)

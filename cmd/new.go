@@ -5,15 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
+// Package-level flag vars shared with setup.go.
 var sailMode bool
 var flagPHP string
 var flagLaravel string
@@ -28,46 +31,42 @@ var flagNoRector bool
 var flagNoLefthook bool
 var flagNoTools bool
 
+var flagNoUp bool
+var flagInteractive bool
+
 func init() {
-	initCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
-	initCmd.Flags().StringVar(&flagPHP, "php", "", "PHP version, skips prompt (e.g. 8.5)")
-	initCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version, skips prompt (e.g. 12 or 12.*)")
-	initCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services, skips prompt (e.g. "pgsql,redis,mailpit")`)
-	initCmd.Flags().StringVar(&flagRuntime, "runtime", "", "runtime, skips prompt: frankenphp or fpm (ignored with --sail)")
-	initCmd.Flags().StringVar(&flagPM, "pm", "", "package manager: npm, pnpm, bun")
-	initCmd.Flags().BoolVar(&flagSchedule, "schedule", false, "enable schedule:work worker, skips prompt")
-	initCmd.Flags().IntVar(&flagQueueCount, "queue-count", 0, "number of queue:work workers (0-4), skips prompt")
-	initCmd.Flags().BoolVar(&flagNoPint, "no-pint", false, "exclude pint from dev tools")
-	initCmd.Flags().BoolVar(&flagNoLarastan, "no-larastan", false, "exclude larastan from dev tools")
-	initCmd.Flags().BoolVar(&flagNoRector, "no-rector", false, "exclude rector from dev tools")
-	initCmd.Flags().BoolVar(&flagNoLefthook, "no-lefthook", false, "exclude lefthook from dev tools")
-	initCmd.Flags().BoolVar(&flagNoTools, "no-tools", false, "skip dev tools entirely")
-	rootCmd.AddCommand(initCmd)
+	newCmd.Flags().BoolVar(&sailMode, "sail", false, "generate a Sail-compatible project (no Frank traces)")
+	newCmd.Flags().StringVar(&flagPHP, "php", "", "PHP version (e.g. 8.5)")
+	newCmd.Flags().StringVar(&flagLaravel, "laravel", "", "Laravel version (e.g. 13 or 13.*)")
+	newCmd.Flags().StringVar(&flagWith, "with", "", `comma-separated services (e.g. "pgsql,redis,mailpit")`)
+	newCmd.Flags().StringVar(&flagRuntime, "runtime", "", "runtime: frankenphp or fpm (ignored with --sail)")
+	newCmd.Flags().StringVar(&flagPM, "pm", "", "package manager: npm, pnpm, bun")
+	newCmd.Flags().BoolVar(&flagSchedule, "schedule", false, "enable schedule:work worker")
+	newCmd.Flags().IntVar(&flagQueueCount, "queue-count", 0, "number of queue:work workers (0-4)")
+	newCmd.Flags().BoolVar(&flagNoPint, "no-pint", false, "exclude pint from dev tools")
+	newCmd.Flags().BoolVar(&flagNoLarastan, "no-larastan", false, "exclude larastan from dev tools")
+	newCmd.Flags().BoolVar(&flagNoRector, "no-rector", false, "exclude rector from dev tools")
+	newCmd.Flags().BoolVar(&flagNoLefthook, "no-lefthook", false, "exclude lefthook from dev tools")
+	newCmd.Flags().BoolVar(&flagNoTools, "no-tools", false, "skip dev tools entirely")
+	newCmd.Flags().BoolVar(&flagNoUp, "no-up", false, "skip container start after install")
+	newCmd.Flags().BoolVar(&flagInteractive, "interactive", false, "run full interactive wizard")
+	rootCmd.AddCommand(newCmd)
 }
 
-// normalizeLaravelVersion accepts "12", "12.x", or "12.*" and always returns "12.*".
-func normalizeLaravelVersion(v string) string {
-	v = strings.TrimSpace(v)
-	v = strings.TrimSuffix(v, ".*")
-	v = strings.TrimSuffix(v, ".x")
-	return v + ".*"
-}
+var newCmd = &cobra.Command{
+	Use:   "new <project>",
+	Short: "Create a new Laravel project (zero to localhost)",
+	Long: `Create a new Laravel project with a complete Docker environment.
+Runs the full pipeline: scaffold, install Laravel, generate Docker files,
+start containers, and install npm dependencies.
 
-// parseServices splits a comma-separated service list and trims whitespace.
-func parseServices(s string) []string {
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if t := strings.TrimSpace(p); t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-var initCmd = &cobra.Command{
-	Use:          "init [dirname]",
-	Short:        "Interactive wizard to create frank.yaml",
+Examples:
+  frank new my-app                          # all defaults, starts containers
+  frank new my-app --php 8.4 --with redis   # override via flags
+  frank new my-app --no-up                  # skip container start
+  frank new my-app --interactive            # full wizard
+  frank new my-app --sail                   # sail-only install`,
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -75,104 +74,257 @@ var initCmd = &cobra.Command{
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-	RunE: runInit,
+	RunE: runNew,
 }
 
-func runInit(cmd *cobra.Command, args []string) error {
-	// positionalArg tracks whether the user specified a directory via positional arg
-	// (as opposed to --dir). Used later to print a helpful completion message.
-	var positionalArg string
+func runNew(cmd *cobra.Command, args []string) error {
+	projectName := args[0]
 
-	// --dir always wins. Only consider the positional arg when --dir is not set.
-	if Dir == "" && len(args) > 0 {
-		positionalArg = args[0]
-		target := args[0]
-		if !filepath.IsAbs(target) {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
-			}
-			target = filepath.Join(cwd, target)
-		}
-
-		// If the directory exists, it must be empty.
-		if info, err := os.Stat(target); err == nil && info.IsDir() {
-			entries, err := os.ReadDir(target)
-			if err != nil {
-				return fmt.Errorf("read directory: %w", err)
-			}
-			if len(entries) > 0 {
-				return fmt.Errorf("directory %q already exists and is not empty", args[0])
-			}
-		} else if os.IsNotExist(err) {
-			if err := os.MkdirAll(target, 0755); err != nil {
-				return fmt.Errorf("create directory: %w", err)
-			}
-		} else if err != nil {
-			return fmt.Errorf("stat directory: %w", err)
-		}
-
-		// Temporarily set Dir so resolveDir() returns the target path.
-		Dir = target
-		defer func() { Dir = "" }()
+	// 1. Pre-flight: docker dependencies
+	if err := docker.CheckDependencies(); err != nil {
+		return err
 	}
 
-	dir := resolveDir()
+	// 2. Create directory
+	target := projectName
+	if !filepath.IsAbs(target) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get working directory: %w", err)
+		}
+		target = filepath.Join(cwd, target)
+	}
 
-	// If --dir was explicitly set and the directory doesn't exist, offer to create it.
-	if Dir != "" && positionalArg == "" {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			var create bool
-			prompt := huh.NewForm(
-				huh.NewGroup(
-					huh.NewConfirm().
-						Title(fmt.Sprintf("Directory %q does not exist. Create it?", dir)).
-						Value(&create),
-				),
-			)
-			if err := prompt.Run(); err != nil {
+	if info, err := os.Stat(target); err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("%q exists and is not a directory", projectName)
+		}
+		entries, err := os.ReadDir(target)
+		if err != nil {
+			return fmt.Errorf("read directory: %w", err)
+		}
+		if len(entries) > 0 {
+			return fmt.Errorf("directory %q already exists and is not empty", projectName)
+		}
+	} else if os.IsNotExist(err) {
+		if err := os.MkdirAll(target, 0755); err != nil {
+			return fmt.Errorf("create directory: %w", err)
+		}
+	} else {
+		return fmt.Errorf("stat directory: %w", err)
+	}
+
+	dir := target
+
+	// --interactive delegates to the existing wizard
+	if flagInteractive {
+		// Temporarily set Dir so resolveDir() returns target.
+		Dir = dir
+		defer func() { Dir = "" }()
+
+		existingCompose := detectExistingCompose(dir)
+		cfg := config.New()
+
+		var initErr error
+		if sailMode {
+			initErr = runSailInit(cfg, dir, existingCompose)
+		} else {
+			initErr = runFrankInit(cmd, cfg, dir, existingCompose)
+		}
+		if initErr != nil {
+			output.Warning(fmt.Sprintf("failed: %v — remove the directory and start fresh", initErr))
+			return initErr
+		}
+
+		if !flagNoUp {
+			if err := runNewUp(dir, cfg); err != nil {
 				return err
 			}
-			if !create {
-				return fmt.Errorf("directory %q does not exist", dir)
-			}
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return fmt.Errorf("create directory: %w", err)
-			}
 		}
+
+		printNewNextSteps(projectName, !flagNoUp)
+		return nil
 	}
 
-	existingCompose := detectExistingCompose(dir)
-
+	// Non-interactive pipeline
 	cfg := config.New()
 
-	var initErr error
-	if sailMode {
-		initErr = runSailInit(cfg, dir, existingCompose)
+	// Apply defaults for non-interactive mode
+	if flagPHP != "" {
+		cfg.PHP.Version = flagPHP
+	}
+	// config.New() sets "latest" — override to "13.*" unless --laravel was given
+	if flagLaravel != "" {
+		cfg.Laravel.Version = normalizeLaravelVersion(flagLaravel)
 	} else {
-		initErr = runFrankInit(cmd, cfg, dir, existingCompose)
+		cfg.Laravel.Version = "13.*"
 	}
-
-	if initErr == nil {
-		var steps []string
-		if positionalArg != "" {
-			steps = append(steps, fmt.Sprintf("cd %s", positionalArg))
-		} else if Dir != "" {
-			steps = append(steps, fmt.Sprintf("cd %s", Dir))
+	if flagRuntime != "" {
+		cfg.PHP.Runtime = flagRuntime
+	}
+	if flagPM != "" {
+		switch flagPM {
+		case "npm", "pnpm", "bun":
+			cfg.Node.PackageManager = flagPM
+		default:
+			return fmt.Errorf("invalid --pm %q: valid options are npm, pnpm, bun", flagPM)
 		}
-		steps = append(steps, "frank up -d")
-		output.NextSteps(steps)
 	}
 
-	return initErr
+	// Services
+	if sailMode {
+		if flagWith != "" {
+			cfg.Services = parseServices(flagWith)
+		} else {
+			cfg.Services = []string{"mysql", "mailpit"}
+		}
+	} else {
+		if flagWith != "" {
+			cfg.Services = parseServices(flagWith)
+		} else {
+			cfg.Services = []string{"pgsql", "mailpit"}
+		}
+	}
+
+	// Workers (non-interactive defaults: schedule on, 1 queue worker)
+	scheduleWorker := flagSchedule
+	queueCount := flagQueueCount
+	if !cmd.Flags().Changed("schedule") {
+		scheduleWorker = true
+	}
+	if !cmd.Flags().Changed("queue-count") {
+		queueCount = 1
+	}
+	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
+
+	// Tools
+	if !flagNoTools {
+		allTools := tool.AllNames()
+		cfg.Tools = make([]string, 0, len(allTools))
+		for _, t := range allTools {
+			switch t {
+			case "pint":
+				if !flagNoPint {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "larastan":
+				if !flagNoLarastan {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "rector":
+				if !flagNoRector {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			case "lefthook":
+				if !flagNoLefthook {
+					cfg.Tools = append(cfg.Tools, t)
+				}
+			default:
+				cfg.Tools = append(cfg.Tools, t)
+			}
+		}
+	}
+
+	// Sail mode: set runtime to fpm, delegate to sail install path
+	if sailMode {
+		cfg.PHP.Runtime = "fpm"
+		existingCompose := detectExistingCompose(dir)
+		if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
+			output.Warning(fmt.Sprintf("failed: %v — remove the directory and start fresh", err))
+			return err
+		}
+
+		var sailServices []string
+		for _, svc := range cfg.Services {
+			if svc == "sqlite" {
+				continue
+			}
+			sailServices = append(sailServices, svc)
+		}
+		if err := runSailInstall(dir, sailServices, cfg.PHP.Version); err != nil {
+			output.Warning(fmt.Sprintf("sail install failed: %v — remove the directory and start fresh", err))
+			return fmt.Errorf("sail install: %w", err)
+		}
+
+		output.NextSteps([]string{
+			fmt.Sprintf("cd %s", projectName),
+			"vendor/bin/sail up",
+		})
+		return nil
+	}
+
+	// 3-7. Write config, generate, install Laravel, dev tools
+	existingCompose := detectExistingCompose(dir)
+	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
+		output.Warning(fmt.Sprintf("failed: %v — remove the directory and start fresh", err))
+		return err
+	}
+
+	// 8. Start containers + npm install
+	if !flagNoUp {
+		if err := runNewUp(dir, cfg); err != nil {
+			return err
+		}
+	}
+
+	// 9. NextSteps
+	printNewNextSteps(projectName, !flagNoUp)
+	return nil
 }
+
+// runNewUp runs doUp then npm install inside the container.
+func runNewUp(dir string, cfg *config.Config) error {
+	if err := doUp(dir, true, false, nil); err != nil {
+		output.Warning(fmt.Sprintf("containers failed to start: %v", err))
+		return err
+	}
+
+	// npm install inside the container
+	client := docker.New(dir)
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+		pm := "npm"
+		if cfg != nil && cfg.Node.PackageManager != "" {
+			pm = cfg.Node.PackageManager
+		}
+
+		output.Detail(fmt.Sprintf("running %s install", pm))
+
+		// Wait for container to be ready
+		if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
+			output.Warning(fmt.Sprintf("container not ready for %s install: %v", pm, err))
+			return nil
+		}
+
+		if err := client.Exec("laravel.test", pm, "install"); err != nil {
+			output.Warning(fmt.Sprintf("%s install failed: %v", pm, err))
+		} else {
+			output.Group("Installed npm dependencies", "")
+		}
+	}
+
+	return nil
+}
+
+// printNewNextSteps prints the final NextSteps block for frank new.
+func printNewNextSteps(projectName string, containersStarted bool) {
+	steps := []string{fmt.Sprintf("cd %s", projectName)}
+	if containersStarted {
+		steps = append(steps, "http://localhost")
+	} else {
+		steps = append(steps, "frank up -d")
+	}
+	steps = append(steps, "")
+	steps = append(steps, "Tip: run `frank activate` to load shell aliases (up, down, artisan, etc.)")
+	output.NextSteps(steps)
+}
+
+// --- Interactive wizard (used by frank new --interactive) ---
 
 func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose string) error {
 	selectedServices := []string{"pgsql", "mailpit"}
 	scheduleWorker := flagSchedule
 	queueCount := flagQueueCount
 
-	// Default workers on when prompts are shown (matches applyDefaults behaviour).
 	if !cmd.Flags().Changed("schedule") {
 		scheduleWorker = true
 	}
@@ -302,10 +454,8 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 	cfg.Services = selectedServices
 	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
 
-	// Tool selection
 	if !flagNoTools {
 		allTools := tool.AllNames()
-		// In non-interactive (flag) mode, start with all tools then remove --no-* ones
 		if flagPHP != "" || sailMode {
 			cfg.Tools = make([]string, 0)
 			for _, t := range allTools {
@@ -331,7 +481,6 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 				}
 			}
 		} else {
-			// Interactive: multi-select with all pre-selected
 			selectedTools := make([]string, len(allTools))
 			copy(selectedTools, allTools)
 			options := make([]huh.Option[string], len(allTools))
@@ -356,24 +505,7 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 	return writeConfigAndGenerate(cfg, dir, existingCompose)
 }
 
-// applyWorkersFromInit builds a cfg.Workers block from init answers.
-// queueCount of 0 means no queue pool; a single default pool is added otherwise.
-func applyWorkersFromInit(cfg *config.Config, schedule bool, queueCount int) {
-	cfg.Workers = config.Workers{}
-	if schedule {
-		cfg.Workers.Schedule = true
-	}
-	if queueCount > 0 {
-		cfg.Workers.Queue = []config.QueuePool{{
-			Name:   "default",
-			Queues: []string{"default"},
-			Count:  queueCount,
-		}}
-	}
-}
-
 func runSailInit(cfg *config.Config, dir, existingCompose string) error {
-	// Sail always uses FPM — no runtime prompt needed.
 	cfg.PHP.Runtime = "fpm"
 	selectedServices := []string{"pgsql", "mailpit"}
 
@@ -437,7 +569,6 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 
 	cfg.Services = selectedServices
 
-	// Tool selection (non-interactive: all tools unless --no-* flags)
 	if !flagNoTools {
 		allTools := tool.AllNames()
 		cfg.Tools = make([]string, 0)
@@ -465,14 +596,10 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 		}
 	}
 
-	// Step 1: Write frank.yaml, generate .frank/, and install Laravel.
 	if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
 		return err
 	}
 
-	// Step 2: Install Sail via a second disposable composer container.
-	// Running sail:install inside a live container causes inception problems
-	// (exit 137/OOM). sail:install only writes files so a disposable container works fine.
 	var sailServices []string
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
@@ -486,6 +613,44 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 
 	output.NextSteps([]string{"vendor/bin/sail up"})
 	return nil
+}
+
+// --- Shared helpers (moved from init.go, used by both new.go and setup.go) ---
+
+// normalizeLaravelVersion accepts "12", "12.x", or "12.*" and always returns "12.*".
+func normalizeLaravelVersion(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimSuffix(v, ".*")
+	v = strings.TrimSuffix(v, ".x")
+	return v + ".*"
+}
+
+// parseServices splits a comma-separated service list and trims whitespace.
+func parseServices(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// applyWorkersFromInit builds a cfg.Workers block from init answers.
+// queueCount of 0 means no queue pool; a single default pool is added otherwise.
+func applyWorkersFromInit(cfg *config.Config, schedule bool, queueCount int) {
+	cfg.Workers = config.Workers{}
+	if schedule {
+		cfg.Workers.Schedule = true
+	}
+	if queueCount > 0 {
+		cfg.Workers.Queue = []config.QueuePool{{
+			Name:   "default",
+			Queues: []string{"default"},
+			Count:  queueCount,
+		}}
+	}
 }
 
 func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) error {
