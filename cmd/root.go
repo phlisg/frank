@@ -62,14 +62,25 @@ func Execute(fsys fs.FS, version string) {
 	}
 }
 
+// ANSI escape helpers — no external deps.
+const (
+	ansiReset   = "\033[0m"
+	ansiBold    = "\033[1m"
+	ansiDim     = "\033[2m"
+	ansiGreen   = "\033[32m"
+	ansiRed     = "\033[31m"
+)
+
 func runRoot(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
 	cfg, err := config.Load(dir)
 	if err != nil {
-		fmt.Println("No frank.yaml found")
+		// No project — show branded header + cobra help.
 		fmt.Println()
-		fmt.Println("  Run frank new or frank setup to get started.")
+		fmt.Printf("  %sFrank%s — Laravel Development Environment\n", ansiBold, ansiReset)
+		fmt.Println()
+		fmt.Printf("  Run %sfrank new%s or %sfrank setup%s to get started.\n", ansiBold, ansiReset, ansiBold, ansiReset)
 		fmt.Println()
 		printCommands(cmd)
 		return nil
@@ -78,33 +89,109 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	projectName := config.ProjectName(dir)
 	state, running, total := docker.New(dir).ContainerStatus()
 
-	fmt.Printf("%-12s %s · PHP %s\n", projectName, cfg.PHP.Runtime, cfg.PHP.Version)
-	fmt.Printf("%-12s %s\n", "Services", strings.Join(cfg.Services, ", "))
+	// Header
+	fmt.Println()
+	fmt.Printf("  %sFrank%s — %s%s%s\n", ansiBold, ansiReset, ansiBold, projectName, ansiReset)
+	fmt.Println()
 
-	switch state {
-	case docker.StateRunning, docker.StatePartial:
-		fmt.Printf("%-12s %d/%d running\n", "Status", running, total)
-		fmt.Println()
-		fmt.Println("  frank compose ps   view running services")
-		fmt.Println("  frank down   stop containers")
-	default:
-		fmt.Printf("%-12s stopped\n", "Status")
-		fmt.Println()
-		fmt.Println("  frank up     start containers")
+	// Info rows
+	printRow("PHP", fmt.Sprintf("%s (%s)", cfg.PHP.Version, cfg.PHP.Runtime))
+	printRow("Laravel", cfg.Laravel.Version)
+	printRow("Services", strings.Join(cfg.Services, ", "))
+	printRow("Node", cfg.Node.PackageManager)
+
+	// Workers summary
+	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
+		var parts []string
+		if cfg.Workers.Schedule {
+			dot := colorDot(state)
+			parts = append(parts, dot+" scheduler")
+		}
+		if len(cfg.Workers.Queue) > 0 {
+			queueTotal := 0
+			for _, p := range cfg.Workers.Queue {
+				queueTotal += p.Count
+			}
+			parts = append(parts, fmt.Sprintf("%d× queue", queueTotal))
+		}
+		printRow("Workers", strings.Join(parts, "  "))
 	}
 
+	// Status
+	switch state {
+	case docker.StateRunning:
+		printRow("Status", fmt.Sprintf("%s%s●%s %d/%d running", ansiGreen, ansiBold, ansiReset, running, total))
+	case docker.StatePartial:
+		printRow("Status", fmt.Sprintf("%s%s●%s %d/%d running", ansiRed, ansiBold, ansiReset, running, total))
+	default:
+		printRow("Status", fmt.Sprintf("%s%s●%s stopped", ansiRed, ansiBold, ansiReset))
+	}
+
+	// Next-step hints
 	fmt.Println()
-	printCommands(cmd)
+	switch state {
+	case docker.StateRunning, docker.StatePartial:
+		printHint("frank compose ps", "view running services")
+		printHint("frank down", "stop containers")
+	default:
+		printHint("frank up", "start containers")
+	}
+	fmt.Println()
+
 	return nil
 }
 
+// colorDot returns a green or red bullet based on container state.
+func colorDot(state docker.ContainerState) string {
+	if state == docker.StateRunning {
+		return ansiGreen + ansiBold + "●" + ansiReset
+	}
+	return ansiRed + ansiBold + "●" + ansiReset
+}
+
+// printRow prints a dim label + value, indented.
+func printRow(label, value string) {
+	fmt.Printf("  %s%-12s%s%s\n", ansiDim, label, ansiReset, value)
+}
+
+// printHint prints a command hint line.
+func printHint(command, desc string) {
+	fmt.Printf("  %-22s%s%s%s\n", command, ansiDim, desc, ansiReset)
+}
+
 func printCommands(cmd *cobra.Command) {
-	fmt.Println("Available commands:")
+	mainNames := []string{"new", "up", "down", "install", "setup"}
+	mainSet := make(map[string]bool, len(mainNames))
+	for _, n := range mainNames {
+		mainSet[n] = true
+	}
+
+	subs := make(map[string]*cobra.Command)
+	var otherNames []string
 	for _, sub := range cmd.Commands() {
-		if !sub.Hidden {
-			fmt.Printf("  %-14s %s\n", sub.Name(), sub.Short)
+		if sub.Hidden {
+			continue
+		}
+		subs[sub.Name()] = sub
+		if !mainSet[sub.Name()] {
+			otherNames = append(otherNames, sub.Name())
 		}
 	}
+
+	fmt.Printf("  %sMain Commands:%s\n", ansiDim, ansiReset)
+	for _, name := range mainNames {
+		if sub, ok := subs[name]; ok {
+			fmt.Printf("    %-14s%s%s%s\n", name, ansiDim, sub.Short, ansiReset)
+		}
+	}
+	fmt.Println()
+
+	fmt.Printf("  %sOther Commands:%s\n", ansiDim, ansiReset)
+	for _, name := range otherNames {
+		sub := subs[name]
+		fmt.Printf("    %-14s%s%s%s\n", name, ansiDim, sub.Short, ansiReset)
+	}
+	fmt.Println()
 }
 
 // resolveDir returns Dir if set, otherwise the current working directory.
