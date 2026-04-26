@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -66,6 +67,20 @@ var validServices = map[string]bool{
 
 var defaultServices = []string{"pgsql", "mailpit"}
 
+var aliasNameRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
+
+var builtinAliasNames = map[string]bool{
+	"artisan": true, "composer": true, "php": true, "tinker": true,
+	"npm": true, "pnpm": true, "bun": true,
+	"psql": true, "mysql": true, "mariadb": true, "redis-cli": true,
+}
+
+var shellBuiltins = map[string]bool{
+	"cd": true, "ls": true, "echo": true, "pwd": true, "export": true,
+	"source": true, "alias": true, "unalias": true, "exit": true,
+	"test": true, "type": true, "exec": true,
+}
+
 var workerPoolNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 var knownWorkersKeys = map[string]bool{
@@ -93,6 +108,21 @@ type Config struct {
 	Workers  Workers                  `yaml:"workers"`
 	Node     Node                     `yaml:"node,omitempty"`
 	Tools    []string                 `yaml:"tools,omitempty"`
+	Aliases  map[string]Alias         `yaml:"aliases,omitempty"`
+}
+
+type Alias struct {
+	Cmd  string `yaml:"cmd"`
+	Host bool   `yaml:"host,omitempty"`
+}
+
+func (a *Alias) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		a.Cmd = value.Value
+		return nil
+	}
+	type raw Alias
+	return value.Decode((*raw)(a))
 }
 
 type Node struct {
@@ -247,6 +277,10 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 		return err
 	}
 
+	if err := validateAliases(cfg.Aliases); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -335,6 +369,30 @@ func warnUnknownNodeKeys(root *yaml.Node) {
 			fmt.Fprintf(os.Stderr, "warning: unknown key %q under node — ignored\n", key)
 		}
 	}
+}
+
+func validateAliases(aliases map[string]Alias) error {
+	seen := make(map[string]string, len(aliases))
+	for name, a := range aliases {
+		if !aliasNameRe.MatchString(name) {
+			return fmt.Errorf("aliases.%s: invalid name — must match [a-zA-Z_][a-zA-Z0-9_-]*", name)
+		}
+		if a.Cmd == "" {
+			return fmt.Errorf("aliases.%s: cmd must not be empty", name)
+		}
+		lower := strings.ToLower(name)
+		if builtinAliasNames[lower] {
+			return fmt.Errorf("aliases.%s: collides with built-in alias %q", name, lower)
+		}
+		if prev, ok := seen[lower]; ok {
+			return fmt.Errorf("aliases.%s: case-insensitive collision with %q", name, prev)
+		}
+		seen[lower] = name
+		if shellBuiltins[lower] {
+			fmt.Fprintf(os.Stderr, "warning: alias %q shadows shell builtin\n", name)
+		}
+	}
+	return nil
 }
 
 func mapValue(m *yaml.Node, key string) *yaml.Node {
