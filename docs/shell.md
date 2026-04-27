@@ -96,13 +96,15 @@ Custom aliases activate alongside built-ins when you run `frank config shell act
 **Auto-activation** — the recommended setup for day-to-day use:
 
 ```bash
-echo 'eval "$(frank config shell setup)"' >> ~/.zshrc   # or ~/.bashrc
+echo '(( $+commands[frank] )) && eval "$(frank config shell setup)"' >> ~/.zshrc   # or ~/.bashrc
 ```
+
+The `(( $+commands[frank] ))` guard ensures the line is silently skipped if `frank` isn't in your PATH yet (e.g. during early shell init before `~/go/bin` is added). Without it you'll see `zsh: frank: command not found` on every new terminal.
 
 This installs a `chpwd` hook (zsh) or `cd` wrapper (bash) that watches for `frank.yaml` as you navigate directories. Step into a Frank project and aliases activate automatically. Step out and they're gone. No manual `eval` needed, no aliases leaking between projects.
 
 Shell completion is wired up at the same time — `frank <tab>`, `frank new <tab>`, and subcommand completion all work out of the box once `shell-setup` is in your profile. If you want completion without the auto-activation hook, you can add it separately:
 
 ```bash
-echo 'eval "$(frank config shell completion zsh)"' >> ~/.zshrc   # or bash / fish / powershell
+echo '(( $+commands[frank] )) && eval "$(frank config shell completion zsh)"' >> ~/.zshrc   # or bash / fish / powershell
 ```
