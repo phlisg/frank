@@ -21,4 +21,7 @@ var (
 	// Live indicator
 	LiveOn  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 	LiveOff = lipgloss.NewStyle().Faint(true)
+
+	// Restart banner injected in place of Docker/entrypoint restart noise
+	RestartBanner = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 )

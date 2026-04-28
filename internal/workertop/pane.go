@@ -191,13 +191,39 @@ func (p *Pane) View() string {
 	return style.Width(w).Height(h).Render(body)
 }
 
+// restartNoisePatterns lists substrings emitted by Docker's restart
+// machinery and the entrypoint's UID remap. When a log line matches
+// any pattern, it is suppressed; the first match in a consecutive run
+// is replaced with a styled "── RESTART ──" banner.
+var restartNoisePatterns = []string{
+	"exited with code",
+	"usermod: no changes",
+	"usermod: no change",
+}
+
+// isRestartNoise reports whether line matches any restart noise pattern.
+func isRestartNoise(line string) bool {
+	for _, p := range restartNoisePatterns {
+		if strings.Contains(line, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // appendLine pushes a line onto the FIFO, trims the front when the
 // cap is exceeded, and pushes the updated content into the viewport
-// with auto-scroll to bottom.
+// with auto-scroll to bottom. Restart noise from Docker/entrypoint
+// is collapsed into a single styled banner.
 func (p *Pane) appendLine(line string) {
-	p.buffer = append(p.buffer, line)
+	if isRestartNoise(line) {
+		if len(p.buffer) == 0 || !strings.Contains(p.buffer[len(p.buffer)-1], "RESTART") {
+			p.buffer = append(p.buffer, RestartBanner.Render("── RESTART ──"))
+		}
+	} else {
+		p.buffer = append(p.buffer, line)
+	}
 	if len(p.buffer) > PaneBufferCap {
-		// Drop oldest; slice tail to amortize over many appends.
 		drop := len(p.buffer) - PaneBufferCap
 		p.buffer = append(p.buffer[:0], p.buffer[drop:]...)
 	}
