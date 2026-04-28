@@ -47,6 +47,14 @@ type Pane struct {
 	// buffer is a FIFO ring holding up to PaneBufferCap lines. Append
 	// only; trimmed from the front when full.
 	buffer []string
+
+	// paused freezes viewport scroll — new lines still buffer but the
+	// viewport doesn't auto-scroll to bottom until unpaused.
+	paused bool
+
+	// searchQuery is the active filter string (case-insensitive). Empty
+	// means no filter — all lines shown.
+	searchQuery string
 }
 
 // Pane messages. TopModel translates raw events into these
@@ -227,7 +235,54 @@ func (p *Pane) appendLine(line string) {
 		drop := len(p.buffer) - PaneBufferCap
 		p.buffer = append(p.buffer[:0], p.buffer[drop:]...)
 	}
-	p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	if p.searchQuery == "" {
+		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	} else {
+		p.rebuildViewport()
+		return
+	}
+	if !p.paused {
+		p.viewport.GotoBottom()
+	}
+}
+
+// TogglePause flips the paused state. On unpause, scrolls to bottom
+// to catch up with buffered lines.
+func (p *Pane) TogglePause() {
+	p.paused = !p.paused
+	if !p.paused {
+		p.viewport.GotoBottom()
+	}
+}
+
+// SetSearch sets the filter query and re-renders the viewport with
+// only matching lines. Empty query restores the full buffer.
+func (p *Pane) SetSearch(query string) {
+	p.searchQuery = query
+	p.rebuildViewport()
+}
+
+// ClearSearch removes the filter and restores the full buffer.
+func (p *Pane) ClearSearch() {
+	p.searchQuery = ""
+	p.rebuildViewport()
+}
+
+// rebuildViewport renders buffer lines into the viewport, applying the
+// search filter if active.
+func (p *Pane) rebuildViewport() {
+	if p.searchQuery == "" {
+		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	} else {
+		q := strings.ToLower(p.searchQuery)
+		var filtered []string
+		for _, line := range p.buffer {
+			if strings.Contains(strings.ToLower(line), q) {
+				filtered = append(filtered, line)
+			}
+		}
+		p.viewport.SetContent(strings.Join(filtered, "\n"))
+	}
 	p.viewport.GotoBottom()
 }
 
@@ -275,6 +330,9 @@ func (p *Pane) titleBar() string {
 	}
 	right := TitleMem.Render(memStr)
 
+	if p.paused {
+		right = right + " " + TitlePaused.Render("[PAUSED]")
+	}
 	if p.state == StateExited {
 		right = right + " " + TitleExit.Render(fmt.Sprintf("[exited %d]", p.exitCode))
 	}
