@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +84,10 @@ type TopModel struct {
 	statsHub    *Hub
 	reconciler  *Reconciler // nil when !opts.Live
 	logsReaders map[string]*LogsReader
+
+	// restartStatus is shown in the footer while a restart is in
+	// progress. Empty string means idle.
+	restartStatus string
 }
 
 // Internal message types. reconcileMsg routes a ReconcileEvent through the
@@ -91,6 +96,15 @@ type TopModel struct {
 type reconcileMsg struct {
 	evt ReconcileEvent
 }
+
+// restartingMsg signals that a restart sequence has begun; the footer
+// shows which service is being restarted.
+type restartingMsg struct {
+	service string
+}
+
+// restartDoneMsg signals that the full restart sequence finished.
+type restartDoneMsg struct{}
 
 // paneRect is an absolute terminal rect in cells (x/y 0-indexed).
 type paneRect struct {
@@ -385,6 +399,20 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		delete(m.logsReaders, msg.PaneID)
 		return m, nil
 
+	case restartSequenceMsg:
+		return m, restartOneCmd(msg.services, 0)
+
+	case restartingMsg:
+		m.restartStatus = msg.service
+		return m, nil
+
+	case restartNextMsg:
+		return m, restartOneCmd(msg.services, msg.next)
+
+	case restartDoneMsg:
+		m.restartStatus = ""
+		return m, nil
+
 	case reconcileMsg:
 		return m, m.handleReconcile(msg.evt)
 
@@ -423,6 +451,12 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.zoomedID = ""
 			m.recomputeLayout()
 			return m, m.resizeAllCmd()
+		}
+		return m, nil
+
+	case "r":
+		if m.restartStatus == "" {
+			return m, m.restartAllWorkersCmd()
 		}
 		return m, nil
 
@@ -778,14 +812,66 @@ func (m *TopModel) header() string {
 }
 
 // footer renders the bottom key-hint line, swapping hints when zoomed.
+// During a restart, the status line replaces the normal hints.
 func (m *TopModel) footer() string {
+	if m.restartStatus != "" {
+		return Footer.Render(RestartBanner.Render("restarting " + m.restartStatus + "..."))
+	}
 	var text string
 	if m.zoomedID != "" {
-		text = "esc / click back · pgup/pgdn scroll · q quit"
+		text = "esc / click back · pgup/pgdn scroll · r restart · q quit"
 	} else {
-		text = "q quit · tab focus · enter / click zoom · esc back"
+		text = "q quit · tab focus · enter / click zoom · r restart · esc back"
 	}
 	return Footer.Render(text)
+}
+
+// restartAllWorkersCmd collects all declared workers (schedule + queue)
+// and kicks off a sequential restart chain. Skips adhoc workers (not
+// compose services).
+func (m *TopModel) restartAllWorkersCmd() tea.Cmd {
+	var services []string
+	for _, row := range m.rowOrder {
+		if row.kind == KindAdhoc {
+			continue
+		}
+		services = append(services, row.paneIDs...)
+	}
+	if len(services) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		return restartSequenceMsg{services: services}
+	}
+}
+
+// restartSequenceMsg kicks off the sequential restart. Handled by
+// Update to start the async chain.
+type restartSequenceMsg struct {
+	services []string
+}
+
+// restartOneCmd restarts a single service and returns the next step.
+func restartOneCmd(services []string, idx int) tea.Cmd {
+	if idx >= len(services) {
+		return func() tea.Msg { return restartDoneMsg{} }
+	}
+	svc := services[idx]
+	return tea.Sequence(
+		func() tea.Msg { return restartingMsg{service: svc} },
+		func() tea.Msg {
+			argv := append([]string{"docker"}, composePrefix...)
+			argv = append(argv, "restart", svc)
+			cmd := exec.Command(argv[0], argv[1:]...)
+			_ = cmd.Run()
+			return restartNextMsg{services: services, next: idx + 1}
+		},
+	)
+}
+
+type restartNextMsg struct {
+	services []string
+	next     int
 }
 
 // waitTimeout waits on wg for up to d. If wg doesn't complete, it returns
