@@ -37,6 +37,8 @@ Having PHP installed locally was also a source of confusion: the PHP CLI is in _
 At work, more and more projects were using queues and when developing locally the experience is pretty terrible: many shell panes with one running `npm run dev`, another with `php artisan queue:worker --queue=1,2,3` (yes `queue:listen` exists but inconsistent experience), and maybe another running the scheduler. Oh, and you had to re-run the queues every now and then after editing the code. 
 Also some colleagues at my current workplace who are not accustomed to using queues, were forgetting to run them losing time/energy on why things don't work.
 
+-- Add a paragraph on common aliases for easier sharing and normality across projects --
+
 #### The Laravel Way
 
 I also know that the Laravel community is somewhat opinionated (a bit like the "Pythonic" term in a way), so instead of changing people's habits too much, I want to offer a drop-in/drop-out experience, covering various use cases but without ever locking the developer inside the tool that is Frank. You can use it solely to install a Laravel app via Docker and use Laravel Herd if that's your jam, or to create a Sail app directly. At its core, Frank is just a "Docker Laravel installer".

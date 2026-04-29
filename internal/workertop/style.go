@@ -12,7 +12,8 @@ var (
 	// Title bar parts
 	TitleName = lipgloss.NewStyle().Bold(true)
 	TitleMem  = lipgloss.NewStyle().Faint(true)
-	TitleExit = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // for "[exited N]" badge
+	TitleExit   = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // for "[exited N]" badge
+	TitlePaused = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true) // yellow [PAUSED] badge
 
 	// Header / footer
 	Header = lipgloss.NewStyle().Bold(true).Padding(0, 1)
@@ -21,4 +22,7 @@ var (
 	// Live indicator
 	LiveOn  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 	LiveOff = lipgloss.NewStyle().Faint(true)
+
+	// Restart banner injected in place of Docker/entrypoint restart noise
+	RestartBanner = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 )

@@ -451,6 +451,132 @@ func TestStop_Idempotent(t *testing.T) {
 	}
 }
 
+// TestNewSubdir_AutoWatched creates a new subdirectory under a watched root
+// after arming and verifies the watcher picks up file changes inside it.
+func TestNewSubdir_AutoWatched(t *testing.T) {
+	root := fakeLaravelProject(t)
+
+	fake := &fakeRunner{}
+	w, err := New(Config{
+		ProjectRoot:  root,
+		Runner:       fake,
+		DebounceBase: 20 * time.Millisecond,
+		DebounceMax:  80 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- w.Start(ctx) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Create new subdir — simulates `artisan make:job`.
+	jobsDir := filepath.Join(root, "app", "Jobs")
+	if err := os.MkdirAll(jobsDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Give fsnotify time to process the Create event and add the watch.
+	time.Sleep(100 * time.Millisecond)
+
+	// Write a .php file inside the new dir.
+	if err := os.WriteFile(filepath.Join(jobsDir, "ProcessPodcast.php"), []byte("<?php"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("queue:restart not dispatched after creating file in new subdirectory")
+		default:
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	_ = w.Stop()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Start did not return")
+	}
+}
+
+// TestDeletedSubdir_WatchRemoved verifies that removing a watched directory
+// doesn't cause errors and the watcher continues operating.
+func TestDeletedSubdir_WatchRemoved(t *testing.T) {
+	root := fakeLaravelProject(t)
+
+	// Pre-create a subdir so it gets watched at arm time.
+	jobsDir := filepath.Join(root, "app", "Jobs")
+	if err := os.MkdirAll(jobsDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(jobsDir, "Job.php"), []byte("<?php"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	fake := &fakeRunner{}
+	w, err := New(Config{
+		ProjectRoot:  root,
+		Runner:       fake,
+		DebounceBase: 20 * time.Millisecond,
+		DebounceMax:  80 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- w.Start(ctx) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Remove the subdirectory.
+	if err := os.RemoveAll(jobsDir); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	// Watcher should keep working — edit a file in an existing dir.
+	time.Sleep(100 * time.Millisecond)
+
+	target := filepath.Join(root, "app", "Http", "Controllers", "Foo.php")
+	if err := os.WriteFile(target, []byte("<?php // still works"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("watcher stopped working after directory removal")
+		default:
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	_ = w.Stop()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Start did not return")
+	}
+}
+
 func keys(m map[string]struct{}) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

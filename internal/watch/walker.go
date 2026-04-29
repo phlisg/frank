@@ -159,6 +159,36 @@ func (w *Watcher) armWatches() (int, error) {
 	return len(added), firstErr
 }
 
+// handleDirEvent reacts to Create and Remove events for directories.
+// Create: if a new directory appears under a watched root and isn't ignored,
+// add an fsnotify watch so files created inside it are observed.
+// Remove: remove the watch to avoid stale inotify descriptors.
+func (w *Watcher) handleDirEvent(ev fsnotify.Event) {
+	if w.fsw == nil {
+		return
+	}
+
+	switch {
+	case ev.Op&fsnotify.Create != 0:
+		info, err := os.Lstat(ev.Name)
+		if err != nil || !info.IsDir() {
+			return
+		}
+		rel, err := filepath.Rel(w.cfg.ProjectRoot, ev.Name)
+		if err != nil {
+			return
+		}
+		matcher := &ignoreMatcher{gi: w.gitignore}
+		if matcher.Matches(rel, true) {
+			return
+		}
+		_ = w.fsw.Add(ev.Name)
+
+	case ev.Op&fsnotify.Remove != 0:
+		_ = w.fsw.Remove(ev.Name)
+	}
+}
+
 // hasGitignore reports whether the project has a .gitignore file. Used only
 // for the arm-time log — actual matcher construction tolerates absence.
 func hasGitignore(projectRoot string) bool {

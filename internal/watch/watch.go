@@ -210,6 +210,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+			w.handleDirEvent(ev)
 			if _, fire := w.classify(ev); !fire {
 				continue
 			}

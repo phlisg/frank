@@ -47,6 +47,14 @@ type Pane struct {
 	// buffer is a FIFO ring holding up to PaneBufferCap lines. Append
 	// only; trimmed from the front when full.
 	buffer []string
+
+	// paused freezes viewport scroll — new lines still buffer but the
+	// viewport doesn't auto-scroll to bottom until unpaused.
+	paused bool
+
+	// searchQuery is the active filter string (case-insensitive). Empty
+	// means no filter — all lines shown.
+	searchQuery string
 }
 
 // Pane messages. TopModel translates raw events into these
@@ -191,17 +199,90 @@ func (p *Pane) View() string {
 	return style.Width(w).Height(h).Render(body)
 }
 
+// restartNoisePatterns lists substrings emitted by Docker's restart
+// machinery and the entrypoint's UID remap. When a log line matches
+// any pattern, it is suppressed; the first match in a consecutive run
+// is replaced with a styled "── RESTART ──" banner.
+var restartNoisePatterns = []string{
+	"exited with code",
+	"usermod: no changes",
+	"usermod: no change",
+}
+
+// isRestartNoise reports whether line matches any restart noise pattern.
+func isRestartNoise(line string) bool {
+	for _, p := range restartNoisePatterns {
+		if strings.Contains(line, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // appendLine pushes a line onto the FIFO, trims the front when the
 // cap is exceeded, and pushes the updated content into the viewport
-// with auto-scroll to bottom.
+// with auto-scroll to bottom. Restart noise from Docker/entrypoint
+// is collapsed into a single styled banner.
 func (p *Pane) appendLine(line string) {
-	p.buffer = append(p.buffer, line)
+	if isRestartNoise(line) {
+		if len(p.buffer) == 0 || !strings.Contains(p.buffer[len(p.buffer)-1], "RESTART") {
+			p.buffer = append(p.buffer, RestartBanner.Render("── RESTART ──"))
+		}
+	} else {
+		p.buffer = append(p.buffer, line)
+	}
 	if len(p.buffer) > PaneBufferCap {
-		// Drop oldest; slice tail to amortize over many appends.
 		drop := len(p.buffer) - PaneBufferCap
 		p.buffer = append(p.buffer[:0], p.buffer[drop:]...)
 	}
-	p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	if p.searchQuery == "" {
+		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	} else {
+		p.rebuildViewport()
+		return
+	}
+	if !p.paused {
+		p.viewport.GotoBottom()
+	}
+}
+
+// TogglePause flips the paused state. On unpause, scrolls to bottom
+// to catch up with buffered lines.
+func (p *Pane) TogglePause() {
+	p.paused = !p.paused
+	if !p.paused {
+		p.viewport.GotoBottom()
+	}
+}
+
+// SetSearch sets the filter query and re-renders the viewport with
+// only matching lines. Empty query restores the full buffer.
+func (p *Pane) SetSearch(query string) {
+	p.searchQuery = query
+	p.rebuildViewport()
+}
+
+// ClearSearch removes the filter and restores the full buffer.
+func (p *Pane) ClearSearch() {
+	p.searchQuery = ""
+	p.rebuildViewport()
+}
+
+// rebuildViewport renders buffer lines into the viewport, applying the
+// search filter if active.
+func (p *Pane) rebuildViewport() {
+	if p.searchQuery == "" {
+		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
+	} else {
+		q := strings.ToLower(p.searchQuery)
+		var filtered []string
+		for _, line := range p.buffer {
+			if strings.Contains(strings.ToLower(line), q) {
+				filtered = append(filtered, line)
+			}
+		}
+		p.viewport.SetContent(strings.Join(filtered, "\n"))
+	}
 	p.viewport.GotoBottom()
 }
 
@@ -249,6 +330,9 @@ func (p *Pane) titleBar() string {
 	}
 	right := TitleMem.Render(memStr)
 
+	if p.paused {
+		right = right + " " + TitlePaused.Render("[PAUSED]")
+	}
 	if p.state == StateExited {
 		right = right + " " + TitleExit.Render(fmt.Sprintf("[exited %d]", p.exitCode))
 	}
