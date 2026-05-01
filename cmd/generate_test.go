@@ -95,6 +95,16 @@ var integrationFixtures = []integrationFixture{
 		},
 		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile"},
 	},
+	{
+		name: "frankenphp-pgsql-no-https",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+			Laravel:  config.Laravel{Version: "13.x"},
+			Services: []string{"pgsql", "mailpit"},
+			Server:   config.Server{HTTPS: new(bool)},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile"},
+	},
 }
 
 func TestGenerate_Integration(t *testing.T) {
