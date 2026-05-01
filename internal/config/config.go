@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -83,6 +84,11 @@ var shellBuiltins = map[string]bool{
 
 var workerPoolNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
+var knownServerKeys = map[string]bool{
+	"https": true,
+	"port":  true,
+}
+
 var knownWorkersKeys = map[string]bool{
 	"schedule": true,
 	"queue":    true,
@@ -106,9 +112,31 @@ type Config struct {
 	Services []string                 `yaml:"services"`
 	Config   map[string]ServiceConfig `yaml:"config"`
 	Workers  Workers                  `yaml:"workers"`
+	Server   Server                   `yaml:"server,omitempty"`
 	Node     Node                     `yaml:"node,omitempty"`
 	Tools    []string                 `yaml:"tools,omitempty"`
 	Aliases  map[string]Alias         `yaml:"aliases,omitempty"`
+}
+
+type Server struct {
+	HTTPS *bool `yaml:"https"`
+	Port  int   `yaml:"port,omitempty"`
+}
+
+// IsHTTPS reports whether HTTPS is enabled (defaults to true when unset).
+func (s Server) IsHTTPS() bool {
+	return s.HTTPS == nil || *s.HTTPS
+}
+
+// EffectivePort returns the port to use, defaulting based on HTTPS setting.
+func (s Server) EffectivePort() int {
+	if s.Port != 0 {
+		return s.Port
+	}
+	if s.IsHTTPS() {
+		return 443
+	}
+	return 80
 }
 
 type Alias struct {
@@ -186,6 +214,7 @@ func Load(dir string) (*Config, error) {
 		return nil, fmt.Errorf("could not parse %s: %w", ConfigFileName, err)
 	}
 
+	warnUnknownServerKeys(&root)
 	warnUnknownWorkerKeys(&root)
 	warnUnknownNodeKeys(&root)
 
@@ -227,6 +256,11 @@ func applyDefaults(cfg *Config) {
 	if cfg.Node.PackageManager == "" {
 		cfg.Node.PackageManager = DefaultPackageManager
 	}
+	// Default server: HTTPS enabled.
+	if cfg.Server.HTTPS == nil {
+		t := true
+		cfg.Server.HTTPS = &t
+	}
 	// Default workers: schedule + 1 queue worker on the "default" queue.
 	if !cfg.Workers.Schedule && len(cfg.Workers.Queue) == 0 {
 		cfg.Workers.Schedule = true
@@ -258,6 +292,10 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 	}
 	if !validPackageManagers[cfg.Node.PackageManager] {
 		return fmt.Errorf("unsupported package manager %q — valid options: npm, pnpm, bun", cfg.Node.PackageManager)
+	}
+
+	if cfg.Server.Port != 0 && (cfg.Server.Port < 1 || cfg.Server.Port > 65535) {
+		return fmt.Errorf("server.port must be between 1 and 65535")
 	}
 
 	var dbCount int
@@ -299,10 +337,8 @@ func validateWorkers(w *Workers, explicitEmptyQueues []bool) error {
 		if p.Tries < 0 || p.Timeout < 0 || p.Memory < 0 || p.Sleep < 0 || p.Backoff < 0 {
 			return fmt.Errorf("workers.queue[%d] (%s): passthrough values must be ≥ 0", i, p.Name)
 		}
-		for _, q := range p.Queues {
-			if q == "" {
-				return fmt.Errorf("workers.queue[%d] (%s): queue name must not be empty", i, p.Name)
-			}
+		if slices.Contains(p.Queues, "") {
+			return fmt.Errorf("workers.queue[%d] (%s): queue name must not be empty", i, p.Name)
 		}
 		if prev, ok := names[p.Name]; ok {
 			return fmt.Errorf("workers.queue[%d] and [%d]: duplicate pool name %q", prev, i, p.Name)
@@ -310,6 +346,27 @@ func validateWorkers(w *Workers, explicitEmptyQueues []bool) error {
 		names[p.Name] = i
 	}
 	return nil
+}
+
+// warnUnknownServerKeys emits a warning for unknown keys under the server block.
+func warnUnknownServerKeys(root *yaml.Node) {
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return
+	}
+	top := root.Content[0]
+	if top.Kind != yaml.MappingNode {
+		return
+	}
+	server := mapValue(top, "server")
+	if server == nil || server.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(server.Content); i += 2 {
+		key := server.Content[i].Value
+		if !knownServerKeys[key] {
+			fmt.Fprintf(os.Stderr, "warning: unknown key %q under server — ignored\n", key)
+		}
+	}
 }
 
 // warnUnknownWorkerKeys emits a warning for unknown keys under the workers
@@ -409,12 +466,7 @@ func mapValue(m *yaml.Node, key string) *yaml.Node {
 
 // HasService reports whether the named service is in cfg.Services.
 func (cfg *Config) HasService(name string) bool {
-	for _, svc := range cfg.Services {
-		if svc == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(cfg.Services, name)
 }
 
 // IsDatabase reports whether name is a database service.
