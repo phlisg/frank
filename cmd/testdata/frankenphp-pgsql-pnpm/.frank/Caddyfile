@@ -4,11 +4,9 @@
     order php_server before file_server
 }
 
-:80, :443 {
+:80 {
     root * /var/www/html/public
-
     php_server
-
     try_files {path} {path}/ /index.php?{query}
 
     header {
@@ -29,3 +27,4 @@
         format console
     }
 }
+

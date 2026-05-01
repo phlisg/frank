@@ -67,7 +67,6 @@ services:
             - frank
         ports:
             - 80:80
-            - 443:443
             - 5173:5173
         volumes:
             - .:/var/www/html

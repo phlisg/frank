@@ -25,12 +25,27 @@ nginx:
     context: .
     dockerfile: .frank/nginx.Dockerfile
   ports:
+{{- if .HTTPS}}
+{{- if .CustomPort}}
+    - "{{.ServerPort}}:443"
+{{- else}}
     - "80:80"
     - "443:443"
+{{- end}}
+{{- else}}
+{{- if .CustomPort}}
+    - "{{.ServerPort}}:80"
+{{- else}}
+    - "80:80"
+{{- end}}
+{{- end}}
     - "5173:5173"
   networks:
     - frank
   volumes:
     - .:/var/www/html
+{{- if .HTTPS}}
+    - .frank/certs/:/etc/certs/:ro
+{{- end}}
   depends_on:
     - laravel.test
