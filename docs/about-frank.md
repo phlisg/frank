@@ -8,6 +8,7 @@
 - Docker support
 - Contextual aliases
 - Minimal dependencies: go and docker
+- etc...
 
 ## About
 
@@ -37,7 +38,7 @@ Having PHP installed locally was also a source of confusion: the PHP CLI is in _
 At work, more and more projects were using queues and when developing locally the experience is pretty terrible: many shell panes with one running `npm run dev`, another with `php artisan queue:worker --queue=1,2,3` (yes `queue:listen` exists but inconsistent experience), and maybe another running the scheduler. Oh, and you had to re-run the queues every now and then after editing the code. 
 Also some colleagues at my current workplace who are not accustomed to using queues, were forgetting to run them losing time/energy on why things don't work.
 
--- Add a paragraph on common aliases for easier sharing and normality across projects --
+On another professional setting, people usually work with their shortcuts and that is fine. For instance, I use `pa` (`php artisan`) which auto-detects either sail or local php (redundant now), but some other colleagues might use `arti` or whatever. You can always dictate the full command when collaborating with a colleague, but what about "oh just run this" and it _just works_? Commitable aliases per project, almost making them wish they were here by default!
 
 #### The Laravel Way
 
@@ -63,6 +64,8 @@ frank config shell setup >> .zshrc && source ~/.zshrc # or your favourite shell
 
 ### The Go Situation (Mac users especially)
 
-The other dependency you need is a correctly installed Go (so trading PHP locally for Go? I know, I know...). I'm usually using [Proto](https://moonrepo.dev/proto) to install Go easily - Proto is cool too, as a tool. 
+While you get a single binary that enables PHP development without installing them locally, with queue workers and other helpful tool, the only drawback is that you need to have Go installed (so much for not having PHP locally right?).
 
-For WSL/Linux, you can bypass the Go install and download the latest binary from Github, but unfortunately for Mac users, for now, until I know how to sign binaries, you'll need a working Go install.
+The good part is that if you're using WSL/Linux, you can download the binary. For Mac users, for now you'll need to install go.
+
+> I'm usually using [Proto](https://moonrepo.dev/proto) to install Go easily - Proto is cool too, as a tool. 
