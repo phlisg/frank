@@ -220,6 +220,7 @@ services:
             - 5432:5432
         volumes:
             - pgsql_data:/var/lib/postgresql/data
+            - .frank/scripts/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql
 volumes:
     pgsql_data:
         driver: local
