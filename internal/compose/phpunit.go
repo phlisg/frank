@@ -8,13 +8,17 @@ import (
 	"strings"
 )
 
-// envNameRe matches <env name="..." value="..."/> lines in phpunit.xml.
-var envNameRe = regexp.MustCompile(`^(\s*<env\s+name=")([^"]+)("\s+value=")([^"]*)(".*)$`)
+// phpunitVarRe matches <env name="..." value="..."/> and <server name="..." value="..."/> lines.
+var phpunitVarRe = regexp.MustCompile(`^(\s*<(?:env|server)\s+name=")([^"]+)("\s+value=")([^"]*)(".*)$`)
 
 // PatchPHPUnitXML rewrites phpunit.xml so the testing database uses the given
 // connection (e.g. "mysql", "pgsql") with database name "testing".
 // For sqlite (or empty string) no patching is needed — returns nil.
 // If phpunit.xml does not exist the call is a no-op.
+//
+// Sets both <env> and <server> entries because Docker injects DB_* into
+// $_SERVER, and Laravel's immutable Env repository reads $_SERVER first.
+// Without <server>, phpunit.xml <env> values are silently ignored.
 func PatchPHPUnitXML(dir string, dbConnection string) error {
 	if dbConnection == "" || dbConnection == "sqlite" {
 		return nil
@@ -30,8 +34,8 @@ func RestorePHPUnitXML(dir string) error {
 }
 
 // patchPHPUnit is the shared implementation for PatchPHPUnitXML and
-// RestorePHPUnitXML. It sets DB_CONNECTION to dbConnection and DB_DATABASE
-// to dbDatabase, inserting env lines before </php> if they are missing.
+// RestorePHPUnitXML. It patches both <env> and <server> entries for
+// DB_CONNECTION and DB_DATABASE, inserting missing lines before </php>.
 func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	path := filepath.Join(dir, "phpunit.xml")
 	data, err := os.ReadFile(path)
@@ -44,44 +48,61 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 
 	lines := strings.Split(string(data), "\n")
 
-	foundConn := false
-	foundDB := false
-	phpCloseIdx := -1 // index of the </php> line
+	// Track which combinations we've found: env+server × conn+db.
+	foundEnvConn := false
+	foundEnvDB := false
+	foundServerConn := false
+	foundServerDB := false
+	phpCloseIdx := -1
 
 	for i, line := range lines {
-		if m := envNameRe.FindStringSubmatch(line); m != nil {
-			switch m[2] {
-			case "DB_CONNECTION":
+		if m := phpunitVarRe.FindStringSubmatch(line); m != nil {
+			tag := extractTag(line)
+			switch {
+			case m[2] == "DB_CONNECTION" && tag == "env":
 				lines[i] = m[1] + m[2] + m[3] + dbConnection + ensureForce(m[5])
-				foundConn = true
-			case "DB_DATABASE":
+				foundEnvConn = true
+			case m[2] == "DB_DATABASE" && tag == "env":
 				lines[i] = m[1] + m[2] + m[3] + dbDatabase + ensureForce(m[5])
-				foundDB = true
+				foundEnvDB = true
+			case m[2] == "DB_CONNECTION" && tag == "server":
+				lines[i] = m[1] + m[2] + m[3] + dbConnection + m[5]
+				foundServerConn = true
+			case m[2] == "DB_DATABASE" && tag == "server":
+				lines[i] = m[1] + m[2] + m[3] + dbDatabase + m[5]
+				foundServerDB = true
 			}
 		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "</php>" {
+		if strings.TrimSpace(line) == "</php>" {
 			phpCloseIdx = i
 		}
 	}
 
-	// Insert missing env lines before </php>.
-	if phpCloseIdx >= 0 && (!foundConn || !foundDB) {
-		// Detect indentation from the </php> line or use 8 spaces.
-		indent := "        "
-		if idx := strings.Index(lines[phpCloseIdx], "</php>"); idx > 0 {
-			indent = lines[phpCloseIdx][:idx] + "    "
-		}
+	if phpCloseIdx < 0 {
+		return nil
+	}
 
-		var inserts []string
-		if !foundConn {
-			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s" force="true"/>`, indent, dbConnection))
-		}
-		if !foundDB {
-			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s" force="true"/>`, indent, dbDatabase))
-		}
+	// Build missing lines.
+	indent := "        "
+	if idx := strings.Index(lines[phpCloseIdx], "</php>"); idx > 0 {
+		indent = lines[phpCloseIdx][:idx] + "    "
+	}
 
-		// Splice inserts before phpCloseIdx.
+	var inserts []string
+	if !foundEnvConn {
+		inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s" force="true"/>`, indent, dbConnection))
+	}
+	if !foundEnvDB {
+		inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s" force="true"/>`, indent, dbDatabase))
+	}
+	if !foundServerConn {
+		inserts = append(inserts, fmt.Sprintf(`%s<server name="DB_CONNECTION" value="%s"/>`, indent, dbConnection))
+	}
+	if !foundServerDB {
+		inserts = append(inserts, fmt.Sprintf(`%s<server name="DB_DATABASE" value="%s"/>`, indent, dbDatabase))
+	}
+
+	if len(inserts) > 0 {
 		tail := make([]string, len(lines[phpCloseIdx:]))
 		copy(tail, lines[phpCloseIdx:])
 		lines = append(lines[:phpCloseIdx], inserts...)
@@ -89,6 +110,15 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	}
 
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+}
+
+// extractTag returns "env" or "server" from a line like `<env name=...` or `<server name=...`.
+func extractTag(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "<server") {
+		return "server"
+	}
+	return "env"
 }
 
 // ensureForce guarantees the trailing portion of an <env/> line contains

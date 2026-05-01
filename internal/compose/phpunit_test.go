@@ -12,7 +12,6 @@ func TestPatchPHPUnitXML_FileNotExist(t *testing.T) {
 	if err := PatchPHPUnitXML(dir, "mysql"); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	// No file should be created.
 	if _, err := os.Stat(filepath.Join(dir, "phpunit.xml")); !os.IsNotExist(err) {
 		t.Fatal("phpunit.xml should not be created")
 	}
@@ -74,16 +73,11 @@ func TestPatchPHPUnitXML_NormalPatch(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="mysql" force="true"`) {
-		t.Errorf("DB_CONNECTION not patched with force:\n%s", s)
-	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
-		t.Errorf("DB_DATABASE not patched with force:\n%s", s)
-	}
-	// APP_ENV should be untouched (no force added).
-	if !strings.Contains(s, `name="APP_ENV" value="testing"/>`) {
-		t.Errorf("APP_ENV should not be modified:\n%s", s)
-	}
+	requireContains(t, s, `<env name="DB_CONNECTION" value="mysql" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="mysql"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+	requireContains(t, s, `name="APP_ENV" value="testing"/>`)
 }
 
 func TestPatchPHPUnitXML_MissingEnvLines(t *testing.T) {
@@ -102,18 +96,17 @@ func TestPatchPHPUnitXML_MissingEnvLines(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql" force="true"`) {
-		t.Errorf("DB_CONNECTION not inserted with force:\n%s", s)
-	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
-		t.Errorf("DB_DATABASE not inserted with force:\n%s", s)
-	}
-	// Inserted before </php>.
+	requireContains(t, s, `<env name="DB_CONNECTION" value="pgsql" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="pgsql"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+
+	// All inserted before </php>.
 	phpIdx := strings.Index(s, "</php>")
-	connIdx := strings.Index(s, `name="DB_CONNECTION"`)
-	dbIdx := strings.Index(s, `name="DB_DATABASE"`)
-	if connIdx > phpIdx || dbIdx > phpIdx {
-		t.Errorf("env lines should appear before </php>:\n%s", s)
+	for _, needle := range []string{`<env name="DB_CONNECTION"`, `<server name="DB_DATABASE"`} {
+		if idx := strings.Index(s, needle); idx > phpIdx {
+			t.Errorf("%s should appear before </php>:\n%s", needle, s)
+		}
 	}
 }
 
@@ -133,17 +126,42 @@ func TestPatchPHPUnitXML_ForceAttribute(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `value="mariadb" force="true"`) {
-		t.Errorf("DB_CONNECTION not patched or force lost:\n%s", s)
+	requireContains(t, s, `<env name="DB_CONNECTION" value="mariadb" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="mariadb"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+}
+
+func TestPatchPHPUnitXML_ExistingServerEntries(t *testing.T) {
+	dir := t.TempDir()
+	content := `<phpunit>
+    <php>
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_CONNECTION" value="sqlite"/>
+        <server name="DB_DATABASE" value=":memory:"/>
+    </php>
+</phpunit>`
+	os.WriteFile(filepath.Join(dir, "phpunit.xml"), []byte(content), 0644)
+
+	if err := PatchPHPUnitXML(dir, "pgsql"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(s, `value="testing" force="true"`) {
-		t.Errorf("DB_DATABASE not patched or force lost:\n%s", s)
+
+	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
+	s := string(got)
+	requireContains(t, s, `<env name="DB_CONNECTION" value="pgsql" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="pgsql"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+	// No duplicates — count occurrences.
+	if c := strings.Count(s, `name="DB_CONNECTION"`); c != 2 {
+		t.Errorf("expected exactly 2 DB_CONNECTION entries (env+server), got %d:\n%s", c, s)
 	}
 }
 
 func TestPatchPHPUnitXML_FullLaravelDefault(t *testing.T) {
 	dir := t.TempDir()
-	// Realistic Laravel 11+ default phpunit.xml.
 	content := `<?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
@@ -186,25 +204,16 @@ func TestPatchPHPUnitXML_FullLaravelDefault(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql" force="true"`) {
-		t.Errorf("DB_CONNECTION not patched with force:\n%s", s)
-	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
-		t.Errorf("DB_DATABASE not patched with force:\n%s", s)
-	}
-	// Other env vars untouched (no force added).
-	if !strings.Contains(s, `name="CACHE_STORE" value="array"/>`) {
-		t.Errorf("CACHE_STORE should be untouched:\n%s", s)
-	}
-	// XML structure preserved.
-	if !strings.Contains(s, "<testsuites>") {
-		t.Errorf("testsuites section missing:\n%s", s)
-	}
+	requireContains(t, s, `<env name="DB_CONNECTION" value="pgsql" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="pgsql"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+	requireContains(t, s, `name="CACHE_STORE" value="array"/>`)
+	requireContains(t, s, "<testsuites>")
 }
 
 func TestPatchPHPUnitXML_CommentedOutLines(t *testing.T) {
 	dir := t.TempDir()
-	// Laravel 11+ default: DB lines are commented out.
 	content := `<?xml version="1.0" encoding="UTF-8"?>
 <phpunit>
     <php>
@@ -224,27 +233,23 @@ func TestPatchPHPUnitXML_CommentedOutLines(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="mariadb" force="true"`) {
-		t.Errorf("DB_CONNECTION not inserted with force:\n%s", s)
-	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
-		t.Errorf("DB_DATABASE not inserted with force:\n%s", s)
-	}
-	// Commented lines should still be present (untouched).
-	if !strings.Contains(s, `<!-- <env name="DB_CONNECTION"`) {
-		t.Errorf("original commented line should remain:\n%s", s)
-	}
+	requireContains(t, s, `<env name="DB_CONNECTION" value="mariadb" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value="testing" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="mariadb"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value="testing"/>`)
+	requireContains(t, s, `<!-- <env name="DB_CONNECTION"`)
 }
 
 func TestRestorePHPUnitXML(t *testing.T) {
 	dir := t.TempDir()
-	// phpunit.xml patched for pgsql/testing — restore should revert to sqlite/:memory:.
 	content := `<?xml version="1.0" encoding="UTF-8"?>
 <phpunit>
     <php>
         <env name="APP_ENV" value="testing"/>
-        <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="testing"/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="testing" force="true"/>
+        <server name="DB_CONNECTION" value="pgsql"/>
+        <server name="DB_DATABASE" value="testing"/>
     </php>
 </phpunit>`
 	os.WriteFile(filepath.Join(dir, "phpunit.xml"), []byte(content), 0644)
@@ -255,21 +260,23 @@ func TestRestorePHPUnitXML(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="sqlite" force="true"`) {
-		t.Errorf("DB_CONNECTION not restored to sqlite with force:\n%s", s)
-	}
-	if !strings.Contains(s, `name="DB_DATABASE" value=":memory:" force="true"`) {
-		t.Errorf("DB_DATABASE not restored to :memory: with force:\n%s", s)
-	}
-	// APP_ENV should be untouched.
-	if !strings.Contains(s, `name="APP_ENV" value="testing"`) {
-		t.Errorf("APP_ENV should not be modified:\n%s", s)
-	}
+	requireContains(t, s, `<env name="DB_CONNECTION" value="sqlite" force="true"/>`)
+	requireContains(t, s, `<env name="DB_DATABASE" value=":memory:" force="true"/>`)
+	requireContains(t, s, `<server name="DB_CONNECTION" value="sqlite"/>`)
+	requireContains(t, s, `<server name="DB_DATABASE" value=":memory:"/>`)
+	requireContains(t, s, `name="APP_ENV" value="testing"`)
 }
 
 func TestRestorePHPUnitXML_FileNotExist(t *testing.T) {
 	dir := t.TempDir()
 	if err := RestorePHPUnitXML(dir); err != nil {
 		t.Fatalf("expected nil for missing file, got %v", err)
+	}
+}
+
+func requireContains(t *testing.T, haystack, needle string) {
+	t.Helper()
+	if !strings.Contains(haystack, needle) {
+		t.Errorf("expected to find %q in:\n%s", needle, haystack)
 	}
 }
