@@ -201,3 +201,41 @@ func TestPatchPHPUnitXML_FullLaravelDefault(t *testing.T) {
 		t.Errorf("testsuites section missing:\n%s", s)
 	}
 }
+
+func TestRestorePHPUnitXML(t *testing.T) {
+	dir := t.TempDir()
+	// phpunit.xml patched for pgsql/testing — restore should revert to sqlite/:memory:.
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<phpunit>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_DATABASE" value="testing"/>
+    </php>
+</phpunit>`
+	os.WriteFile(filepath.Join(dir, "phpunit.xml"), []byte(content), 0644)
+
+	if err := RestorePHPUnitXML(dir); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
+	s := string(got)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="sqlite"`) {
+		t.Errorf("DB_CONNECTION not restored to sqlite:\n%s", s)
+	}
+	if !strings.Contains(s, `name="DB_DATABASE" value=":memory:"`) {
+		t.Errorf("DB_DATABASE not restored to :memory::\n%s", s)
+	}
+	// APP_ENV should be untouched.
+	if !strings.Contains(s, `name="APP_ENV" value="testing"`) {
+		t.Errorf("APP_ENV should not be modified:\n%s", s)
+	}
+}
+
+func TestRestorePHPUnitXML_FileNotExist(t *testing.T) {
+	dir := t.TempDir()
+	if err := RestorePHPUnitXML(dir); err != nil {
+		t.Fatalf("expected nil for missing file, got %v", err)
+	}
+}

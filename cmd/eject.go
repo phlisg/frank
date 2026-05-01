@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/phlisg/frank/internal/compose"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -58,6 +60,11 @@ func runEject(cmd *cobra.Command, args []string) error {
 		"--php="+cfg.PHP.Version,
 	); err != nil {
 		return fmt.Errorf("sail:install failed: %w", err)
+	}
+
+	// Restore phpunit.xml to Laravel defaults (sqlite/:memory:).
+	if err := compose.RestorePHPUnitXML(dir); err != nil {
+		output.Warning(fmt.Sprintf("could not restore phpunit.xml: %v", err))
 	}
 
 	fmt.Println("  eject complete — run ./vendor/bin/sail up to start containers")

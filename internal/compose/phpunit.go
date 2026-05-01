@@ -19,7 +19,20 @@ func PatchPHPUnitXML(dir string, dbConnection string) error {
 	if dbConnection == "" || dbConnection == "sqlite" {
 		return nil
 	}
+	return patchPHPUnit(dir, dbConnection, "testing")
+}
 
+// RestorePHPUnitXML resets phpunit.xml to Laravel defaults:
+// DB_CONNECTION → sqlite, DB_DATABASE → :memory:.
+// If phpunit.xml does not exist the call is a no-op.
+func RestorePHPUnitXML(dir string) error {
+	return patchPHPUnit(dir, "sqlite", ":memory:")
+}
+
+// patchPHPUnit is the shared implementation for PatchPHPUnitXML and
+// RestorePHPUnitXML. It sets DB_CONNECTION to dbConnection and DB_DATABASE
+// to dbDatabase, inserting env lines before </php> if they are missing.
+func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	path := filepath.Join(dir, "phpunit.xml")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -42,7 +55,7 @@ func PatchPHPUnitXML(dir string, dbConnection string) error {
 				lines[i] = m[1] + m[2] + m[3] + dbConnection + m[5]
 				foundConn = true
 			case "DB_DATABASE":
-				lines[i] = m[1] + m[2] + m[3] + "testing" + m[5]
+				lines[i] = m[1] + m[2] + m[3] + dbDatabase + m[5]
 				foundDB = true
 			}
 		}
@@ -65,7 +78,7 @@ func PatchPHPUnitXML(dir string, dbConnection string) error {
 			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s"/>`, indent, dbConnection))
 		}
 		if !foundDB {
-			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="testing"/>`, indent))
+			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s"/>`, indent, dbDatabase))
 		}
 
 		// Splice inserts before phpCloseIdx.
