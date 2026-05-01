@@ -58,6 +58,18 @@ func TestApplyWorkersFromInitBoth(t *testing.T) {
 	}
 }
 
+// stripComments returns only the non-comment lines from the marshalled output,
+// so tests can check the active YAML without matching the reference comment block.
+func stripComments(s string) string {
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		if !strings.HasPrefix(line, "#") {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func TestMarshalConfigOmitsEmptyWorkers(t *testing.T) {
 	cfg := config.New()
 	// Explicitly clear workers to test omission behaviour.
@@ -66,7 +78,8 @@ func TestMarshalConfigOmitsEmptyWorkers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshalConfig: %v", err)
 	}
-	if strings.Contains(out, "workers:") {
+	active := stripComments(out)
+	if strings.Contains(active, "workers:") {
 		t.Errorf("expected no workers key for empty workers, got:\n%s", out)
 	}
 }
@@ -91,7 +104,8 @@ func TestMarshalConfigOmitsDefaultNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshalConfig: %v", err)
 	}
-	if strings.Contains(out, "node:") {
+	active := stripComments(out)
+	if strings.Contains(active, "node:") {
 		t.Errorf("expected no node key for default npm, got:\n%s", out)
 	}
 }

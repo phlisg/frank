@@ -8,6 +8,7 @@ mysql:
     MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
   volumes:
     - mysql_data:/var/lib/mysql
+    - .frank/scripts/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh
   ports:
     - "{{.Port}}:3306"
   networks:

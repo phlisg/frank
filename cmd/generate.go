@@ -139,6 +139,47 @@ func generate(cfg *config.Config, dir string) error {
 		return fmt.Errorf("write .frank/README.md: %w", err)
 	}
 
+	// Write testing database init script for non-sqlite databases.
+	db := cfg.Database()
+	if db != "" && db != "sqlite" {
+		scriptsDir := filepath.Join(frankDir, "scripts")
+		if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+			return fmt.Errorf("create .frank/scripts directory: %w", err)
+		}
+
+		// Clean up stale init scripts from previous engine (e.g. .sql leftover after switching to mysql).
+		for _, ext := range []string{".sql", ".sh"} {
+			_ = os.Remove(filepath.Join(scriptsDir, "create-testing-database"+ext))
+		}
+
+		var tmplPath, outFile string
+		switch db {
+		case "pgsql":
+			tmplPath = "templates/services/pgsql/create-testing-database.sql"
+			outFile = "create-testing-database.sql"
+		case "mysql":
+			tmplPath = "templates/services/mysql/create-testing-database.sh"
+			outFile = "create-testing-database.sh"
+		case "mariadb":
+			tmplPath = "templates/services/mariadb/create-testing-database.sh"
+			outFile = "create-testing-database.sh"
+		}
+
+		content, err := engine.ReadFile(tmplPath)
+		if err != nil {
+			return fmt.Errorf("read init script template: %w", err)
+		}
+		if err := writeFile(filepath.Join(scriptsDir, outFile), content); err != nil {
+			return err
+		}
+		output.Detail("wrote .frank/scripts/" + outFile)
+	}
+
+	// Patch phpunit.xml with the correct DB_CONNECTION for testing.
+	if err := compose.PatchPHPUnitXML(dir, db); err != nil {
+		return fmt.Errorf("patch phpunit.xml: %w", err)
+	}
+
 	// Ensure .frank/ is in root .gitignore.
 	gitignorePath := filepath.Join(dir, ".gitignore")
 	if err := ensureGitignoreLine(gitignorePath, ".frank/"); err != nil {
@@ -164,6 +205,10 @@ func generatedFileCount(cfg *config.Config) int {
 		count++ // Caddyfile
 	case "fpm":
 		count += 2 // nginx.conf + nginx.Dockerfile
+	}
+	db := cfg.Database()
+	if db != "" && db != "sqlite" {
+		count++ // init script
 	}
 	return count
 }

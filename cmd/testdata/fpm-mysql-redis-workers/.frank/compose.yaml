@@ -203,6 +203,7 @@ services:
             - 3306:3306
         volumes:
             - mysql_data:/var/lib/mysql
+            - .frank/scripts/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh
     nginx:
         build:
             context: .

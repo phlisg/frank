@@ -6,6 +6,7 @@ pgsql:
     POSTGRES_PASSWORD: "${DB_PASSWORD}"
   volumes:
     - pgsql_data:/var/lib/postgresql/data
+    - .frank/scripts/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql
   ports:
     - "{{.Port}}:5432"
   networks:
