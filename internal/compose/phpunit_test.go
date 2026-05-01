@@ -74,14 +74,14 @@ func TestPatchPHPUnitXML_NormalPatch(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="mysql"`) {
-		t.Errorf("DB_CONNECTION not patched:\n%s", s)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="mysql" force="true"`) {
+		t.Errorf("DB_CONNECTION not patched with force:\n%s", s)
 	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing"`) {
-		t.Errorf("DB_DATABASE not patched:\n%s", s)
+	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
+		t.Errorf("DB_DATABASE not patched with force:\n%s", s)
 	}
-	// APP_ENV should be untouched.
-	if !strings.Contains(s, `name="APP_ENV" value="testing"`) {
+	// APP_ENV should be untouched (no force added).
+	if !strings.Contains(s, `name="APP_ENV" value="testing"/>`) {
 		t.Errorf("APP_ENV should not be modified:\n%s", s)
 	}
 }
@@ -102,11 +102,11 @@ func TestPatchPHPUnitXML_MissingEnvLines(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql"`) {
-		t.Errorf("DB_CONNECTION not inserted:\n%s", s)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql" force="true"`) {
+		t.Errorf("DB_CONNECTION not inserted with force:\n%s", s)
 	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing"`) {
-		t.Errorf("DB_DATABASE not inserted:\n%s", s)
+	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
+		t.Errorf("DB_DATABASE not inserted with force:\n%s", s)
 	}
 	// Inserted before </php>.
 	phpIdx := strings.Index(s, "</php>")
@@ -186,19 +186,53 @@ func TestPatchPHPUnitXML_FullLaravelDefault(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql"`) {
-		t.Errorf("DB_CONNECTION not patched:\n%s", s)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="pgsql" force="true"`) {
+		t.Errorf("DB_CONNECTION not patched with force:\n%s", s)
 	}
-	if !strings.Contains(s, `name="DB_DATABASE" value="testing"`) {
-		t.Errorf("DB_DATABASE not patched:\n%s", s)
+	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
+		t.Errorf("DB_DATABASE not patched with force:\n%s", s)
 	}
-	// Other env vars untouched.
-	if !strings.Contains(s, `name="CACHE_STORE" value="array"`) {
+	// Other env vars untouched (no force added).
+	if !strings.Contains(s, `name="CACHE_STORE" value="array"/>`) {
 		t.Errorf("CACHE_STORE should be untouched:\n%s", s)
 	}
 	// XML structure preserved.
 	if !strings.Contains(s, "<testsuites>") {
 		t.Errorf("testsuites section missing:\n%s", s)
+	}
+}
+
+func TestPatchPHPUnitXML_CommentedOutLines(t *testing.T) {
+	dir := t.TempDir()
+	// Laravel 11+ default: DB lines are commented out.
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<phpunit>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
+        <!-- <env name="DB_DATABASE" value=":memory:"/> -->
+        <env name="MAIL_MAILER" value="array"/>
+    </php>
+</phpunit>`
+	os.WriteFile(filepath.Join(dir, "phpunit.xml"), []byte(content), 0644)
+
+	if err := PatchPHPUnitXML(dir, "mariadb"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
+	s := string(got)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="mariadb" force="true"`) {
+		t.Errorf("DB_CONNECTION not inserted with force:\n%s", s)
+	}
+	if !strings.Contains(s, `name="DB_DATABASE" value="testing" force="true"`) {
+		t.Errorf("DB_DATABASE not inserted with force:\n%s", s)
+	}
+	// Commented lines should still be present (untouched).
+	if !strings.Contains(s, `<!-- <env name="DB_CONNECTION"`) {
+		t.Errorf("original commented line should remain:\n%s", s)
 	}
 }
 
@@ -221,11 +255,11 @@ func TestRestorePHPUnitXML(t *testing.T) {
 
 	got, _ := os.ReadFile(filepath.Join(dir, "phpunit.xml"))
 	s := string(got)
-	if !strings.Contains(s, `name="DB_CONNECTION" value="sqlite"`) {
-		t.Errorf("DB_CONNECTION not restored to sqlite:\n%s", s)
+	if !strings.Contains(s, `name="DB_CONNECTION" value="sqlite" force="true"`) {
+		t.Errorf("DB_CONNECTION not restored to sqlite with force:\n%s", s)
 	}
-	if !strings.Contains(s, `name="DB_DATABASE" value=":memory:"`) {
-		t.Errorf("DB_DATABASE not restored to :memory::\n%s", s)
+	if !strings.Contains(s, `name="DB_DATABASE" value=":memory:" force="true"`) {
+		t.Errorf("DB_DATABASE not restored to :memory: with force:\n%s", s)
 	}
 	// APP_ENV should be untouched.
 	if !strings.Contains(s, `name="APP_ENV" value="testing"`) {

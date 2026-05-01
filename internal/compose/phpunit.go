@@ -52,10 +52,10 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 		if m := envNameRe.FindStringSubmatch(line); m != nil {
 			switch m[2] {
 			case "DB_CONNECTION":
-				lines[i] = m[1] + m[2] + m[3] + dbConnection + m[5]
+				lines[i] = m[1] + m[2] + m[3] + dbConnection + ensureForce(m[5])
 				foundConn = true
 			case "DB_DATABASE":
-				lines[i] = m[1] + m[2] + m[3] + dbDatabase + m[5]
+				lines[i] = m[1] + m[2] + m[3] + dbDatabase + ensureForce(m[5])
 				foundDB = true
 			}
 		}
@@ -75,10 +75,10 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 
 		var inserts []string
 		if !foundConn {
-			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s"/>`, indent, dbConnection))
+			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s" force="true"/>`, indent, dbConnection))
 		}
 		if !foundDB {
-			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s"/>`, indent, dbDatabase))
+			inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s" force="true"/>`, indent, dbDatabase))
 		}
 
 		// Splice inserts before phpCloseIdx.
@@ -89,4 +89,13 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	}
 
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+}
+
+// ensureForce guarantees the trailing portion of an <env/> line contains
+// force="true" so phpunit.xml values override .env.
+func ensureForce(suffix string) string {
+	if strings.Contains(suffix, `force="true"`) {
+		return suffix
+	}
+	return strings.Replace(suffix, `"/>`, `" force="true"/>`, 1)
 }

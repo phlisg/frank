@@ -10,7 +10,7 @@ When you run `frank generate` (or `frank new` / `frank setup`), Frank:
 
 1. **Writes an init script** to `.frank/scripts/` — a short SQL or shell script that creates a `testing` database inside the same DB container.
 2. **Mounts the script** into the container's `docker-entrypoint-initdb.d/` so it runs automatically on first boot.
-3. **Patches `phpunit.xml`** — sets `DB_CONNECTION` and `DB_DATABASE` so Laravel's test runner uses the testing database.
+3. **Patches `phpunit.xml`** — sets `DB_CONNECTION` and `DB_DATABASE` with `force="true"` so they override `.env` values and Laravel's test runner uses the testing database.
 
 SQLite projects skip all of this — Laravel's default `:memory:` works fine.
 
