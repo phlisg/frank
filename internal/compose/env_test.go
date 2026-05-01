@@ -23,7 +23,7 @@ func TestGenerateEnv_BaseVars(t *testing.T) {
 		"APP_ENV=local",
 		"APP_KEY=",
 		"APP_DEBUG=true",
-		"APP_URL=http://localhost",
+		"APP_URL=https://localhost",
 		"APP_LOCALE=en",          // explicitly required by spec
 		"BCRYPT_ROUNDS=12",
 		"LOG_CHANNEL=stack",
@@ -429,6 +429,38 @@ func TestWriteEnv_AppKeyPreserved(t *testing.T) {
 	}
 	if !strings.Contains(string(example), "APP_KEY=") {
 		t.Error(".env.example must still contain APP_KEY= key")
+	}
+}
+
+func TestGenerateEnv_AppURL(t *testing.T) {
+	boolPtr := func(b bool) *bool { return &b }
+
+	tests := []struct {
+		name   string
+		server config.Server
+		want   string
+	}{
+		{"default (HTTPS nil)", config.Server{}, "APP_URL=https://localhost"},
+		{"HTTPS with port", config.Server{Port: 4433}, "APP_URL=https://localhost:4433"},
+		{"HTTP explicit", config.Server{HTTPS: boolPtr(false)}, "APP_URL=http://localhost"},
+		{"HTTP with port", config.Server{HTTPS: boolPtr(false), Port: 8080}, "APP_URL=http://localhost:8080"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newTestGenerator(t)
+			cfg := &config.Config{
+				PHP:    config.PHP{Version: "8.5", Runtime: "frankenphp"},
+				Server: tt.server,
+			}
+			out, err := g.GenerateEnv(cfg, "myapp")
+			if err != nil {
+				t.Fatalf("GenerateEnv error: %v", err)
+			}
+			if !strings.Contains(out, tt.want+"\n") {
+				t.Errorf("expected %q in output, got:\n%s", tt.want, out)
+			}
+		})
 	}
 }
 

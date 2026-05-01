@@ -214,9 +214,11 @@ services:
             - frank
         ports:
             - 80:80
+            - 443:443
             - 5173:5173
         volumes:
             - .:/var/www/html
+            - .frank/certs/:/etc/certs/:ro
     redis:
         healthcheck:
             interval: 1s

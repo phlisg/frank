@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/phlisg/frank/internal/cert"
 	"github.com/phlisg/frank/internal/compose"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/output"
@@ -67,6 +68,25 @@ func generate(cfg *config.Config, dir string) error {
 		return fmt.Errorf("create .frank directory: %w", err)
 	}
 
+	// Generate TLS certs if HTTPS enabled.
+	if cfg.Server.IsHTTPS() {
+		result, err := cert.Generate(frankDir)
+		if err != nil {
+			return fmt.Errorf("cert generation: %w", err)
+		}
+		switch {
+		case result.Generated:
+			output.Detail("generated TLS certificates")
+			if result.CANotTrusted {
+				output.Warning("mkcert CA not trusted — run `mkcert -install` for browser-trusted certs")
+			}
+		case result.Skipped:
+			output.Detail("TLS certificates already exist")
+		case result.MkcertMissing:
+			output.Warning("mkcert not found — install mkcert and re-run `frank generate` for HTTPS\n  https://github.com/FiloSottile/mkcert#installation")
+		}
+	}
+
 	if err := gen.Write(cfg, projectName, dir); err != nil {
 		return fmt.Errorf("generate compose.yaml: %w", err)
 	}
@@ -81,6 +101,9 @@ func generate(cfg *config.Config, dir string) error {
 	data := template.Data{
 		PHPVersion:  cfg.PHP.Version,
 		ProjectName: projectName,
+		HTTPS:       cfg.Server.IsHTTPS(),
+		ServerPort:  cfg.Server.EffectivePort(),
+		CustomPort:  cfg.Server.Port != 0,
 	}
 
 	dockerfile, err := engine.RenderRuntime(cfg.PHP.Runtime, "Dockerfile.tmpl", data)
@@ -186,6 +209,11 @@ func generate(cfg *config.Config, dir string) error {
 		fmt.Fprintf(os.Stderr, "warning: could not update .gitignore: %v\n", err)
 	}
 
+	// Ensure .frank/certs/ is gitignored (private keys must not be committed).
+	if cfg.Server.IsHTTPS() {
+		ensureCertsGitignore(dir)
+	}
+
 	// Migration: delete leftover Frank files at project root.
 	legacyFiles := []string{"compose.yaml", "Dockerfile", "nginx.conf", "nginx.Dockerfile", "Caddyfile"}
 	for _, name := range legacyFiles {
@@ -228,4 +256,28 @@ func ensureGitignoreLine(path, line string) error {
 	defer f.Close()
 	_, err = fmt.Fprintf(f, "\n%s\n", line)
 	return err
+}
+
+// ensureCertsGitignore ensures .frank/certs/ is listed in the project .gitignore.
+// Best-effort — silently ignores errors.
+func ensureCertsGitignore(dir string) {
+	gitignorePath := filepath.Join(dir, ".gitignore")
+	entry := ".frank/certs/"
+
+	data, _ := os.ReadFile(gitignorePath)
+	if strings.Contains(string(data), entry) {
+		return
+	}
+
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	content := string(data)
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		f.WriteString("\n")
+	}
+	f.WriteString(entry + "\n")
 }
