@@ -1,6 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="Frank" width="150">
+  <img src="docs/assets/logo.svg" alt="Frank" width="150"><br>
 </p>
+
+<h1 align="center">Frank</h1>
 
 <p align="center">
   <a href="https://github.com/phlisg/frank"><img src="https://img.shields.io/github/go-mod/go-version/phlisg/frank" alt="Go Version"></a>&nbsp;
