@@ -1,22 +1,43 @@
-# Frank
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Frank" width="150">
+</p>
 
-> A config-driven Docker environment for Laravel development.
+<p align="center">
+  <a href="https://github.com/phlisg/frank"><img src="https://img.shields.io/github/go-mod/go-version/phlisg/frank" alt="Go Version"></a>&nbsp;
+  <a href="https://github.com/phlisg/frank/releases"><img src="https://img.shields.io/github/v/release/phlisg/frank" alt="Release"></a>&nbsp;
+  <a href="https://goreportcard.com/report/github.com/phlisg/frank"><img src="https://goreportcard.com/badge/github.com/phlisg/frank" alt="Go Report Card"></a>&nbsp;
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/phlisg/frank" alt="License"></a>
+</p>
+
+> A config-driven Docker environment for full-fledged Laravel development.
 
 Frank gives you a full Laravel dev environment from a single `frank.yaml` — no local PHP, Composer, or Node required. Queue workers and the scheduler run as dedicated containers with auto-reload on code change. Onboard a teammate with `git clone` and `frank up`.
 
 ### Features
 
-**Environment**
-- One-file config (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx - Two runtimes: FrankenPHP (default) or PHP-FPM + Nginx - Services: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit
+**Single file config**
+- **One-file config** (`frank.yaml`) → generates Dockerfile, compose, Caddy/nginx 
+
+**Flexible environments**:
+- **Two runtimes**: FrankenPHP (default) or PHP-FPM + Nginx 
+- **Services**: Postgres, MySQL, MariaDB, SQLite, Redis, Memcached, Meilisearch, Mailpit, and more
 
 **Workflow**
-- `frank new` scaffolds a project (interactive or flag-driven) - `frank install` bootstraps Laravel inside the container - Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd` - Custom project aliases in `frank.yaml` (container or host-side) - Shell completion for zsh / bash / fish / powershell
+- `frank new` scaffolds a project (interactive or flag-driven) 
+- `frank install` bootstraps Laravel inside the container - Shell aliases (`artisan`, `composer`, `php`, `psql`, …) auto-activate on `cd` 
+- **Custom project aliases** in `frank.yaml` (container or host-side) 
+- Shell completion for zsh / bash / fish / powershell
 
-**Workers**
-- Declared `schedule:work` + `queue:work` pools in `frank.yaml` - Ad-hoc workers via `frank worker queue|schedule` - Host-side file watcher (`frank watch`) reloads workers on code change - Multi-pane CCTV view of every worker: `frank worker top`
+**Automatically reloading workers**
+- Declared `schedule:work` + `queue:work` pools in `frank.yaml` 
+- Ad-hoc workers via `frank worker queue|schedule` 
+- Host-side file watcher (`frank watch`) reloads workers on code change 
+- Multi-pane CCTV view of every worker: `frank worker top`
 
 **Dev Tools**
-- Preconfigured Pint, Larastan, Rector with opinionated Laravel defaults - Lefthook pre-commit hooks: auto-fix on commit, analyze before push - `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo
+- **Preconfigured** _Pint_, _Larastan_, _Rector_  configuration with opinionated Laravel defaults 
+- **_Lefthook_** pre-commit hooks: auto-fix on commit, analyze before push 
+- `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo
 
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
@@ -67,103 +88,53 @@ sudo mv frank /usr/local/bin/
 
 ## Getting Started
 
-A full walkthrough from zero to a running Laravel app. Scenario: new project with PostgreSQL, Redis (cache + queues), and Mailpit.
-
-**1. Scaffold the project**
-
 ```bash
 frank new my-app
 cd my-app
 ```
 
-The wizard asks for PHP version, Laravel version, runtime, and services. Prefer flags? Skip every prompt in one shot:
+That's it. Frank scaffolds the project, installs Laravel, starts containers, and runs migrations. Visit [http://localhost](http://localhost).
+
+No local PHP, Composer, or Node required.
+
+### What just happened?
+
+`frank new` walked you through PHP version, runtime, and services — or skip the wizard entirely:
 
 ```bash
-frank new --php 8.4 --laravel 12 --runtime frankenphp --with="pgsql,redis,mailpit" my-app
+frank new --php 8.4 --runtime frankenphp --with="pgsql,redis,mailpit" --schedule --queue-count 2 my-app
 ```
 
-Either way, Frank writes `frank.yaml` and generates `compose.yaml`, `Dockerfile`, `Caddyfile`, `.env`, and `.env.example`.
+Frank generated `frank.yaml`, Dockerfile, compose, Caddy/nginx config, `.env` — then built and started everything.
 
-**2. Install Laravel**
-
-```bash
-frank install
-```
-
-Spins up a disposable `composer:latest` container, creates a fresh Laravel project, moves the files into your directory, and patches Vite for Docker HMR. No local PHP required.
-
-**3. Start containers**
-
-```bash
-frank up -d
-```
-
-Starts all services in the background, runs `composer install`, and runs `php artisan migrate`. Visit [http://localhost](http://localhost) — you should see the Laravel welcome page.
-
-**4. Enable shell aliases (once)**
+### Shell aliases
 
 ```bash
 echo 'eval "$(frank config shell setup)"' >> ~/.zshrc   # or ~/.bashrc
 source ~/.zshrc
 ```
 
-Aliases auto-activate when you `cd` into a Frank project. Full alias table: [`docs/shell.md`](docs/shell.md).
+> **Note:** this line must appear **after** your Go bin path (`export PATH=$PATH:$HOME/go/bin` or equivalent) in your shell config — otherwise `frank` won't be found when the eval runs.
 
-**5. Day-to-day**
+Now `artisan`, `composer`, `php`, `npm` and any custom alias resolve to the container automatically when you're in a Frank project:
 
 ```bash
 artisan make:controller Api/PostController --resource
-artisan migrate:fresh --seed
+php vendor/bin/pint
 composer require filament/filament
-frank test                          # runs php artisan test (Pest parallel works out of the box)
-npm run dev                         # Vite HMR on http://localhost:5173
+frank test
+npm run dev
 ```
 
-Visit [http://localhost:8025](http://localhost:8025) for the Mailpit inbox — any mail your app sends in local dev lands here.
-
-**6. Custom aliases**
-
-Add project-specific aliases in `frank.yaml`:
-
-```yaml
-aliases:
-  migrate: "artisan migrate"
-  lint:
-    cmd: "vendor/bin/pint"
-    host: true
-```
-
-Container aliases run inside Docker; `host: true` runs on your machine. Aliases activate alongside the built-in ones when you `cd` into the project. See [`docs/shell.md`](docs/shell.md).
-
-**7. Manage your config**
+### Onboard a teammate
 
 ```bash
-frank config show                   # display resolved configuration
-frank config set php.version 8.4    # change a value
-frank config edit                   # open frank.yaml in your editor
+git clone … && cd my-app
+frank generate
+frank up -d
 ```
 
-Changes take effect on next `frank generate` or `frank up`.
-
-**8. Onboard a teammate**
-
-```bash
-git clone ...
-cd my-app
-frank up -d        # containers start, migrate runs
-```
-
-No local PHP, no Composer, no version conflicts.
-
-**9. Queue workers & scheduler**
-
-Declare them at init time:
-
-```bash
-frank new --schedule --queue-count 2 my-app
-```
-
-`frank up` auto-spawns `frank watch` so edits to `app/`, `config/`, `routes/`, etc. reload workers automatically. Details: [`docs/workers.md`](docs/workers.md).
+`frank generate` rebuilds the Docker files from `frank.yaml`. Then `frank up` starts containers, runs migrations — same environment, every machine.
 
 ---
 
@@ -217,6 +188,15 @@ After editing `frank.yaml`, run `frank generate` to regenerate Docker files — 
 | `mailpit` | Mail (local SMTP + UI) | 1025 / 8025 |
 
 Only one database can be active at a time. Frank enforces this — `frank add mysql` will refuse if `pgsql` is already configured. Use `frank remove pgsql` first.
+
+Ports are customizable in `frank.yaml` via `config.<service>.port`:
+```yaml
+config:
+  pgsql:
+    port: 5433
+  redis:
+    port: 6380
+```
 
 ---
 
