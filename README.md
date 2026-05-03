@@ -235,7 +235,7 @@ config:
 | `frank config shell ...` | Shell integration (aliases, hooks, completion) — see [`docs/shell.md`](docs/shell.md) |
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
-| `frank version` | Print the frank binary version |
+| `frank version [--check\|--update]` | Print version and check for updates. `--check` shows update status; `--update` self-updates via Homebrew or `go install` |
 
 ---
 
