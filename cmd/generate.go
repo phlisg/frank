@@ -223,7 +223,25 @@ func generate(cfg *config.Config, dir string) error {
 		}
 	}
 
+	// Hint: Vite dev server needs HTTPS-aware config when TLS is enabled.
+	if cfg.Server.IsHTTPS() {
+		printViteHTTPSHint()
+	}
+
 	return nil
+}
+
+func printViteHTTPSHint() {
+	output.Warning(`HTTPS enabled — ensure your vite.config.js/ts includes:
+
+  server: {
+      origin: 'https://localhost:5173',
+      hmr: {
+          protocol: 'wss',
+          host: 'localhost',
+          port: 5173,
+      },
+  }`)
 }
 
 func generatedFileCount(cfg *config.Config) int {

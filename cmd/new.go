@@ -32,6 +32,7 @@ var flagNoLefthook bool
 var flagNoTools bool
 
 var flagNoUp bool
+var flagHTTP bool
 var flagInteractive bool
 
 func init() {
@@ -49,6 +50,7 @@ func init() {
 	newCmd.Flags().BoolVar(&flagNoLefthook, "no-lefthook", false, "exclude lefthook from dev tools")
 	newCmd.Flags().BoolVar(&flagNoTools, "no-tools", false, "skip dev tools entirely")
 	newCmd.Flags().BoolVar(&flagNoUp, "no-up", false, "skip container start after install")
+	newCmd.Flags().BoolVar(&flagHTTP, "http", false, "disable HTTPS (serve over plain HTTP)")
 	newCmd.Flags().BoolVar(&flagInteractive, "interactive", false, "run full interactive wizard")
 	rootCmd.AddCommand(newCmd)
 }
@@ -169,6 +171,11 @@ func runNew(cmd *cobra.Command, args []string) error {
 		default:
 			return fmt.Errorf("invalid --pm %q: valid options are npm, pnpm, bun", flagPM)
 		}
+	}
+
+	if flagHTTP {
+		f := false
+		cfg.Server.HTTPS = &f
 	}
 
 	// Services
