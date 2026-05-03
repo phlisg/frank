@@ -56,7 +56,7 @@ func Execute(fsys fs.FS, version string) {
 			output.SetLevel(output.Normal)
 		}
 		name := cmd.Name()
-		if name == "up" || name == "setup" {
+		if name == "up" || name == "setup" || name == "frank" {
 			if status, err := selfupdate.Check(rootCmd.Version); err == nil && status.Available {
 				fmt.Fprintf(os.Stderr, "Update available: v%s (run frank version --update)\n", status.Latest)
 			}
