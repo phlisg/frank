@@ -34,11 +34,6 @@
         format console
     }
 }
-
-:5173 {
-    tls /etc/certs/localhost.pem /etc/certs/localhost-key.pem
-    reverse_proxy laravel.test:5173
-}
 {{else}}
 :80 {
     root * /var/www/html/public

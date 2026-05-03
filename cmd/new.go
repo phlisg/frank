@@ -144,7 +144,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		printNewNextSteps(projectName, !flagNoUp, cfg)
+		printNewNextSteps(projectName, dir, !flagNoUp, cfg)
 		return nil
 	}
 
@@ -275,7 +275,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 
 	// 9. NextSteps
-	printNewNextSteps(projectName, !flagNoUp, cfg)
+	printNewNextSteps(projectName, dir, !flagNoUp, cfg)
 	return nil
 }
 
@@ -320,7 +320,10 @@ func runNewUp(dir string, cfg *config.Config) error {
 }
 
 // printNewNextSteps prints the final NextSteps block for frank new.
-func printNewNextSteps(projectName string, containersStarted bool, cfg *config.Config) {
+func printNewNextSteps(projectName, dir string, containersStarted bool, cfg *config.Config) {
+	if cfg.Server.IsHTTPS() {
+		printViteHTTPSHint(dir)
+	}
 	steps := []string{fmt.Sprintf("cd %s", projectName)}
 	if containersStarted {
 		scheme := "http"
@@ -703,6 +706,11 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		return err
 	}
 	stopLaravel(nil)
+
+	// Patch vite.config to import .frank/vite-server.js (known default shape after create-project).
+	if err := patchViteConfig(dir); err != nil {
+		output.Warning(fmt.Sprintf("could not patch vite.config: %v", err))
+	}
 
 	if len(cfg.Tools) > 0 {
 		phpTools := tool.PHPTools(cfg.Tools)

@@ -54,22 +54,29 @@ With a custom port, the HTTP→HTTPS redirect is suppressed (only the single HTT
 
 ## Vite Dev Server
 
-When running `pnpm dev` (or `npm run dev`) with HTTPS enabled, the Vite dev server needs to know it's being served over TLS. Without this, the browser blocks Vite's assets due to mixed content (HTTPS page loading HTTP scripts).
+When running `pnpm dev` (or `npm run dev`) with HTTPS enabled, Vite must serve its assets over TLS too — otherwise the browser blocks them as mixed content.
 
-Add this to your `vite.config.js` or `vite.config.ts`:
+Frank generates `.frank/vite-server.js` with the correct TLS configuration. Import it in your `vite.config.js` or `vite.config.ts`:
 
 ```js
-    server: {
-        origin: 'https://localhost:5173',
-        hmr: {
-            protocol: 'wss',
-            host: 'localhost',
-            port: 5173,
-        },
-    },
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import frankServer from './.frank/vite-server.js';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/app.js'],
+            refresh: true,
+        }),
+    ],
+    server: frankServer,
+});
 ```
 
-**Why this is needed:** Frank's web server (Caddy/nginx) terminates TLS on port 5173 and proxies to Vite's plain HTTP server inside the container. The `server.origin` setting tells Vite to write `https://localhost:5173` into Laravel's `public/hot` file, so the `@vite` Blade directive generates correct `<script>` URLs.
+**Why this is needed:** Vite must serve over TLS to avoid mixed content errors when your app runs on HTTPS. The generated `.frank/vite-server.js` configures Vite to use the same mkcert certificates as the web server, bind to `0.0.0.0` (required for Docker port mapping), and set the correct `origin` so Laravel's `@vite` Blade directive generates `https://` URLs.
+
+When HTTPS is disabled, `.frank/vite-server.js` exports a minimal config (`host: '0.0.0.0'` only), so the import works regardless of HTTPS mode.
 
 > **Note:** This is only relevant during development with `pnpm dev`. Production builds (pre-compiled assets) work without any Vite configuration.
 

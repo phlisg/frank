@@ -120,8 +120,8 @@ func TestRenderRuntimeCaddyfile(t *testing.T) {
 	if !strings.Contains(out, "redir https://") {
 		t.Error("expected :80 redirect in HTTPS mode without CustomPort")
 	}
-	if !strings.Contains(out, ":5173 {") {
-		t.Error("expected Vite proxy block in HTTPS mode")
+	if strings.Contains(out, ":5173 {") {
+		t.Error("Vite proxy block should not be present — Vite handles its own TLS")
 	}
 
 	// HTTPS + CustomPort: no :80 redirect

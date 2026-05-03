@@ -183,6 +183,9 @@ func runSetupFrank(cmd *cobra.Command, dir string) error {
 		return err
 	}
 
+	if cfg.Server.IsHTTPS() {
+		printViteHTTPSHint(dir)
+	}
 	output.NextSteps([]string{"frank up -d"})
 	return nil
 }
@@ -295,11 +298,20 @@ func setupWriteAndGenerate(cfg *config.Config, dir string) error {
 	return nil
 }
 
-// setupRebuildPrompt asks the user whether to rebuild containers now.
+// setupRebuildPrompt asks the user whether to rebuild and restart containers.
 func setupRebuildPrompt(dir string) error {
+	dc := docker.New(dir)
+	state, _, _ := dc.ContainerStatus()
+	running := state == docker.StateRunning
+
+	title := "Rebuild containers now?"
+	if running {
+		title = "Rebuild and restart containers now?"
+	}
+
 	var rebuild bool
 	if err := huh.NewConfirm().
-		Title("Rebuild containers now?").
+		Title(title).
 		Value(&rebuild).
 		Run(); err != nil {
 		return err
@@ -309,12 +321,17 @@ func setupRebuildPrompt(dir string) error {
 		return nil
 	}
 
-	dc := docker.New(dir)
+	if running {
+		if output.GetLevel() == output.Verbose {
+			return dc.Run("up", "-d", "--build")
+		}
+		_, err := dc.RunQuiet("up", "-d", "--build")
+		return err
+	}
+
 	if output.GetLevel() == output.Verbose {
 		return dc.Run("build")
 	}
-
-	// Normal/quiet: suppress build output via RunQuiet.
 	_, err := dc.RunQuiet("build")
 	return err
 }
