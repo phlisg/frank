@@ -59,12 +59,12 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.schedule": {status: "running", id: "sched-id"},
+					"frank-test-schedule-1": {status: "running", id: "sched-id"},
 				},
 			},
 			want: []PaneSpec{
 				{
-					Name:        "laravel.schedule",
+					Name:        "schedule",
 					Kind:        KindSchedule,
 					ContainerID: "sched-id",
 					State:       StateRunning,
@@ -83,17 +83,17 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.schedule":          {status: "running", id: "s1"},
-					"laravel.queue.default.1":   {status: "running", id: "q1"},
-					"laravel.queue.default.2":   {status: "running", id: "q2"},
-					"laravel.queue.default.3":   {status: "running", id: "q3"},
+					"frank-test-schedule-1":       {status: "running", id: "s1"},
+					"frank-test-queue.default.1-1": {status: "running", id: "q1"},
+					"frank-test-queue.default.2-1": {status: "running", id: "q2"},
+					"frank-test-queue.default.3-1": {status: "running", id: "q3"},
 				},
 			},
 			want: []PaneSpec{
-				{Name: "laravel.schedule", Kind: KindSchedule, ContainerID: "s1", State: StateRunning},
-				{Name: "laravel.queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "q1", State: StateRunning},
-				{Name: "laravel.queue.default.2", Kind: KindQueue, Pool: "default", ContainerID: "q2", State: StateRunning},
-				{Name: "laravel.queue.default.3", Kind: KindQueue, Pool: "default", ContainerID: "q3", State: StateRunning},
+				{Name: "schedule", Kind: KindSchedule, ContainerID: "s1", State: StateRunning},
+				{Name: "queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "q1", State: StateRunning},
+				{Name: "queue.default.2", Kind: KindQueue, Pool: "default", ContainerID: "q2", State: StateRunning},
+				{Name: "queue.default.3", Kind: KindQueue, Pool: "default", ContainerID: "q3", State: StateRunning},
 			},
 		},
 		{
@@ -109,15 +109,15 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.queue.default.1": {status: "running", id: "d1"},
-					"laravel.queue.default.2": {status: "running", id: "d2"},
-					"laravel.queue.emails.1":  {status: "running", id: "e1"},
+					"frank-test-queue.default.1-1": {status: "running", id: "d1"},
+					"frank-test-queue.default.2-1": {status: "running", id: "d2"},
+					"frank-test-queue.emails.1-1":  {status: "running", id: "e1"},
 				},
 			},
 			want: []PaneSpec{
-				{Name: "laravel.queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "d1", State: StateRunning},
-				{Name: "laravel.queue.default.2", Kind: KindQueue, Pool: "default", ContainerID: "d2", State: StateRunning},
-				{Name: "laravel.queue.emails.1", Kind: KindQueue, Pool: "emails", ContainerID: "e1", State: StateRunning},
+				{Name: "queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "d1", State: StateRunning},
+				{Name: "queue.default.2", Kind: KindQueue, Pool: "default", ContainerID: "d2", State: StateRunning},
+				{Name: "queue.emails.1", Kind: KindQueue, Pool: "emails", ContainerID: "e1", State: StateRunning},
 			},
 		},
 		{
@@ -132,15 +132,15 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.schedule":        {status: "running", id: "sched"},
-					"laravel.queue.default.1": {status: "running", id: "q1"},
-					"adhoc-debug":             {status: "running", id: "adhoc1"},
+					"frank-test-schedule-1":        {status: "running", id: "sched"},
+					"frank-test-queue.default.1-1": {status: "running", id: "q1"},
+					"adhoc-debug":                  {status: "running", id: "adhoc1"},
 				},
 				adhoc: []string{"adhoc-debug"},
 			},
 			want: []PaneSpec{
-				{Name: "laravel.schedule", Kind: KindSchedule, ContainerID: "sched", State: StateRunning},
-				{Name: "laravel.queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "q1", State: StateRunning},
+				{Name: "schedule", Kind: KindSchedule, ContainerID: "sched", State: StateRunning},
+				{Name: "queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "q1", State: StateRunning},
 				{Name: "adhoc-debug", Kind: KindAdhoc, ContainerID: "adhoc1", State: StateRunning},
 			},
 		},
@@ -155,13 +155,13 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.queue.default.1": {status: "running", id: "d1"},
+					"frank-test-queue.default.1-1": {status: "running", id: "d1"},
 					// laravel.queue.default.2 missing
 				},
 			},
 			want: []PaneSpec{
-				{Name: "laravel.queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "d1", State: StateRunning},
-				{Name: "laravel.queue.default.2", Kind: KindQueue, Pool: "default", State: StateMissing},
+				{Name: "queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "d1", State: StateRunning},
+				{Name: "queue.default.2", Kind: KindQueue, Pool: "default", State: StateMissing},
 			},
 		},
 		{
@@ -175,11 +175,11 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.queue.default.1": {status: "exited", exitCode: 1, id: "dead1"},
+					"frank-test-queue.default.1-1": {status: "exited", exitCode: 1, id: "dead1"},
 				},
 			},
 			want: []PaneSpec{
-				{Name: "laravel.queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "dead1", State: StateExited, ExitCode: 1},
+				{Name: "queue.default.1", Kind: KindQueue, Pool: "default", ContainerID: "dead1", State: StateExited, ExitCode: 1},
 			},
 		},
 		{
@@ -195,7 +195,7 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"laravel.schedule": {status: "running", id: "s"},
+					"frank-test-schedule-1": {status: "running", id: "s"},
 				},
 				adhocErr: errors.New("docker ps failed"),
 			},

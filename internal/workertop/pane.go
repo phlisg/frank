@@ -359,25 +359,24 @@ func (p *Pane) titleBar() string {
 // shortName compresses declared worker names when the pane is too
 // narrow for the full form:
 //
-//	laravel.queue.<pool>.<i> → laravel.q.<pool[:3]>.<i>
-//	laravel.schedule         → laravel.sched
-//	<adhoc>                  → unchanged (user picks the name)
+//	queue.<pool>.<i> → q.<pool[:3]>.<i>
+//	schedule         → sched
+//	<adhoc>          → unchanged (user picks the name)
 func (p *Pane) shortName() string {
 	switch p.spec.Kind {
 	case KindSchedule:
-		return "laravel.sched"
+		return "sched"
 	case KindQueue:
 		parts := strings.Split(p.spec.Name, ".")
-		// Expect: ["laravel", "queue", pool, index]. Fall back to the
-		// raw name if the shape is unexpected.
-		if len(parts) != 4 || parts[0] != "laravel" || parts[1] != "queue" {
+		// Expect: ["queue", pool, index].
+		if len(parts) != 3 || parts[0] != "queue" {
 			return p.spec.Name
 		}
-		pool := parts[2]
+		pool := parts[1]
 		if len(pool) > 3 {
 			pool = pool[:3]
 		}
-		return fmt.Sprintf("laravel.q.%s.%s", pool, parts[3])
+		return fmt.Sprintf("q.%s.%s", pool, parts[2])
 	default:
 		return p.spec.Name
 	}

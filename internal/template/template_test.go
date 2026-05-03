@@ -276,7 +276,7 @@ func TestRenderWorker_Schedule(t *testing.T) {
 		t.Fatalf("RenderWorker error: %v", err)
 	}
 	checks := []string{
-		"laravel.schedule:",
+		"schedule:",
 		"frank-myapp-laravel.test",
 		"frank.worker.type: schedule",
 		"schedule:work",
@@ -297,7 +297,7 @@ func TestRenderWorker_QueueWithFlags(t *testing.T) {
 	e := newTestEngine(t)
 	out, err := e.RenderWorker("queue", WorkerData{
 		ProjectName: "app",
-		ServiceName: "laravel.queue.high.1",
+		ServiceName: "queue.high.1",
 		PoolName:    "high",
 		QueuesCSV:   "high,critical",
 		Tries:       3,
@@ -307,7 +307,7 @@ func TestRenderWorker_QueueWithFlags(t *testing.T) {
 		t.Fatalf("RenderWorker error: %v", err)
 	}
 	checks := []string{
-		"laravel.queue.high.1:",
+		"queue.high.1:",
 		"frank.worker.pool: \"high\"",
 		"--queue=high,critical",
 		"--tries=3",

@@ -4,153 +4,6 @@ networks:
     frank:
         driver: bridge
 services:
-    laravel.migrate:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - /bin/bash
-            - -lc
-            - |
-              set -e
-              if [ ! -d vendor ]; then
-                echo "[frank.migrate] composer install"
-                composer install --no-interaction --prefer-dist --no-progress
-              fi
-              echo "[frank.migrate] artisan migrate --force"
-              php artisan migrate --force
-        container_name: laravel.migrate
-        depends_on:
-            mysql:
-                condition: service_healthy
-            redis:
-                condition: service_healthy
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-fpm-mysql-redis-workers-laravel.test
-        labels:
-            frank.init: migrate
-            frank.project: fpm-mysql-redis-workers
-        networks:
-            - frank
-        restart: "no"
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.queue.default.1:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - queue:work
-            - --queue=default
-        container_name: laravel.queue.default.1
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-fpm-mysql-redis-workers-laravel.test
-        labels:
-            frank.project: fpm-mysql-redis-workers
-            frank.worker: declared
-            frank.worker.pool: default
-            frank.worker.type: queue
-        networks:
-            - frank
-        restart: unless-stopped
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.queue.default.2:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - queue:work
-            - --queue=default
-        container_name: laravel.queue.default.2
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-fpm-mysql-redis-workers-laravel.test
-        labels:
-            frank.project: fpm-mysql-redis-workers
-            frank.worker: declared
-            frank.worker.pool: default
-            frank.worker.type: queue
-        networks:
-            - frank
-        restart: unless-stopped
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.queue.high.1:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - queue:work
-            - --queue=high
-        container_name: laravel.queue.high.1
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-fpm-mysql-redis-workers-laravel.test
-        labels:
-            frank.project: fpm-mysql-redis-workers
-            frank.worker: declared
-            frank.worker.pool: high
-            frank.worker.type: queue
-        networks:
-            - frank
-        restart: unless-stopped
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
     laravel.test:
         build:
             args:
@@ -176,6 +29,44 @@ services:
             - 5173:5173
         stdin_open: true
         tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    migrate:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - /bin/bash
+            - -lc
+            - |
+              set -e
+              if [ ! -d vendor ]; then
+                echo "[frank.migrate] composer install"
+                composer install --no-interaction --prefer-dist --no-progress
+              fi
+              echo "[frank.migrate] artisan migrate --force"
+              php artisan migrate --force
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-fpm-mysql-redis-workers-laravel.test
+        labels:
+            frank.init: migrate
+            frank.project: fpm-mysql-redis-workers
+        networks:
+            - frank
+        restart: "no"
         volumes:
             - .:/var/www/html
         working_dir: /var/www/html
@@ -220,6 +111,111 @@ services:
         volumes:
             - .:/var/www/html
             - .frank/certs/:/etc/certs/:ro
+    queue.default.1:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - queue:work
+            - --queue=default
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-fpm-mysql-redis-workers-laravel.test
+        labels:
+            frank.project: fpm-mysql-redis-workers
+            frank.worker: declared
+            frank.worker.pool: default
+            frank.worker.type: queue
+        networks:
+            - frank
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    queue.default.2:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - queue:work
+            - --queue=default
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-fpm-mysql-redis-workers-laravel.test
+        labels:
+            frank.project: fpm-mysql-redis-workers
+            frank.worker: declared
+            frank.worker.pool: default
+            frank.worker.type: queue
+        networks:
+            - frank
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    queue.high.1:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - queue:work
+            - --queue=high
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-fpm-mysql-redis-workers-laravel.test
+        labels:
+            frank.project: fpm-mysql-redis-workers
+            frank.worker: declared
+            frank.worker.pool: high
+            frank.worker.type: queue
+        networks:
+            - frank
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
     redis:
         healthcheck:
             interval: 1s

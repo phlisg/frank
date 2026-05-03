@@ -87,10 +87,10 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 
 	if cfg.Workers.Schedule {
 		spec := PaneSpec{
-			Name: "laravel.schedule",
+			Name: "schedule",
 			Kind: KindSchedule,
 		}
-		if err := resolveState(d, &spec); err != nil {
+		if err := resolveState(d, containerName(projectName, spec.Name), &spec); err != nil {
 			return nil, err
 		}
 		specs = append(specs, spec)
@@ -99,11 +99,11 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 	for _, pool := range cfg.Workers.Queue {
 		for i := 1; i <= pool.Count; i++ {
 			spec := PaneSpec{
-				Name: fmt.Sprintf("laravel.queue.%s.%d", pool.Name, i),
+				Name: fmt.Sprintf("queue.%s.%d", pool.Name, i),
 				Kind: KindQueue,
 				Pool: pool.Name,
 			}
-			if err := resolveState(d, &spec); err != nil {
+			if err := resolveState(d, containerName(projectName, spec.Name), &spec); err != nil {
 				return nil, err
 			}
 			specs = append(specs, spec)
@@ -119,7 +119,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 			Name: name,
 			Kind: KindAdhoc,
 		}
-		if err := resolveState(d, &spec); err != nil {
+		if err := resolveState(d, name, &spec); err != nil {
 			return nil, err
 		}
 		specs = append(specs, spec)
@@ -128,12 +128,18 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 	return specs, nil
 }
 
-// resolveState inspects the container named spec.Name and fills in
+// containerName derives the compose auto-generated container name
+// from the project name and service name: <project>-<service>-1.
+func containerName(project, service string) string {
+	return fmt.Sprintf("%s-%s-1", project, service)
+}
+
+// resolveState inspects the given container name and fills in
 // ContainerID, State, and (when exited) ExitCode on spec.
-func resolveState(d containerInspector, spec *PaneSpec) error {
-	status, exitCode, id, err := d.InspectContainer(spec.Name)
+func resolveState(d containerInspector, name string, spec *PaneSpec) error {
+	status, exitCode, id, err := d.InspectContainer(name)
 	if err != nil {
-		return fmt.Errorf("inspect %s: %w", spec.Name, err)
+		return fmt.Errorf("inspect %s: %w", name, err)
 	}
 	spec.ContainerID = id
 	switch status {

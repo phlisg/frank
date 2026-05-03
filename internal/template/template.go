@@ -31,7 +31,7 @@ type Data struct {
 type WorkerData struct {
 	ProjectName string
 	// ServiceName is the full compose service key for a queue worker,
-	// e.g. "laravel.queue.default.1". Unused by the schedule fragment.
+	// e.g. "queue.default.1". Unused by the schedule fragment.
 	ServiceName string
 	// PoolName is the queue pool identifier (label frank.worker.pool).
 	PoolName string

@@ -33,7 +33,7 @@ var watchCmd = &cobra.Command{
 	Long: `Runs the host-side file watcher in the foreground. Edits under app/,
 bootstrap/, config/, database/, lang/, resources/views/, routes/, .env,
 or composer.lock trigger 'php artisan queue:restart' and (when
-workers.schedule is enabled) a compose restart of laravel.schedule.
+workers.schedule is enabled) a compose restart of the schedule service.
 
 Default invocation errors if another watcher is already running — use
 --stop to SIGTERM the detached one first, or --status to inspect it.`,

@@ -129,13 +129,13 @@ func buildQueueArtisanArgs(queue string, tries, timeout, memory, sleep, backoff 
 // adhocQueueName returns the ad-hoc queue worker container name for index i
 // (1-based) at the given epoch.
 func adhocQueueName(epoch int64, i int) string {
-	return fmt.Sprintf("laravel.queue.adhoc.%d.%d", epoch, i)
+	return fmt.Sprintf("queue.adhoc.%d.%d", epoch, i)
 }
 
 // adhocScheduleName returns the ad-hoc schedule container name at the given
 // epoch.
 func adhocScheduleName(epoch int64) string {
-	return fmt.Sprintf("laravel.schedule.adhoc.%d", epoch)
+	return fmt.Sprintf("schedule.adhoc.%d", epoch)
 }
 
 func runWorkerQueue(cmd *cobra.Command, args []string) error {
@@ -294,16 +294,16 @@ func runWorkerStop(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Declared workers: stopped via compose (managed services). Collect names
-	// and hand them to `docker compose stop`.
-	declaredOut, err := client.ListContainers(projectName, "declared", "{{.Names}}")
+	// Declared workers: stopped via compose (managed services). Collect service
+	// names and hand them to `docker compose stop`.
+	declaredOut, err := client.ListContainers(projectName, "declared", "{{.Label \"com.docker.compose.service\"}}")
 	if err != nil {
 		return nil
 	}
 	var declaredNames []string
 	for _, line := range strings.Split(strings.TrimSpace(declaredOut), "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" && line != "laravel.test" {
+		if line != "" {
 			declaredNames = append(declaredNames, line)
 		}
 	}
@@ -358,10 +358,11 @@ func runWorkerLogs(cmd *cobra.Command, args []string) error {
 }
 
 // listWorkerNames partitions the project's worker containers into declared
-// (managed by compose) and ad-hoc (started via `compose run -d`). Both
-// lists preserve docker's output order so the UX is predictable.
+// (managed by compose) and ad-hoc (started via `compose run -d`). Declared
+// workers return compose service names (for `docker compose logs`); ad-hoc
+// workers return container names (for `docker logs`).
 func listWorkerNames(client *docker.Client, projectName string) (declared, adhoc []string, err error) {
-	out, err := client.ListContainers(projectName, "", "{{.Names}}\t{{.Label \"frank.worker\"}}")
+	out, err := client.ListContainers(projectName, "", "{{.Names}}\t{{.Label \"frank.worker\"}}\t{{.Label \"com.docker.compose.service\"}}")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -369,29 +370,37 @@ func listWorkerNames(client *docker.Client, projectName string) (declared, adhoc
 	return declared, adhoc, nil
 }
 
-// parseWorkerList splits docker ps output (one "<name>\t<frank.worker>"
-// line per container) into declared and ad-hoc names. Lines without a
-// label kind default to declared so containers predating the label scheme
-// stay addressable; ad-hoc classification requires an explicit "adhoc".
+// parseWorkerList splits docker ps output (one
+// "<name>\t<frank.worker>\t<com.docker.compose.service>" line per container)
+// into declared and ad-hoc names. Declared workers return the compose service
+// name (third column); ad-hoc workers return the container name (first column).
 func parseWorkerList(out string) (declared, adhoc []string) {
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "\t", 2)
+		parts := strings.SplitN(line, "\t", 3)
 		name := strings.TrimSpace(parts[0])
 		if name == "" {
 			continue
 		}
 		kind := ""
-		if len(parts) == 2 {
+		if len(parts) >= 2 {
 			kind = strings.TrimSpace(parts[1])
 		}
 		if kind == "adhoc" {
 			adhoc = append(adhoc, name)
 		} else {
-			declared = append(declared, name)
+			svc := ""
+			if len(parts) >= 3 {
+				svc = strings.TrimSpace(parts[2])
+			}
+			if svc != "" {
+				declared = append(declared, svc)
+			} else {
+				declared = append(declared, name)
+			}
 		}
 	}
 	return declared, adhoc

@@ -131,7 +131,7 @@ func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
 }
 
 // serviceDepends returns the depends_on map for laravel.test and the
-// laravel.migrate helper, keyed by db/cache/queue service name with the right
+// migrate helper, keyed by db/cache/queue service name with the right
 // condition (service_healthy when the service ships a healthcheck, otherwise
 // service_started). sqlite has no compose service and is skipped.
 func serviceDepends(cfg *config.Config) map[string]interface{} {
@@ -154,7 +154,7 @@ func serviceDepends(cfg *config.Config) map[string]interface{} {
 // `user: sail` on every declared worker so CLI commands drop root before
 // touching the bind mount (php-fpm's in-pool user drop doesn't apply to CLI).
 //
-// A one-shot laravel.migrate service is emitted alongside the workers: it
+// A one-shot migrate service is emitted alongside the workers: it
 // runs composer install (when vendor/ is missing) and php artisan migrate
 // --force, then exits. Workers depend on its service_completed_successfully
 // so queue:work does not boot before the Laravel cache/jobs tables exist —
@@ -176,7 +176,7 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 	// docker.io and fail.
 	laravelBuild := laravelTestBuild(services)
 
-	// Emit the one-shot laravel.migrate initializer.
+	// Emit the one-shot migrate initializer.
 	initFrag, err := g.engine.RenderWorker("init", template.WorkerData{
 		ProjectName: projectName,
 	})
@@ -186,9 +186,9 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 	if err := mergeFragment(services, initFrag); err != nil {
 		return fmt.Errorf("merge init fragment: %w", err)
 	}
-	injectBuild(services, "laravel.migrate", laravelBuild)
+	injectBuild(services, "migrate", laravelBuild)
 	if migrateDeps := serviceDepends(cfg); len(migrateDeps) > 0 {
-		if svc, ok := services["laravel.migrate"].(map[string]interface{}); ok {
+		if svc, ok := services["migrate"].(map[string]interface{}); ok {
 			svc["depends_on"] = migrateDeps
 		}
 	}
@@ -202,13 +202,13 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 		if err := mergeFragment(services, frag); err != nil {
 			return fmt.Errorf("merge schedule worker fragment: %w", err)
 		}
-		injectBuild(services, "laravel.schedule", laravelBuild)
+		injectBuild(services, "schedule", laravelBuild)
 	}
 
 	for _, pool := range w.Queue {
 		queuesCSV := strings.Join(pool.Queues, ",")
 		for i := 1; i <= pool.Count; i++ {
-			name := fmt.Sprintf("laravel.queue.%s.%d", pool.Name, i)
+			name := fmt.Sprintf("queue.%s.%d", pool.Name, i)
 			frag, err := g.engine.RenderWorker("queue", template.WorkerData{
 				ProjectName: projectName,
 				ServiceName: name,

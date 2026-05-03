@@ -1,5 +1,4 @@
-laravel.migrate:
-  container_name: laravel.migrate
+migrate:
   image: "frank-{{.ProjectName}}-laravel.test"
   volumes:
     - .:/var/www/html

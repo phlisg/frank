@@ -39,7 +39,7 @@ func (d *dockerRunner) Trigger(ctx context.Context, kind TriggerKind) error {
 	case TriggerQueueRestart:
 		args = append(prefix, "exec", "-T", "laravel.test", "php", "artisan", "queue:restart")
 	case TriggerScheduleRestart:
-		args = append(prefix, "restart", "laravel.schedule")
+		args = append(prefix, "restart", "schedule")
 	default:
 		return fmt.Errorf("watch: unknown trigger kind %d", kind)
 	}
