@@ -142,7 +142,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		printNewNextSteps(projectName, !flagNoUp)
+		printNewNextSteps(projectName, !flagNoUp, cfg)
 		return nil
 	}
 
@@ -268,7 +268,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 
 	// 9. NextSteps
-	printNewNextSteps(projectName, !flagNoUp)
+	printNewNextSteps(projectName, !flagNoUp, cfg)
 	return nil
 }
 
@@ -313,10 +313,18 @@ func runNewUp(dir string, cfg *config.Config) error {
 }
 
 // printNewNextSteps prints the final NextSteps block for frank new.
-func printNewNextSteps(projectName string, containersStarted bool) {
+func printNewNextSteps(projectName string, containersStarted bool, cfg *config.Config) {
 	steps := []string{fmt.Sprintf("cd %s", projectName)}
 	if containersStarted {
-		steps = append(steps, "http://localhost")
+		scheme := "http"
+		if cfg.Server.IsHTTPS() {
+			scheme = "https"
+		}
+		port := ""
+		if cfg.Server.Port != 0 {
+			port = fmt.Sprintf(":%d", cfg.Server.Port)
+		}
+		steps = append(steps, fmt.Sprintf("%s://localhost%s", scheme, port))
 	} else {
 		steps = append(steps, "frank up -d")
 	}
