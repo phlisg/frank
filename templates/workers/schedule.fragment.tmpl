@@ -1,11 +1,10 @@
-laravel.schedule:
-  container_name: laravel.schedule
+schedule:
   tty: true
   image: "frank-{{.ProjectName}}-laravel.test"
   depends_on:
     laravel.test:
       condition: service_started
-    laravel.migrate:
+    migrate:
       condition: service_completed_successfully
   volumes:
     - .:/var/www/html

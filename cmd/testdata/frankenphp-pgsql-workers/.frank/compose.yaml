@@ -4,152 +4,6 @@ networks:
     frank:
         driver: bridge
 services:
-    laravel.migrate:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - /bin/bash
-            - -lc
-            - |
-              set -e
-              if [ ! -d vendor ]; then
-                echo "[frank.migrate] composer install"
-                composer install --no-interaction --prefer-dist --no-progress
-              fi
-              echo "[frank.migrate] artisan migrate --force"
-              php artisan migrate --force
-        container_name: laravel.migrate
-        depends_on:
-            mailpit:
-                condition: service_healthy
-            pgsql:
-                condition: service_healthy
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-frankenphp-pgsql-workers-laravel.test
-        labels:
-            frank.init: migrate
-            frank.project: frankenphp-pgsql-workers
-        networks:
-            - frank
-        restart: "no"
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.queue.default.1:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - queue:work
-            - --queue=default
-        container_name: laravel.queue.default.1
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-frankenphp-pgsql-workers-laravel.test
-        labels:
-            frank.project: frankenphp-pgsql-workers
-            frank.worker: declared
-            frank.worker.pool: default
-            frank.worker.type: queue
-        networks:
-            - frank
-        restart: unless-stopped
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.queue.default.2:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - queue:work
-            - --queue=default
-        container_name: laravel.queue.default.2
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-frankenphp-pgsql-workers-laravel.test
-        labels:
-            frank.project: frankenphp-pgsql-workers
-            frank.worker: declared
-            frank.worker.pool: default
-            frank.worker.type: queue
-        networks:
-            - frank
-        restart: unless-stopped
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
-    laravel.schedule:
-        build:
-            args:
-                WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
-        command:
-            - php
-            - artisan
-            - schedule:work
-        container_name: laravel.schedule
-        depends_on:
-            laravel.migrate:
-                condition: service_completed_successfully
-            laravel.test:
-                condition: service_started
-        env_file:
-            - .env
-        environment:
-            - WWWUSER=${UID:-1000}
-        healthcheck:
-            disable: true
-        image: frank-frankenphp-pgsql-workers-laravel.test
-        labels:
-            frank.project: frankenphp-pgsql-workers
-            frank.worker: declared
-            frank.worker.type: schedule
-        networks:
-            - frank
-        restart: unless-stopped
-        stop_signal: SIGKILL
-        tty: true
-        volumes:
-            - .:/var/www/html
-        working_dir: /var/www/html
     laravel.test:
         build:
             args:
@@ -200,6 +54,44 @@ services:
         ports:
             - 1025:1025
             - 8025:8025
+    migrate:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - /bin/bash
+            - -lc
+            - |
+              set -e
+              if [ ! -d vendor ]; then
+                echo "[frank.migrate] composer install"
+                composer install --no-interaction --prefer-dist --no-progress
+              fi
+              echo "[frank.migrate] artisan migrate --force"
+              php artisan migrate --force
+        depends_on:
+            mailpit:
+                condition: service_healthy
+            pgsql:
+                condition: service_healthy
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-frankenphp-pgsql-workers-laravel.test
+        labels:
+            frank.init: migrate
+            frank.project: frankenphp-pgsql-workers
+        networks:
+            - frank
+        restart: "no"
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
     pgsql:
         environment:
             POSTGRES_DB: ${DB_DATABASE}
@@ -221,6 +113,110 @@ services:
         volumes:
             - pgsql_data:/var/lib/postgresql/data
             - .frank/scripts/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql
+    queue.default.1:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - queue:work
+            - --queue=default
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-frankenphp-pgsql-workers-laravel.test
+        labels:
+            frank.project: frankenphp-pgsql-workers
+            frank.worker: declared
+            frank.worker.pool: default
+            frank.worker.type: queue
+        networks:
+            - frank
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    queue.default.2:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - queue:work
+            - --queue=default
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-frankenphp-pgsql-workers-laravel.test
+        labels:
+            frank.project: frankenphp-pgsql-workers
+            frank.worker: declared
+            frank.worker.pool: default
+            frank.worker.type: queue
+        networks:
+            - frank
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    schedule:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - php
+            - artisan
+            - schedule:work
+        depends_on:
+            laravel.test:
+                condition: service_started
+            migrate:
+                condition: service_completed_successfully
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+        healthcheck:
+            disable: true
+        image: frank-frankenphp-pgsql-workers-laravel.test
+        labels:
+            frank.project: frankenphp-pgsql-workers
+            frank.worker: declared
+            frank.worker.type: schedule
+        networks:
+            - frank
+        restart: unless-stopped
+        stop_signal: SIGKILL
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
 volumes:
     pgsql_data:
         driver: local

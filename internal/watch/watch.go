@@ -7,7 +7,7 @@
 // filters events against a baseline ignore set unioned with the project
 // .gitignore, debounces bursts, and dispatches two triggers per window:
 // `php artisan queue:restart` inside the laravel.test container and
-// `docker compose restart laravel.schedule` for the scheduler.
+// `docker compose restart schedule` for the scheduler.
 //
 // This file declares the exported surface only. Follow-up tasks own the
 // concrete logic:
@@ -36,7 +36,7 @@ type Config struct {
 	ProjectRoot string
 
 	// ScheduleEnabled mirrors workers.schedule from frank.yaml. When false,
-	// the dispatcher skips `docker compose restart laravel.schedule` (spec
+	// the dispatcher skips `docker compose restart schedule` (spec
 	// "Trigger dispatch").
 	ScheduleEnabled bool
 
@@ -96,7 +96,7 @@ const (
 	// laravel.test.
 	TriggerQueueRestart TriggerKind = iota
 
-	// TriggerScheduleRestart runs `docker compose restart laravel.schedule`.
+	// TriggerScheduleRestart runs `docker compose restart schedule`.
 	TriggerScheduleRestart
 )
 

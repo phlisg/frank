@@ -207,10 +207,10 @@ func TestGenerate_NoWorkers_Unchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
-	if strings.Contains(out, "laravel.schedule") {
+	if strings.Contains(out, "\n    schedule:\n") {
 		t.Error("no schedule worker expected when Workers.Schedule == false")
 	}
-	if strings.Contains(out, "laravel.queue.") {
+	if strings.Contains(out, "queue.") {
 		t.Error("no queue workers expected when Workers.Queue is empty")
 	}
 }
@@ -228,7 +228,7 @@ func TestGenerate_ScheduleOnly(t *testing.T) {
 		t.Fatalf("Generate error: %v", err)
 	}
 	checks := []string{
-		"laravel.schedule:",
+		"\n    schedule:\n",
 		"frank-myapp-laravel.test",
 		"frank.worker: declared",
 		"frank.worker.type: schedule",
@@ -240,7 +240,7 @@ func TestGenerate_ScheduleOnly(t *testing.T) {
 			t.Errorf("expected %q in output:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "laravel.queue.") {
+	if strings.Contains(out, "queue.") {
 		t.Error("unexpected queue worker when only schedule enabled")
 	}
 }
@@ -261,12 +261,12 @@ func TestGenerate_QueuePoolCountThree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
-	for _, name := range []string{"laravel.queue.default.1:", "laravel.queue.default.2:", "laravel.queue.default.3:"} {
+	for _, name := range []string{"queue.default.1:", "queue.default.2:", "queue.default.3:"} {
 		if !strings.Contains(out, name) {
 			t.Errorf("expected %q in output:\n%s", name, out)
 		}
 	}
-	if strings.Contains(out, "laravel.queue.default.4") {
+	if strings.Contains(out, "queue.default.4") {
 		t.Error("unexpected 4th queue worker for count=3")
 	}
 	if !strings.Contains(out, "frank.worker.pool: default") {
@@ -295,18 +295,18 @@ func TestGenerate_MultiplePoolsNamed(t *testing.T) {
 		t.Fatalf("Generate error: %v", err)
 	}
 	for _, name := range []string{
-		"laravel.queue.high.1:",
-		"laravel.queue.high.2:",
-		"laravel.queue.default.1:",
+		"queue.high.1:",
+		"queue.high.2:",
+		"queue.default.1:",
 	} {
 		if !strings.Contains(out, name) {
 			t.Errorf("expected %q in output:\n%s", name, out)
 		}
 	}
-	if strings.Contains(out, "laravel.queue.high.3") {
+	if strings.Contains(out, "queue.high.3") {
 		t.Error("unexpected 3rd high worker for count=2")
 	}
-	if strings.Contains(out, "laravel.queue.default.2") {
+	if strings.Contains(out, "queue.default.2") {
 		t.Error("unexpected 2nd default worker for count=1")
 	}
 	if !strings.Contains(out, "--queue=high,critical") {

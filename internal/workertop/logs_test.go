@@ -77,13 +77,13 @@ type emptyReader struct{}
 func (emptyReader) Read(p []byte) (int, error) { return 0, io.EOF }
 
 func TestLogsReader_Declared(t *testing.T) {
-	spec := PaneSpec{Kind: KindQueue, Name: "laravel.queue.default.1"}
+	spec := PaneSpec{Kind: KindQueue, Name: "queue.default.1"}
 
 	// argv assertion
 	argv := argvFor(t, spec)
 	want := []string{
 		"docker", "compose", "--project-directory", ".", "-f", ".frank/compose.yaml",
-		"logs", "-f", "--no-log-prefix", "--tail", "25", "laravel.queue.default.1",
+		"logs", "-f", "--no-log-prefix", "--tail", "25", "queue.default.1",
 	}
 	if !reflect.DeepEqual(argv, want) {
 		t.Fatalf("declared argv mismatch:\n got: %q\nwant: %q", argv, want)
@@ -124,9 +124,9 @@ loop:
 	}
 
 	wantLines := []LogLine{
-		{PaneID: "laravel.queue.default.1", Line: "first"},
-		{PaneID: "laravel.queue.default.1", Line: "second"},
-		{PaneID: "laravel.queue.default.1", Line: "third"},
+		{PaneID: "queue.default.1", Line: "first"},
+		{PaneID: "queue.default.1", Line: "second"},
+		{PaneID: "queue.default.1", Line: "third"},
 	}
 	if !reflect.DeepEqual(got, wantLines) {
 		t.Fatalf("log lines mismatch:\n got: %+v\nwant: %+v", got, wantLines)
@@ -140,10 +140,10 @@ loop:
 }
 
 func TestLogsReader_Adhoc(t *testing.T) {
-	spec := PaneSpec{Kind: KindAdhoc, Name: "laravel.queue.default.1.adhoc"}
+	spec := PaneSpec{Kind: KindAdhoc, Name: "queue.default.1.adhoc"}
 
 	argv := argvFor(t, spec)
-	want := []string{"docker", "logs", "-f", "--tail", "25", "laravel.queue.default.1.adhoc"}
+	want := []string{"docker", "logs", "-f", "--tail", "25", "queue.default.1.adhoc"}
 	if !reflect.DeepEqual(argv, want) {
 		t.Fatalf("adhoc argv mismatch:\n got: %q\nwant: %q", argv, want)
 	}
@@ -178,9 +178,9 @@ loop:
 	}
 
 	wantLines := []LogLine{
-		{PaneID: "laravel.queue.default.1.adhoc", Line: "a"},
-		{PaneID: "laravel.queue.default.1.adhoc", Line: "b"},
-		{PaneID: "laravel.queue.default.1.adhoc", Line: "c"},
+		{PaneID: "queue.default.1.adhoc", Line: "a"},
+		{PaneID: "queue.default.1.adhoc", Line: "b"},
+		{PaneID: "queue.default.1.adhoc", Line: "c"},
 	}
 	if !reflect.DeepEqual(got, wantLines) {
 		t.Fatalf("log lines mismatch:\n got: %+v\nwant: %+v", got, wantLines)
@@ -194,7 +194,7 @@ loop:
 }
 
 func TestLogsReader_Cancel(t *testing.T) {
-	spec := PaneSpec{Kind: KindQueue, Name: "laravel.queue.default.1"}
+	spec := PaneSpec{Kind: KindQueue, Name: "queue.default.1"}
 
 	pr, pw := io.Pipe()
 	f := &fakeExec{stdout: pr, waitSignal: make(chan struct{})}
@@ -254,7 +254,7 @@ drained:
 }
 
 func TestLogsReader_StartError(t *testing.T) {
-	spec := PaneSpec{Kind: KindQueue, Name: "laravel.queue.default.1"}
+	spec := PaneSpec{Kind: KindQueue, Name: "queue.default.1"}
 
 	f := &fakeExec{startErr: errors.New("boom")}
 	r := NewLogsReader(spec, f.fn)
@@ -281,7 +281,7 @@ func TestLogsReader_StartError(t *testing.T) {
 }
 
 func TestLogsReader_EOF(t *testing.T) {
-	spec := PaneSpec{Kind: KindQueue, Name: "laravel.queue.default.1"}
+	spec := PaneSpec{Kind: KindQueue, Name: "queue.default.1"}
 
 	pr, pw := io.Pipe()
 	f := &fakeExec{stdout: pr, waitSignal: make(chan struct{})}

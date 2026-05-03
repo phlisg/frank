@@ -7,7 +7,7 @@ import (
 
 func TestIsRestartNoise(t *testing.T) {
 	noisy := []string{
-		"laravel.queue.default.1 exited with code 0 (restarting)",
+		"queue.default.1 exited with code 0 (restarting)",
 		"usermod: no changes",
 		"usermod: no change",
 	}
@@ -30,12 +30,12 @@ func TestIsRestartNoise(t *testing.T) {
 }
 
 func TestAppendLine_CollapsesRestartNoise(t *testing.T) {
-	p := NewPane(PaneSpec{Name: "laravel.queue.default.1", Kind: KindQueue})
+	p := NewPane(PaneSpec{Name: "queue.default.1", Kind: KindQueue})
 	p.viewport.Width = 80
 	p.viewport.Height = 20
 
 	p.appendLine("INFO Processing job...")
-	p.appendLine("laravel.queue.default.1 exited with code 0 (restarting)")
+	p.appendLine("queue.default.1 exited with code 0 (restarting)")
 	p.appendLine("usermod: no changes")
 	p.appendLine("INFO Back to work")
 
@@ -49,7 +49,7 @@ func TestAppendLine_CollapsesRestartNoise(t *testing.T) {
 }
 
 func TestSearch_FiltersBufferLines(t *testing.T) {
-	p := NewPane(PaneSpec{Name: "laravel.queue.default.1", Kind: KindQueue})
+	p := NewPane(PaneSpec{Name: "queue.default.1", Kind: KindQueue})
 	p.viewport.Width = 80
 	p.viewport.Height = 20
 
@@ -91,7 +91,7 @@ func TestSearch_FiltersBufferLines(t *testing.T) {
 }
 
 func TestPause_FreezesScrollAndUnpauseCatchesUp(t *testing.T) {
-	p := NewPane(PaneSpec{Name: "laravel.queue.default.1", Kind: KindQueue})
+	p := NewPane(PaneSpec{Name: "queue.default.1", Kind: KindQueue})
 	p.viewport.Width = 80
 	p.viewport.Height = 5
 

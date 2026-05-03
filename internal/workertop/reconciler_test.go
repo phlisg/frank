@@ -215,7 +215,7 @@ func TestReconciler_Preexisting(t *testing.T) {
 	initial := []PaneSpec{
 		{Name: "A", Kind: KindAdhoc, ContainerID: "id-a", State: StateRunning},
 		// Non-adhoc entries must be ignored by seeding.
-		{Name: "laravel.schedule", Kind: KindSchedule},
+		{Name: "schedule", Kind: KindSchedule},
 	}
 	lister := &fakeLister{
 		ticks: []fakeTick{

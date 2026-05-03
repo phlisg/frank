@@ -7,7 +7,7 @@ import (
 
 func TestAdhocQueueName(t *testing.T) {
 	name := adhocQueueName(1700000000, 3)
-	want := "laravel.queue.adhoc.1700000000.3"
+	want := "queue.adhoc.1700000000.3"
 	if name != want {
 		t.Errorf("adhocQueueName = %q, want %q", name, want)
 	}
@@ -15,7 +15,7 @@ func TestAdhocQueueName(t *testing.T) {
 
 func TestAdhocScheduleName(t *testing.T) {
 	name := adhocScheduleName(1700000000)
-	want := "laravel.schedule.adhoc.1700000000"
+	want := "schedule.adhoc.1700000000"
 	if name != want {
 		t.Errorf("adhocScheduleName = %q, want %q", name, want)
 	}
@@ -23,17 +23,17 @@ func TestAdhocScheduleName(t *testing.T) {
 
 func TestParseWorkerList_PartitionsByLabel(t *testing.T) {
 	in := strings.Join([]string{
-		"laravel.queue.default.1\tdeclared",
-		"laravel.queue.default.2\tdeclared",
-		"laravel.schedule\tdeclared",
-		"laravel.queue.adhoc.1700000000.1\tadhoc",
-		"laravel.schedule.adhoc.1700000000\tadhoc",
+		"myapp-queue.default.1-1\tdeclared\tqueue.default.1",
+		"myapp-queue.default.2-1\tdeclared\tqueue.default.2",
+		"myapp-schedule-1\tdeclared\tschedule",
+		"queue.adhoc.1700000000.1\tadhoc\t",
+		"schedule.adhoc.1700000000\tadhoc\t",
 	}, "\n")
 
 	declared, adhoc := parseWorkerList(in)
 
-	wantDeclared := []string{"laravel.queue.default.1", "laravel.queue.default.2", "laravel.schedule"}
-	wantAdhoc := []string{"laravel.queue.adhoc.1700000000.1", "laravel.schedule.adhoc.1700000000"}
+	wantDeclared := []string{"queue.default.1", "queue.default.2", "schedule"}
+	wantAdhoc := []string{"queue.adhoc.1700000000.1", "schedule.adhoc.1700000000"}
 
 	if !equalSlice(declared, wantDeclared) {
 		t.Errorf("declared = %v, want %v", declared, wantDeclared)
@@ -56,13 +56,13 @@ func TestParseWorkerList_EmptyAndBlankLines(t *testing.T) {
 }
 
 func TestParseWorkerList_MissingKindDefaultsDeclared(t *testing.T) {
-	in := "legacy.worker.name\t"
+	in := "legacy-worker-1\t\tlegacy.worker"
 	declared, adhoc := parseWorkerList(in)
 	if len(adhoc) != 0 {
 		t.Errorf("empty kind should not classify as adhoc: %v", adhoc)
 	}
-	if len(declared) != 1 || declared[0] != "legacy.worker.name" {
-		t.Errorf("declared = %v, want [legacy.worker.name]", declared)
+	if len(declared) != 1 || declared[0] != "legacy.worker" {
+		t.Errorf("declared = %v, want [legacy.worker]", declared)
 	}
 }
 
