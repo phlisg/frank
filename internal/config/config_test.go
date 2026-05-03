@@ -420,6 +420,93 @@ node:
 	}
 }
 
+func TestServerDefaults(t *testing.T) {
+	cfg := New()
+	if !cfg.Server.IsHTTPS() {
+		t.Error("Server.IsHTTPS() should default to true")
+	}
+	if got := cfg.Server.EffectivePort(); got != 443 {
+		t.Errorf("Server.EffectivePort() = %d, want 443", got)
+	}
+}
+
+func TestServerHTTPSExplicitFalse(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+server:
+  https: false
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if cfg.Server.IsHTTPS() {
+		t.Error("Server.IsHTTPS() should be false when explicitly set")
+	}
+	if got := cfg.Server.EffectivePort(); got != 80 {
+		t.Errorf("Server.EffectivePort() = %d, want 80", got)
+	}
+}
+
+func TestServerHTTPSWithCustomPort(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+server:
+  https: true
+  port: 4433
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if !cfg.Server.IsHTTPS() {
+		t.Error("Server.IsHTTPS() should be true")
+	}
+	if got := cfg.Server.EffectivePort(); got != 4433 {
+		t.Errorf("Server.EffectivePort() = %d, want 4433", got)
+	}
+}
+
+func TestServerPortValidation(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+server:
+  port: 99999
+`)
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error for invalid port 99999")
+	}
+}
+
+func TestServerUnknownKeyWarning(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+server:
+  https: true
+  futureThing: yes
+`)
+	r, w, _ := os.Pipe()
+	oldStderr := os.Stderr
+	os.Stderr = w
+	_, err := Load(dir)
+	w.Close()
+	os.Stderr = oldStderr
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	out := string(buf[:n])
+	if !containsAll(out, "futureThing") {
+		t.Errorf("expected warning for unknown server key, got: %q", out)
+	}
+}
+
 func TestHasService(t *testing.T) {
 	cfg := &Config{Services: []string{"pgsql", "mailpit"}}
 	if !cfg.HasService("pgsql") {

@@ -4,11 +4,16 @@
     order php_server before file_server
 }
 
-:80, :443 {
+
+:80 {
+    redir https://{host}{uri} permanent
+}
+
+
+:443 {
+    tls /etc/certs/localhost.pem /etc/certs/localhost-key.pem
     root * /var/www/html/public
-
     php_server
-
     try_files {path} {path}/ /index.php?{query}
 
     header {
@@ -29,3 +34,4 @@
         format console
     }
 }
+

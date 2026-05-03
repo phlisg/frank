@@ -3,3 +3,10 @@ pre-commit:
   commands:
     go-test:
       run: go test ./...
+
+    vulnerabilities:
+      run: go tool govulncheck ./...
+    
+    vet:
+      run: go vet ./...
+      

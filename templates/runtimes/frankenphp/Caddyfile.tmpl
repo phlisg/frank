@@ -3,12 +3,17 @@
     frankenphp
     order php_server before file_server
 }
+{{if .HTTPS}}
+{{if not .CustomPort}}
+:80 {
+    redir https://{host}{uri} permanent
+}
+{{end}}
 
-:80, :443 {
+:443 {
+    tls /etc/certs/localhost.pem /etc/certs/localhost-key.pem
     root * /var/www/html/public
-
     php_server
-
     try_files {path} {path}/ /index.php?{query}
 
     header {
@@ -29,3 +34,28 @@
         format console
     }
 }
+{{else}}
+:80 {
+    root * /var/www/html/public
+    php_server
+    try_files {path} {path}/ /index.php?{query}
+
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    @static {
+        file
+        path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.svg *.woff *.woff2 *.ttf *.eot
+    }
+    header @static Cache-Control max-age=31536000
+
+    log {
+        output stdout
+        format console
+    }
+}
+{{end}}

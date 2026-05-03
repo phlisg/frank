@@ -16,6 +16,10 @@ type Data struct {
 	PHPVersion string
 	// Project-level
 	ProjectName string
+	// Server/TLS
+	HTTPS      bool
+	ServerPort int
+	CustomPort bool
 	// Service-level (populated per service)
 	Version       string
 	Port          int

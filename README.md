@@ -169,6 +169,8 @@ services:
 | `workers.schedule` | boolean | `false` | Run `php artisan schedule:work` in a dedicated container |
 | `workers.queue` | list — see [`docs/workers.md`](docs/workers.md) | `[]` | Declare long-running `queue:work` worker pools |
 | `tools` | list — `pint` `larastan` `rector` `lefthook` | `[]` | Dev tools installed by `frank new` or `frank tool add` — see [`docs/tools.md`](docs/tools.md) |
+| `server.https` | boolean | `true` | Serve over HTTPS with locally-trusted mkcert certificates — see [`docs/https.md`](docs/https.md) |
+| `server.port` | integer | `443` (HTTPS) / `80` (HTTP) | Custom host-side port |
 | `aliases` | map | `{}` | Custom shell aliases activated by `frank config shell activate` |
 | `aliases.<name>` | string or `{cmd, host}` | — | String = container command; map with `host: true` = host-side |
 
@@ -206,7 +208,7 @@ config:
 
 | Command | Description |
 | ------- | ----------- |
-| `frank new <project>` | Create a new Laravel project — zero to localhost in one command. Non-interactive by default; use `--interactive` for wizard. Flags: `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count`, `--no-pint`, `--no-larastan`, `--no-rector`, `--no-lefthook`, `--no-tools`, `--no-up`, `--sail` |
+| `frank new <project>` | Create a new Laravel project — zero to localhost in one command. Non-interactive by default; use `--interactive` for wizard. Flags: `--php`, `--laravel`, `--runtime`, `--with`, `--schedule`, `--queue-count`, `--http`, `--no-pint`, `--no-larastan`, `--no-rector`, `--no-lefthook`, `--no-tools`, `--no-up`, `--sail` |
 | `frank setup` | Configure Frank in an existing Laravel project (interactive wizard). Supports `--sail` and `--dir` |
 | `frank tool add <tool>` | Add a dev tool to `frank.yaml` and install its config files |
 | `frank generate` | Regenerate Docker files from `frank.yaml` without prompting |
@@ -237,6 +239,7 @@ config:
 
 ## Further Reading
 
+- HTTPS (local TLS) — [`docs/https.md`](docs/https.md)
 - Testing — [`docs/testing.md`](docs/testing.md)
 - Dev tools — [`docs/tools.md`](docs/tools.md)
 - Workers & code reload — [`docs/workers.md`](docs/workers.md)

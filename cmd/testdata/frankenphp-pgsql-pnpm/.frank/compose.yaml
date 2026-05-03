@@ -20,7 +20,6 @@ services:
         environment:
             - APP_ENV=local
             - APP_DEBUG=true
-            - SERVER_NAME=:80
             - PSYSH_CONFIG=/var/www/html/.psysh.php
             - PSYSH_HOME=/var/www/html/storage/psysh
             - WWWUSER=${UID:-1000}
@@ -35,6 +34,7 @@ services:
         tty: true
         volumes:
             - .:/var/www/html
+            - .frank/certs/:/etc/certs/:ro
         working_dir: /var/www/html
     mailpit:
         healthcheck:

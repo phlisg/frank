@@ -244,54 +244,62 @@ func patchComposerPHPVersion(dir, phpVersion string) error {
 // patchViteConfig patches vite.config.js for Docker HMR: binds to all interfaces,
 // enables CORS, uses polling (inotify unreliable over volume mounts), and allows
 // serving files from the project root.
+// patchViteConfig inserts the frankServer import and server property into
+// vite.config.js (or .ts). Only patches if the file exists and doesn't
+// already reference vite-server. Covers Docker host binding, CORS, and HTTPS.
 func patchViteConfig(dir string) error {
-	path := filepath.Join(dir, "vite.config.js")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	var name string
+	var data []byte
+	for _, n := range []string{"vite.config.js", "vite.config.ts"} {
+		d, err := os.ReadFile(filepath.Join(dir, n))
+		if err == nil {
+			name = n
+			data = d
+			break
 		}
-		return err
+	}
+	if name == "" {
+		return nil
 	}
 
 	content := string(data)
-
-	if strings.Contains(content, "'0.0.0.0'") {
+	if strings.Contains(content, "vite-server") {
 		return nil
 	}
 
-	const dockerServer = `server: {
-        host: '0.0.0.0',
-        cors: true,
-        hmr: { host: 'localhost' },
-        watch: {
-            usePolling: true,`
+	lines := strings.Split(content, "\n")
 
-	var patched string
-	if strings.Contains(content, "server:") {
-		// Merge into existing server block instead of adding a duplicate key.
-		patched = strings.Replace(content, "server: {\n        watch: {", dockerServer, 1)
-		if patched == content {
-			// Fallback: server block has different indentation/shape — inject at open brace.
-			patched = strings.Replace(content, "server: {", "server: {\n        host: '0.0.0.0',\n        cors: true,", 1)
+	// Insert import after the last import line.
+	lastImport := -1
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "import ") {
+			lastImport = i
 		}
-	} else {
-		patched = strings.Replace(
-			content,
-			"defineConfig({",
-			"defineConfig({\n    server: { host: '0.0.0.0', cors: true, hmr: { host: 'localhost' }, watch: { usePolling: true }, fs: { allow: ['.'] } },",
-			1,
-		)
 	}
-
-	if patched == content {
-		return nil
+	if lastImport == -1 {
+		return fmt.Errorf("no import lines found")
 	}
+	importLine := "import frankServer from './.frank/vite-server.js';"
+	lines = append(lines[:lastImport+1], append([]string{importLine}, lines[lastImport+1:]...)...)
 
-	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
+	// Insert server: frankServer before closing });
+	closingIdx := -1
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) == "});" {
+			closingIdx = i
+			break
+		}
+	}
+	if closingIdx == -1 {
+		return fmt.Errorf("could not find closing });")
+	}
+	serverLine := "    server: frankServer,"
+	lines = append(lines[:closingIdx], append([]string{serverLine}, lines[closingIdx:]...)...)
+
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(strings.Join(lines, "\n")), 0644); err != nil {
 		return err
 	}
-	output.Detail("patched vite.config.js (Docker HMR)")
+	output.Detail("patched vite.config (Frank server)")
 	return nil
 }
 

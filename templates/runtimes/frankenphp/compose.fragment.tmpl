@@ -5,18 +5,33 @@ laravel.test:
     args:
       WWWGROUP: ${GID:-1000}
   ports:
+{{- if .HTTPS}}
+{{- if .CustomPort}}
+    - "{{.ServerPort}}:443"
+    - "{{.ServerPort}}:443/udp"
+{{- else}}
     - "80:80"
     - "443:443"
     - "443:443/udp"
+{{- end}}
+{{- else}}
+{{- if .CustomPort}}
+    - "{{.ServerPort}}:80"
+{{- else}}
+    - "80:80"
+{{- end}}
+{{- end}}
     - "5173:5173"
   networks:
     - frank
   volumes:
     - .:/var/www/html
+{{- if .HTTPS}}
+    - .frank/certs/:/etc/certs/:ro
+{{- end}}
   environment:
     - APP_ENV=local
     - APP_DEBUG=true
-    - SERVER_NAME=:80
     - PSYSH_CONFIG=/var/www/html/.psysh.php
     - PSYSH_HOME=/var/www/html/storage/psysh
     - WWWUSER=${UID:-1000}

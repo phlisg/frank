@@ -32,6 +32,7 @@ var flagNoLefthook bool
 var flagNoTools bool
 
 var flagNoUp bool
+var flagHTTP bool
 var flagInteractive bool
 
 func init() {
@@ -49,6 +50,7 @@ func init() {
 	newCmd.Flags().BoolVar(&flagNoLefthook, "no-lefthook", false, "exclude lefthook from dev tools")
 	newCmd.Flags().BoolVar(&flagNoTools, "no-tools", false, "skip dev tools entirely")
 	newCmd.Flags().BoolVar(&flagNoUp, "no-up", false, "skip container start after install")
+	newCmd.Flags().BoolVar(&flagHTTP, "http", false, "disable HTTPS (serve over plain HTTP)")
 	newCmd.Flags().BoolVar(&flagInteractive, "interactive", false, "run full interactive wizard")
 	rootCmd.AddCommand(newCmd)
 }
@@ -142,7 +144,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		printNewNextSteps(projectName, !flagNoUp)
+		printNewNextSteps(projectName, dir, !flagNoUp, cfg)
 		return nil
 	}
 
@@ -169,6 +171,11 @@ func runNew(cmd *cobra.Command, args []string) error {
 		default:
 			return fmt.Errorf("invalid --pm %q: valid options are npm, pnpm, bun", flagPM)
 		}
+	}
+
+	if flagHTTP {
+		f := false
+		cfg.Server.HTTPS = &f
 	}
 
 	// Services
@@ -268,7 +275,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 
 	// 9. NextSteps
-	printNewNextSteps(projectName, !flagNoUp)
+	printNewNextSteps(projectName, dir, !flagNoUp, cfg)
 	return nil
 }
 
@@ -313,10 +320,21 @@ func runNewUp(dir string, cfg *config.Config) error {
 }
 
 // printNewNextSteps prints the final NextSteps block for frank new.
-func printNewNextSteps(projectName string, containersStarted bool) {
+func printNewNextSteps(projectName, dir string, containersStarted bool, cfg *config.Config) {
+	if cfg.Server.IsHTTPS() {
+		printViteHTTPSHint(dir)
+	}
 	steps := []string{fmt.Sprintf("cd %s", projectName)}
 	if containersStarted {
-		steps = append(steps, "http://localhost")
+		scheme := "http"
+		if cfg.Server.IsHTTPS() {
+			scheme = "https"
+		}
+		port := ""
+		if cfg.Server.Port != 0 {
+			port = fmt.Sprintf(":%d", cfg.Server.Port)
+		}
+		steps = append(steps, fmt.Sprintf("%s://localhost%s", scheme, port))
 	} else {
 		steps = append(steps, "frank up -d")
 	}
@@ -688,6 +706,11 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		return err
 	}
 	stopLaravel(nil)
+
+	// Patch vite.config to import .frank/vite-server.js (known default shape after create-project).
+	if err := patchViteConfig(dir); err != nil {
+		output.Warning(fmt.Sprintf("could not patch vite.config: %v", err))
+	}
 
 	if len(cfg.Tools) > 0 {
 		phpTools := tool.PHPTools(cfg.Tools)

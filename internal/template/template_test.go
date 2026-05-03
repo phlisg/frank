@@ -93,12 +93,44 @@ func TestRenderRuntimeDockerfile_FPM(t *testing.T) {
 
 func TestRenderRuntimeCaddyfile(t *testing.T) {
 	e := newTestEngine(t)
+
+	// HTTP mode (default): single :80 block
 	out, err := e.RenderRuntime("frankenphp", "Caddyfile.tmpl", Data{})
 	if err != nil {
 		t.Fatalf("RenderRuntime error: %v", err)
 	}
-	if !strings.Contains(out, ":80, :443") {
-		t.Error("expected :80, :443 in Caddyfile")
+	if !strings.Contains(out, ":80 {") {
+		t.Error("expected :80 block in HTTP-mode Caddyfile")
+	}
+	if strings.Contains(out, ":443") {
+		t.Error("HTTP mode should not contain :443")
+	}
+
+	// HTTPS mode: :443 with TLS, :80 redirect, :5173 proxy
+	out, err = e.RenderRuntime("frankenphp", "Caddyfile.tmpl", Data{HTTPS: true})
+	if err != nil {
+		t.Fatalf("RenderRuntime HTTPS error: %v", err)
+	}
+	if !strings.Contains(out, ":443 {") {
+		t.Error("expected :443 block in HTTPS-mode Caddyfile")
+	}
+	if !strings.Contains(out, "tls /etc/certs/localhost.pem") {
+		t.Error("expected tls directive in HTTPS mode")
+	}
+	if !strings.Contains(out, "redir https://") {
+		t.Error("expected :80 redirect in HTTPS mode without CustomPort")
+	}
+	if strings.Contains(out, ":5173 {") {
+		t.Error("Vite proxy block should not be present — Vite handles its own TLS")
+	}
+
+	// HTTPS + CustomPort: no :80 redirect
+	out, err = e.RenderRuntime("frankenphp", "Caddyfile.tmpl", Data{HTTPS: true, CustomPort: true})
+	if err != nil {
+		t.Fatalf("RenderRuntime HTTPS+CustomPort error: %v", err)
+	}
+	if strings.Contains(out, "redir https://") {
+		t.Error("CustomPort should suppress :80 redirect")
 	}
 }
 

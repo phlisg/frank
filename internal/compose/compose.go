@@ -48,6 +48,9 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 	// 1. Render and merge runtime compose fragment.
 	runtimeFrag, err := g.engine.RenderRuntime(cfg.PHP.Runtime, "compose.fragment.tmpl", template.Data{
 		PHPVersion: cfg.PHP.Version,
+		HTTPS:      cfg.Server.IsHTTPS(),
+		ServerPort: cfg.Server.EffectivePort(),
+		CustomPort: cfg.Server.Port != 0,
 	})
 	if err != nil {
 		return "", fmt.Errorf("runtime fragment: %w", err)

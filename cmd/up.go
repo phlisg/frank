@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/phlisg/frank/internal/cert"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
@@ -85,7 +86,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 			cfg, err := config.Load(dir)
 			if err == nil {
 				if state.PHPVersion != cfg.PHP.Version || state.Runtime != cfg.PHP.Runtime {
-					return fmt.Errorf("PHP version or runtime changed since last build — run frank generate && frank up --build")
+					return fmt.Errorf("PHP version or runtime changed since last build — run frank generate && frank up -- --build")
 				}
 			}
 		}
@@ -93,6 +94,19 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 
 	// Resolve watcher intent once so fg + -d paths share the decision.
 	cfg, _ := config.Load(dir)
+
+	// HTTPS nudge: warn if HTTPS enabled but certs missing.
+	if cfg != nil && cfg.Server.IsHTTPS() {
+		frankDir := filepath.Join(dir, ".frank")
+		if !cert.CertsExist(frankDir) {
+			if cert.MkcertAvailable() {
+				output.Warning("mkcert found but no certs generated. Run `frank generate && frank up --build` to enable HTTPS.")
+			} else {
+				output.Warning("HTTPS enabled but mkcert not found. Install mkcert and run `frank generate`, or set `server.https: false` in frank.yaml.\n  https://github.com/FiloSottile/mkcert#installation")
+			}
+		}
+	}
+
 	wantWatcher := shouldRunWatcher(cfg, client, dir)
 
 	// Foreground mode: spawn watcher goroutine BEFORE compose so a .php

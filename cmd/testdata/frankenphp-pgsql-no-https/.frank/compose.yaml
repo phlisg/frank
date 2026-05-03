@@ -27,14 +27,11 @@ services:
             - frank
         ports:
             - 80:80
-            - 443:443
-            - 443:443/udp
             - 5173:5173
         stdin_open: true
         tty: true
         volumes:
             - .:/var/www/html
-            - .frank/certs/:/etc/certs/:ro
         working_dir: /var/www/html
     mailpit:
         healthcheck:
