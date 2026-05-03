@@ -30,19 +30,19 @@ var versionCmd = &cobra.Command{
 		case versionCheck:
 			status, err := selfupdate.Check(rootCmd.Version)
 			if err != nil {
-				fmt.Printf("frank is up to date (v%s)\n", rootCmd.Version)
+				fmt.Printf("frank is up to date (%s)\n", rootCmd.Version)
 				return nil
 			}
 			if status.Available {
-				fmt.Printf("Update available: v%s (run frank version --update)\n", status.Latest)
+				fmt.Printf("Update available: %s (run frank version --update)\n", status.Latest)
 			} else {
-				fmt.Printf("frank is up to date (v%s)\n", rootCmd.Version)
+				fmt.Printf("frank is up to date (%s)\n", rootCmd.Version)
 			}
 
 		case versionUpdate:
 			status, err := selfupdate.Check(rootCmd.Version)
 			if err != nil || !status.Available {
-				fmt.Printf("frank is up to date (v%s)\n", rootCmd.Version)
+				fmt.Printf("frank is up to date (%s)\n", rootCmd.Version)
 				return nil
 			}
 			if err := selfupdate.Run(status.Latest); err != nil {
@@ -54,7 +54,7 @@ var versionCmd = &cobra.Command{
 			fmt.Println(rootCmd.Version)
 			status, err := selfupdate.Check(rootCmd.Version)
 			if err == nil && status.Available {
-				fmt.Printf("\nUpdate available: v%s (run frank version --update)\n", status.Latest)
+				fmt.Printf("\nUpdate available: %s (run frank version --update)\n", status.Latest)
 			}
 		}
 
