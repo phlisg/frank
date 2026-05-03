@@ -39,7 +39,7 @@ Frank gives you a full Laravel dev environment from a single `frank.yaml` — no
 **Dev Tools**
 - **Preconfigured** _Pint_, _Larastan_, _Rector_  configuration with opinionated Laravel defaults 
 - **_Lefthook_** pre-commit hooks: auto-fix on commit, analyze before push 
-- `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo
+- `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo$
 
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
@@ -61,26 +61,28 @@ Frank gives you a full Laravel dev environment from a single `frank.yaml` — no
 
 ## Install
 
-The preferred way to install Frank is via `go install` (requires Go 1.26+):
+### Homebrew (macOS & Linux)
+
+```bash
+brew install phlisg/tap/frank
+```
+
+No Go required. Updates via `brew upgrade frank`.
+
+### Go install
+
+If you have Go 1.26+ installed:
 
 ```bash
 go install github.com/phlisg/frank@latest
 ```
 
+> **Tip**: Don't have Go locally installed and the setup scares you? Try [Proto](https://moonrepo.dev/proto), installs Go in one command :)
+
 <details>
 <summary>Per-OS notes</summary>
 
-**Linux** — alternatively, download a pre-built binary from [GitHub Releases](https://github.com/phlisg/frank/releases):
-
-```bash
-curl -Lo frank https://github.com/phlisg/frank/releases/latest/download/frank-linux-amd64
-chmod +x frank
-sudo mv frank /usr/local/bin/
-```
-
-**macOS** — `go install` is the only supported method. Pre-built binaries are unsigned and macOS Gatekeeper will quarantine them.
-
-**WSL (Windows)** — the Linux binary works as-is, or use `go install`. Make sure Docker Desktop has the **WSL 2 backend** enabled (Settings → Resources → WSL Integration).
+**WSL (Windows)** — either method works. Make sure Docker Desktop has the **WSL 2 backend** enabled (Settings → Resources → WSL Integration).
 
 **Tip:** for better Docker volume mount performance, enable VirtioFS in Docker Desktop → Settings → General → "Use VirtioFS for file sharing".
 
