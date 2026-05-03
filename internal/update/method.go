@@ -9,7 +9,7 @@ import (
 type Method int
 
 const (
-	MethodBrew    Method = iota
+	MethodBrew Method = iota
 	MethodGo
 	MethodUnknown
 )

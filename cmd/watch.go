@@ -197,4 +197,3 @@ func formatUptime(d time.Duration) string {
 	rem := d - time.Duration(days)*24*time.Hour
 	return fmt.Sprintf("%dd%02dh", days, int(rem.Hours()))
 }
-

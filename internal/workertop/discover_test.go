@@ -83,7 +83,7 @@ func TestDiscoverWorkers(t *testing.T) {
 			},
 			insp: &fakeInspector{
 				containers: map[string]fakeContainer{
-					"frank-test-schedule-1":       {status: "running", id: "s1"},
+					"frank-test-schedule-1":        {status: "running", id: "s1"},
 					"frank-test-queue.default.1-1": {status: "running", id: "q1"},
 					"frank-test-queue.default.2-1": {status: "running", id: "q2"},
 					"frank-test-queue.default.3-1": {status: "running", id: "q3"},

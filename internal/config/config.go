@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	DefaultPHPVersion      = "8.5"
-	DefaultPHPRuntime      = "frankenphp"
-	DefaultLaravelVersion  = "latest"
-	DefaultPackageManager  = "npm"
-	ConfigFileName         = "frank.yaml"
+	DefaultPHPVersion     = "8.5"
+	DefaultPHPRuntime     = "frankenphp"
+	DefaultLaravelVersion = "latest"
+	DefaultPackageManager = "npm"
+	ConfigFileName        = "frank.yaml"
 )
 
 var validPackageManagers = map[string]bool{

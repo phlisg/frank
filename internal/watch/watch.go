@@ -103,12 +103,12 @@ const (
 // Watcher owns the lifecycle of the fsnotify watch set and the debounced
 // dispatch loop. Construct with New; drive with Start / Stop.
 type Watcher struct {
-	cfg      Config
-	fsw      *fsnotify.Watcher
-	events   chan fsnotify.Event
-	done     chan struct{}
-	runner   Runner
-	armedAt  time.Time // set by Start after armWatches; drives ArmSuppression
+	cfg     Config
+	fsw     *fsnotify.Watcher
+	events  chan fsnotify.Event
+	done    chan struct{}
+	runner  Runner
+	armedAt time.Time // set by Start after armWatches; drives ArmSuppression
 
 	stopOnce sync.Once
 

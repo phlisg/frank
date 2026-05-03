@@ -14,9 +14,9 @@ import (
 
 // settableKeys maps dotted key paths to their valid values.
 var settableKeys = map[string][]string{
-	"php.version":        {"8.2", "8.3", "8.4", "8.5"},
-	"php.runtime":        {"frankenphp", "fpm"},
-	"laravel.version":    {"12.*", "13.*", "latest"},
+	"php.version":         {"8.2", "8.3", "8.4", "8.5"},
+	"php.runtime":         {"frankenphp", "fpm"},
+	"laravel.version":     {"12.*", "13.*", "latest"},
 	"node.packageManager": {"npm", "pnpm", "bun"},
 }
 

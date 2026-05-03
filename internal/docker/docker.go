@@ -360,7 +360,6 @@ func copyWithPrefix(dst io.Writer, src io.Reader, name string) {
 	}
 }
 
-
 // ContainerStatus queries the running state of the project's containers.
 // Uses a quiet ps call so it doesn't print to the terminal.
 func (c *Client) ContainerStatus() (ContainerState, int, int) {

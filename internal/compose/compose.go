@@ -258,7 +258,6 @@ func injectBuild(services map[string]interface{}, name string, laravelBuild inte
 	svc["build"] = laravelBuild
 }
 
-
 // mergeFragment parses a YAML service fragment and merges it into services.
 // Each fragment is a map of service-name → service-definition.
 func mergeFragment(services map[string]interface{}, fragment string) error {

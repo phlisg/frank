@@ -62,9 +62,9 @@ func TestActivate(t *testing.T) {
 	t.Run("custom aliases sorted", func(t *testing.T) {
 		cfg := testConfig()
 		cfg.Aliases = map[string]config.Alias{
-			"zz":   {Cmd: "echo zz", Host: true},
-			"aa":   {Cmd: "echo aa", Host: true},
-			"mm":   {Cmd: "echo mm", Host: true},
+			"zz": {Cmd: "echo zz", Host: true},
+			"aa": {Cmd: "echo aa", Host: true},
+			"mm": {Cmd: "echo mm", Host: true},
 		}
 		output := Activate(cfg)
 		aaIdx := strings.Index(output, "alias aa=")

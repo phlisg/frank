@@ -118,6 +118,7 @@ type paneRect struct {
 func (r paneRect) contains(x, y int) bool {
 	return x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h
 }
+
 type paneCleanupMsg struct {
 	paneID string
 }

@@ -7,11 +7,11 @@ var (
 	BorderRunning  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("2")) // green
 	BorderDegraded = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("3")) // yellow
 	BorderExited   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("1")) // red
-	BorderFocused  = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("13")) // bright magenta, thick — unmistakable vs green running
+	BorderFocused  = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("13"))  // bright magenta, thick — unmistakable vs green running
 
 	// Title bar parts
-	TitleName = lipgloss.NewStyle().Bold(true)
-	TitleMem  = lipgloss.NewStyle().Faint(true)
+	TitleName   = lipgloss.NewStyle().Bold(true)
+	TitleMem    = lipgloss.NewStyle().Faint(true)
 	TitleExit   = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true) // for "[exited N]" badge
 	TitlePaused = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true) // yellow [PAUSED] badge
 

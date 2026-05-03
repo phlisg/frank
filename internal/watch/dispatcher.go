@@ -189,4 +189,3 @@ func triggerLabel(k TriggerKind) string {
 		return "unknown trigger"
 	}
 }
-

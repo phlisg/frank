@@ -97,11 +97,11 @@ func upArgs(extra ...string) []string {
 func TestContainerStatus_ParseRunning(t *testing.T) {
 	// Simulate the JSON output from docker compose ps --format json
 	cases := []struct {
-		name          string
-		output        string
-		wantState     ContainerState
-		wantRunning   int
-		wantTotal     int
+		name        string
+		output      string
+		wantState   ContainerState
+		wantRunning int
+		wantTotal   int
 	}{
 		{
 			name:        "all running",

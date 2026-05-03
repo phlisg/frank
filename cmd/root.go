@@ -73,11 +73,11 @@ func Execute(fsys fs.FS, version string) {
 
 // ANSI escape helpers — no external deps.
 const (
-	ansiReset   = "\033[0m"
-	ansiBold    = "\033[1m"
-	ansiDim     = "\033[2m"
-	ansiGreen   = "\033[32m"
-	ansiRed     = "\033[31m"
+	ansiReset = "\033[0m"
+	ansiBold  = "\033[1m"
+	ansiDim   = "\033[2m"
+	ansiGreen = "\033[32m"
+	ansiRed   = "\033[31m"
 )
 
 func runRoot(cmd *cobra.Command, args []string) error {

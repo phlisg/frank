@@ -24,7 +24,7 @@ func TestGenerateEnv_BaseVars(t *testing.T) {
 		"APP_KEY=",
 		"APP_DEBUG=true",
 		"APP_URL=https://localhost",
-		"APP_LOCALE=en",          // explicitly required by spec
+		"APP_LOCALE=en", // explicitly required by spec
 		"BCRYPT_ROUNDS=12",
 		"LOG_CHANNEL=stack",
 		"SESSION_LIFETIME=120",
