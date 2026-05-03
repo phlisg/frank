@@ -73,10 +73,11 @@ All `fmt.Println` in new/setup/generate/up/install replaced with `output.*` call
 `writeConfigAndGenerate(cfg, dir, existingCompose)` does:
 
 1. Write `frank.yaml`
-2. `generate()` — writes .frank/ files + .env
+2. `generate()` — writes .frank/ files + .env + .frank/vite-server.js
 3. `installLaravel(dir, cfg, true)` — docker composer container, then regenerates .env (Laravel's create-project overwrites it)
-4. `composerRequireDev(dir, packages)` — docker composer container, adds dev tool packages to both json + lock
-5. `tool.Install()` — writes config files (pint.json, phpstan.neon, etc.) + patches composer scripts
+4. `patchViteConfig(dir)` — inserts `import frankServer` + `server: frankServer` into vite.config.js/ts (idempotent, skips if already present)
+5. `composerRequireDev(dir, packages)` — docker composer container, adds dev tool packages to both json + lock
+6. `tool.Install()` — writes config files (pint.json, phpstan.neon, etc.) + patches composer scripts
 
 `frank setup` uses `setupWriteAndGenerate` instead — steps 1-2 + 5 only (no Laravel install, no composerRequireDev).
 
@@ -141,6 +142,18 @@ Frank commands that forward to docker compose follow a uniform rule: **frank-own
 
 `splitPassthrough` (cmd/passthrough.go) is the single source for tail extraction — uses cobra's `ArgsLenAtDash` with a scan fallback for `DisableFlagParsing` subcommands. `stripDirFlag` in the same file pulls `--dir` out manually for compose/exec, which keep `DisableFlagParsing=true` and therefore don't get cobra's persistent-flag parsing.
 
+## HTTPS (mkcert)
+
+HTTPS enabled by default (`server.https` defaults to `true` via `*bool` nil=true pattern). Config: `Server` struct in `internal/config/config.go` with `IsHTTPS()` and `EffectivePort()` helpers. `--http` flag on `frank new` disables it.
+
+Cert generation: `internal/cert/cert.go` — runs `mkcert localhost 127.0.0.1 ::1`, writes to `.frank/certs/`. Testable via `commandRunner`/`fileSystem` interfaces. Certs gitignored automatically.
+
+Template conditionality: `{{if .HTTPS}}` / `{{if .CustomPort}}` in Caddyfile.tmpl, nginx.conf.tmpl, compose fragments. Custom port suppresses HTTP→HTTPS redirect.
+
+Vite dev server: Vite serves its own TLS using Frank's mkcert certs — **no proxy through Caddy/nginx**. `generate()` writes `.frank/vite-server.js` (HTTPS mode: full TLS config with `host: '0.0.0.0'`, cert paths, origin, cors; HTTP mode: just `host: '0.0.0.0'`). `frank new` auto-patches vite.config via `patchViteConfig()` in `cmd/install.go`. `frank setup`/`frank generate` show a hint if vite.config doesn't import `vite-server`. Port 5173 always mapped on `laravel.test` (both runtimes) — FPM moved it from nginx to laravel.test because Vite runs in the app container, not the proxy.
+
+Key design decision: originally tried TLS-terminating Vite at the proxy layer (Caddy/nginx listening on :5173 with TLS, proxying to Vite). Failed because FrankenPHP's single-container architecture creates a port conflict (Caddy and Vite both want 5173). Direct Vite TLS is simpler and works for both runtimes.
+
 ## Sail Interop Notes
 
 `vendor/bin/sail` is a **bash script** (not PHP) — `./vendor/bin/sail <cmd>` works without a local PHP install. Keep this in mind when writing user-facing messages or docs that reference Sail commands.
@@ -161,5 +174,5 @@ Golden files live in `cmd/testdata/<fixture>/.frank/`. Regenerate after **any** 
 go test ./cmd/ -update
 ```
 
-Fixtures: `frankenphp-pgsql-mailpit`, `fpm-mysql-redis`, `frankenphp-sqlite`, `frankenphp-pgsql-workers`, `fpm-mysql-redis-workers`.  
+Fixtures: `frankenphp-pgsql-mailpit`, `fpm-mysql-redis`, `frankenphp-sqlite`, `frankenphp-pgsql-pnpm`, `frankenphp-pgsql-workers`, `fpm-mysql-redis-workers`, `frankenphp-pgsql-no-https`.  
 Shell tests: `internal/shell/shell_test.go` (no golden files, pattern-match only)
