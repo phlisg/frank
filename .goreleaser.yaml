@@ -40,6 +40,15 @@ signs:
 changelog:
   use: github-native
 
+brews:
+  - repository:
+      owner: phlisg
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/phlisg/frank
+    description: Config-driven Docker environment for Laravel development
+    license: Apache-2.0
+
 release:
   github:
     owner: phlisg
