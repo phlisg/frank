@@ -288,6 +288,7 @@ require (
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
 	github.com/scylladb/go-set v1.0.3-0.20200225121959-cc7b2070d91e // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.10.0 // indirect
+	github.com/securego/gosec v0.0.0-20200401082031-e946c8c39989 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
@@ -344,10 +345,12 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260421165255-392afab6f40e // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
+	golang.org/x/vuln v1.3.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.274.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
@@ -368,4 +371,6 @@ require (
 tool (
 	github.com/air-verse/air
 	github.com/goreleaser/goreleaser/v2
+	github.com/securego/gosec
+	golang.org/x/vuln/cmd/govulncheck
 )
