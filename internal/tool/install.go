@@ -92,7 +92,7 @@ func runLefthookInstall(dir string) {
 		output.Detail("hint: install lefthook to enable git hooks: https://github.com/evilmartians/lefthook")
 		return
 	}
-	cmd := exec.Command(path, "install")
+	cmd := exec.Command(path, "install", "--force")
 	cmd.Dir = dir
 	if output.GetLevel() == output.Verbose {
 		cmd.Stdout = os.Stdout
