@@ -32,7 +32,7 @@ var generateCmd = &cobra.Command{
 			return err
 		}
 		stopGen := output.Spin("Generating Docker files")
-		if err := generate(cfg, dir); err != nil {
+		if err := generate(cfg, dir, rootCmd.Version); err != nil {
 			stopGen(err)
 			return err
 		}
@@ -60,7 +60,7 @@ var generateCmd = &cobra.Command{
 
 // generate runs the full file generation pipeline for cfg into dir.
 // Called by both `frank generate` and at the end of `frank new`.
-func generate(cfg *config.Config, dir string) error {
+func generate(cfg *config.Config, dir, version string) error {
 	projectName := config.ProjectName(dir)
 	engine := template.New(TemplateFS)
 	gen := compose.New(engine)
@@ -151,10 +151,15 @@ func generate(cfg *config.Config, dir string) error {
 
 	// Write .frank/.state JSON.
 	type frankState struct {
-		PHPVersion string `json:"phpVersion"`
-		Runtime    string `json:"runtime"`
+		PHPVersion   string `json:"phpVersion"`
+		Runtime      string `json:"runtime"`
+		FrankVersion string `json:"frankVersion"`
 	}
-	stateJSON, _ := json.Marshal(frankState{PHPVersion: cfg.PHP.Version, Runtime: cfg.PHP.Runtime})
+	stateJSON, _ := json.Marshal(frankState{
+		PHPVersion:   cfg.PHP.Version,
+		Runtime:      cfg.PHP.Runtime,
+		FrankVersion: version,
+	})
 	if err := os.WriteFile(filepath.Join(frankDir, ".state"), stateJSON, 0644); err != nil {
 		return fmt.Errorf("write .frank/.state: %w", err)
 	}

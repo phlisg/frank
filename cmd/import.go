@@ -102,7 +102,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	fmt.Println("  wrote     frank.yaml")
 
 	fmt.Println("\nGenerating Docker files...")
-	return generate(cfg, dir)
+	return generate(cfg, dir, rootCmd.Version)
 }
 
 func parseSailCompose(compose sailComposeFile) (phpVersion string, services []string) {

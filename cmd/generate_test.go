@@ -116,7 +116,7 @@ func TestGenerate_Integration(t *testing.T) {
 				t.Fatalf("mkdir: %v", err)
 			}
 
-			if err := generate(fx.cfg, dir); err != nil {
+			if err := generate(fx.cfg, dir, "dev"); err != nil {
 				t.Fatalf("generate: %v", err)
 			}
 

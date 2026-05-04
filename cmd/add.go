@@ -56,7 +56,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  added    %s\n", service)
 
 	fmt.Println("\nRegenerating Docker files...")
-	return generate(cfg, dir)
+	return generate(cfg, dir, rootCmd.Version)
 }
 
 func saveConfig(cfg *config.Config, dir string) error {

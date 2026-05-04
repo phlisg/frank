@@ -111,7 +111,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 
 	// Regenerate .frank/ files.
 	stopGen := output.Spin("Generating Docker files")
-	if err := generate(cfg, dir); err != nil {
+	if err := generate(cfg, dir, rootCmd.Version); err != nil {
 		stopGen(err)
 		return err
 	}
