@@ -17,6 +17,7 @@ import (
 	"github.com/phlisg/frank/internal/output"
 	"github.com/phlisg/frank/internal/watch"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 )
 
 var (
@@ -76,20 +77,12 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		return fmt.Errorf("no Docker config found — run frank generate first")
 	}
 
-	// Pre-flight: detect runtime/PHP version change since last generate
-	if stateData, err := os.ReadFile(filepath.Join(dir, ".frank", ".state")); err == nil {
-		var state struct {
-			PHPVersion string `json:"phpVersion"`
-			Runtime    string `json:"runtime"`
-		}
-		if err := json.Unmarshal(stateData, &state); err == nil {
-			cfg, err := config.Load(dir)
-			if err == nil {
-				if state.PHPVersion != cfg.PHP.Version || state.Runtime != cfg.PHP.Runtime {
-					return fmt.Errorf("PHP version or runtime changed since last build — run frank generate && frank up -- --build")
-				}
-			}
-		}
+	// Pre-flight: detect stale .frank/ (version mismatch or config change) and auto-regenerate.
+	if regenerated, err := autoRegenerate(dir, rootCmd.Version); err != nil {
+		return err
+	} else if regenerated {
+		composeArgs = append(composeArgs, "--build")
+		quick = false
 	}
 
 	// Resolve watcher intent once so fg + -d paths share the decision.
@@ -197,6 +190,80 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	return nil
+}
+
+// autoRegenerate checks .frank/.state for staleness (frank version mismatch
+// or PHP version/runtime change) and regenerates if needed. Returns true if
+// regeneration occurred.
+func autoRegenerate(dir, currentVersion string) (bool, error) {
+	stateFile := filepath.Join(dir, ".frank", ".state")
+	stateData, err := os.ReadFile(stateFile)
+
+	var state struct {
+		PHPVersion   string `json:"phpVersion"`
+		Runtime      string `json:"runtime"`
+		FrankVersion string `json:"frankVersion"`
+	}
+
+	stale := false
+	reason := ""
+
+	if err != nil {
+		// No .state file — existing project upgrading to this frank version.
+		stale = true
+		reason = ".frank/.state missing"
+	} else if err := json.Unmarshal(stateData, &state); err != nil {
+		stale = true
+		reason = ".frank/.state corrupt"
+	} else {
+		// Check frank version staleness.
+		if currentVersion == "dev" {
+			stale = true
+			reason = "dev build"
+		} else if state.FrankVersion == "" {
+			stale = true
+			reason = "frank version not stamped"
+		} else if state.FrankVersion != "dev" {
+			vc := "v" + currentVersion
+			vs := "v" + state.FrankVersion
+			if semver.IsValid(vc) && semver.IsValid(vs) && semver.Compare(vc, vs) > 0 {
+				stale = true
+				reason = fmt.Sprintf("frank updated %s → %s", state.FrankVersion, currentVersion)
+			}
+		}
+
+		// Check PHP version/runtime change (even if frank version matches).
+		if !stale {
+			cfg, err := config.Load(dir)
+			if err == nil {
+				if state.PHPVersion != cfg.PHP.Version || state.Runtime != cfg.PHP.Runtime {
+					stale = true
+					reason = "PHP version or runtime changed"
+				}
+			}
+		}
+	}
+
+	if !stale {
+		return false, nil
+	}
+
+	// Need to regenerate — load config.
+	cfg, err := config.Load(dir)
+	if err != nil {
+		// Config can't load — skip auto-regen, let normal flow handle it.
+		output.Detail(fmt.Sprintf("skipping auto-regenerate (%s): %v", reason, err))
+		return false, nil
+	}
+
+	stopGen := output.Spin(fmt.Sprintf("Regenerating .frank/ (%s)", reason))
+	if err := generate(cfg, dir, currentVersion); err != nil {
+		stopGen(err)
+		return false, fmt.Errorf("auto-regenerate failed: %w", err)
+	}
+	stopGen(nil)
+
+	return true, nil
 }
 
 // shouldRunWatcher decides whether `frank up` should spawn a watcher.

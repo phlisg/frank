@@ -43,6 +43,9 @@ FROM dunglas/frankenphp:1-php8.5 AS final
 COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
+# Dev-friendly OPcache: recheck file timestamps every request (no stale bytecode)
+RUN printf "opcache.revalidate_freq=0\nmemory_limit=1G\n" > /usr/local/etc/php/conf.d/zz-frank-dev.ini
+
 ARG WWWGROUP=1000
 ARG NODE_VERSION=24
 ARG POSTGRES_VERSION=17

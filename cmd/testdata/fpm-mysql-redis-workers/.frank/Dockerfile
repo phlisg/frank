@@ -44,6 +44,10 @@ RUN curl -sS 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xb8dc7e5394
 # The pool handles the sail user drop — gosu is not used for php-fpm.
 # Note: `daemonize = no` was removed — PHP 8.5 dropped this global directive.
 #       Foreground mode is enforced via the -F flag in CMD instead.
+# Dev-friendly OPcache: recheck file timestamps every request (no stale bytecode)
+RUN printf "opcache.revalidate_freq=0\nmemory_limit=1G\n" > /etc/php/8.4/fpm/conf.d/99-frank-dev.ini \
+    && printf "opcache.revalidate_freq=0\nmemory_limit=1G\n" > /etc/php/8.4/cli/conf.d/99-frank-dev.ini
+
 RUN sed -i 's|error_log = .*|error_log = /dev/stderr|' /etc/php/8.4/fpm/php-fpm.conf \
     && sed -i 's|listen = .*|listen = 0.0.0.0:9000|' /etc/php/8.4/fpm/pool.d/www.conf \
     && sed -i 's|^user = .*|user = sail|' /etc/php/8.4/fpm/pool.d/www.conf \

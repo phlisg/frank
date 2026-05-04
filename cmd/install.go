@@ -101,7 +101,7 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 
 	if regenerate {
 		output.Detail("regenerating Docker files")
-		if err := generate(cfg, dir); err != nil {
+		if err := generate(cfg, dir, rootCmd.Version); err != nil {
 			return err
 		}
 	}

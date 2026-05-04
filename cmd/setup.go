@@ -278,7 +278,7 @@ func setupWriteAndGenerate(cfg *config.Config, dir string) error {
 	output.Group("Wrote frank.yaml", "")
 
 	stopGen := output.Spin("Generating Docker files")
-	if err := generate(cfg, dir); err != nil {
+	if err := generate(cfg, dir, rootCmd.Version); err != nil {
 		stopGen(err)
 		return err
 	}
