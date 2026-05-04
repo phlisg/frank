@@ -73,7 +73,7 @@ All `fmt.Println` in new/setup/generate/up/install replaced with `output.*` call
 `writeConfigAndGenerate(cfg, dir, existingCompose)` does:
 
 1. Write `frank.yaml`
-2. `generate()` — writes .frank/ files + .env + .frank/vite-server.js
+2. `generate(cfg, dir, version)` — writes .frank/ files + .env + .frank/vite-server.js + stamps frankVersion in .frank/.state
 3. `installLaravel(dir, cfg, true)` — docker composer container, then regenerates .env (Laravel's create-project overwrites it)
 4. `patchViteConfig(dir)` — inserts `import frankServer` + `server: frankServer` into vite.config.js/ts (idempotent, skips if already present)
 5. `composerRequireDev(dir, packages)` — docker composer container, adds dev tool packages to both json + lock
@@ -176,3 +176,18 @@ go test ./cmd/ -update
 
 Fixtures: `frankenphp-pgsql-mailpit`, `fpm-mysql-redis`, `frankenphp-sqlite`, `frankenphp-pgsql-pnpm`, `frankenphp-pgsql-workers`, `fpm-mysql-redis-workers`, `frankenphp-pgsql-no-https`.  
 Shell tests: `internal/shell/shell_test.go` (no golden files, pattern-match only)
+
+## Auto-Regeneration on Version Mismatch
+
+`.frank/.state` stores `{"phpVersion":"8.4","runtime":"frankenphp","frankVersion":"1.9.5"}`. `frank up` reads it via `autoRegenerate()` in `cmd/up.go` and compares against `rootCmd.Version` using `golang.org/x/mod/semver`.
+
+Staleness triggers (any one → auto-regenerate + `--build` + override `--quick`):
+- `frankVersion` missing or empty (existing project upgrading)
+- `.state` file missing or corrupt
+- Current frank version > stored version (semver compare, `v`-prefix normalized)
+- Current version is `"dev"` (always stale — for testing pre-release builds)
+- PHP version or runtime changed in frank.yaml vs `.state`
+
+Downgrade (stored > current) → no action. Config load failure → skip auto-regen gracefully.
+
+`generate(cfg, dir, version)` takes version as explicit param (testability). All callers pass `rootCmd.Version`. Tests pass `"dev"`.
