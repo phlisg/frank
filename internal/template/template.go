@@ -24,6 +24,9 @@ type Data struct {
 	Version       string
 	Port          int
 	DashboardPort int // mailpit UI port
+	// Worktree mode
+	EphemeralPorts bool
+	VitePort       int
 }
 
 // WorkerData is the context passed to worker fragment templates.
@@ -128,8 +131,8 @@ func (e *Engine) RenderWorker(kind string, data WorkerData) (string, error) {
 
 // RenderServiceCompose renders the compose.fragment.tmpl for a service.
 // ServiceConfig port/version override defaults if non-zero/non-empty.
-func (e *Engine) RenderServiceCompose(service string, cfg config.ServiceConfig, projectName string) (string, error) {
-	data := e.serviceData(service, cfg, projectName)
+func (e *Engine) RenderServiceCompose(service string, cfg config.ServiceConfig, projectName string, ephemeralPorts bool) (string, error) {
+	data := e.serviceData(service, cfg, projectName, ephemeralPorts)
 	return e.Render(path.Join("templates", "services", service, "compose.fragment.tmpl"), data)
 }
 
@@ -143,14 +146,14 @@ func (e *Engine) ReadFile(filePath string) (string, error) {
 }
 
 // RenderServiceEnv renders the env.tmpl for a service.
-func (e *Engine) RenderServiceEnv(service string, cfg config.ServiceConfig, projectName string) (string, error) {
-	data := e.serviceData(service, cfg, projectName)
+func (e *Engine) RenderServiceEnv(service string, cfg config.ServiceConfig, projectName string, ephemeralPorts bool) (string, error) {
+	data := e.serviceData(service, cfg, projectName, ephemeralPorts)
 	return e.Render(path.Join("templates", "services", service, "env.tmpl"), data)
 }
 
 // serviceData builds a Data value for a service, applying config overrides
 // on top of per-service defaults.
-func (e *Engine) serviceData(service string, cfg config.ServiceConfig, projectName string) Data {
+func (e *Engine) serviceData(service string, cfg config.ServiceConfig, projectName string, ephemeralPorts bool) Data {
 	port := defaultPorts[service]
 	if cfg.Port != 0 {
 		port = cfg.Port
@@ -164,9 +167,10 @@ func (e *Engine) serviceData(service string, cfg config.ServiceConfig, projectNa
 	dashboardPort := defaultMailpitDashboardPort
 
 	return Data{
-		ProjectName:   projectName,
-		Version:       version,
-		Port:          port,
-		DashboardPort: dashboardPort,
+		ProjectName:    projectName,
+		Version:        version,
+		Port:           port,
+		DashboardPort:  dashboardPort,
+		EphemeralPorts: ephemeralPorts,
 	}
 }

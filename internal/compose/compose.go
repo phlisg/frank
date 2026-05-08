@@ -65,7 +65,7 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 			continue // sqlite has no compose fragment
 		}
 		svcCfg := cfg.Config[svc]
-		frag, err := g.engine.RenderServiceCompose(svc, svcCfg, projectName)
+		frag, err := g.engine.RenderServiceCompose(svc, svcCfg, projectName, false)
 		if err != nil {
 			return "", fmt.Errorf("service %q fragment: %w", svc, err)
 		}

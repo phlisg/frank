@@ -42,7 +42,7 @@ func (g *Generator) buildEnvLines(cfg *config.Config, projectName string, isExam
 	}
 	for _, svc := range cfg.Services {
 		svcCfg := cfg.Config[svc]
-		rendered, err := g.engine.RenderServiceEnv(svc, svcCfg, projectName)
+		rendered, err := g.engine.RenderServiceEnv(svc, svcCfg, projectName, false)
 		if err != nil {
 			return nil, fmt.Errorf("service %q env: %w", svc, err)
 		}

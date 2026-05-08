@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -529,4 +530,13 @@ func (cfg *Config) Database() string {
 		}
 	}
 	return ""
+}
+
+// ViteWorktreePort maps a project name to a deterministic port in 5174–5199
+// using FNV-1a hashing, for use in worktree mode where the default 5173 may
+// conflict with the main project.
+func ViteWorktreePort(projectName string) int {
+	h := fnv.New32a()
+	h.Write([]byte(projectName))
+	return 5174 + int(h.Sum32()%26)
 }
