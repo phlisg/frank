@@ -3,19 +3,19 @@ package mcp
 import "github.com/mark3labs/mcp-go/mcp"
 
 var statusTool = mcp.NewTool("frank_status",
-	mcp.WithDescription("Container health overview — shows state, health, and ports for all services"),
+	mcp.WithDescription("Check container status — use this instead of running docker compose ps or frank compose ps. Returns state, health, and ports for all services as structured JSON."),
 	mcp.WithReadOnlyHintAnnotation(true),
 	mcp.WithDestructiveHintAnnotation(false),
 )
 
 var configTool = mcp.NewTool("frank_config",
-	mcp.WithDescription("Resolved frank.yaml configuration as JSON"),
+	mcp.WithDescription("Read the project's frank.yaml configuration — use this instead of reading frank.yaml directly. Returns the fully resolved config (with defaults applied) as JSON."),
 	mcp.WithReadOnlyHintAnnotation(true),
 	mcp.WithDestructiveHintAnnotation(false),
 )
 
 var logsTool = mcp.NewTool("frank_logs",
-	mcp.WithDescription("Tail service logs from running containers"),
+	mcp.WithDescription("Tail container logs — use this instead of docker compose logs. Returns recent log output for one or all services."),
 	mcp.WithString("service",
 		mcp.Description("Service name, e.g. laravel.test, pgsql — omit for all"),
 	),
@@ -28,7 +28,7 @@ var logsTool = mcp.NewTool("frank_logs",
 )
 
 var execTool = mcp.NewTool("frank_exec",
-	mcp.WithDescription("Run a command inside a container"),
+	mcp.WithDescription("Run a command inside a container — use this instead of docker compose exec or frank exec. Supports artisan, composer, npm, pest, and any other CLI tool."),
 	mcp.WithArray("command",
 		mcp.Required(),
 		mcp.Description(`Command and arguments, e.g. ["php", "artisan", "migrate"]`),
