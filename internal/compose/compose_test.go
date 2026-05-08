@@ -24,7 +24,7 @@ func TestGenerate_FrankenPHPWithPgsql(t *testing.T) {
 		Services: []string{"pgsql", "mailpit"},
 	}
 
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestGenerate_FPMWithMySQL(t *testing.T) {
 		Services: []string{"mysql", "redis"},
 	}
 
-	out, err := g.Generate(cfg, "testapp")
+	out, err := g.Generate(cfg, "testapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestGenerate_SQLiteNoComposeFragment(t *testing.T) {
 		Services: []string{"sqlite"},
 	}
 
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestGenerate_NoVolumesWhenNoneNeeded(t *testing.T) {
 		Services: []string{"mailpit", "memcached"},
 	}
 
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestGenerate_NetworkIsFrank(t *testing.T) {
 	g := newTestGenerator(t)
 	cfg := config.New()
 
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestGenerate_HeaderComment(t *testing.T) {
 	g := newTestGenerator(t)
 	cfg := config.New()
 
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestWrite_CreatesFile(t *testing.T) {
 		t.Fatalf("mkdir .frank: %v", err)
 	}
 
-	if err := g.Write(cfg, "myapp", dir); err != nil {
+	if err := g.Write(cfg, "myapp", dir, false, 5173); err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
 
@@ -173,6 +173,8 @@ func TestHostPortKey(t *testing.T) {
 		{"443:443/udp", "443/udp"},
 		{"80:80", "80/tcp"},
 		{"1025:1025", "1025/tcp"},
+		{"5432", ""},
+		{"443/udp", ""},
 	}
 	for _, c := range cases {
 		got := hostPortKey(c.in)
@@ -203,7 +205,7 @@ func TestGenerate_NoWorkers_Unchanged(t *testing.T) {
 		Laravel:  config.Laravel{Version: "latest"},
 		Services: []string{"pgsql", "mailpit"},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -223,7 +225,7 @@ func TestGenerate_ScheduleOnly(t *testing.T) {
 		Services: []string{"pgsql"},
 		Workers:  config.Workers{Schedule: true},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -257,7 +259,7 @@ func TestGenerate_QueuePoolCountThree(t *testing.T) {
 			},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -290,7 +292,7 @@ func TestGenerate_MultiplePoolsNamed(t *testing.T) {
 			},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -325,7 +327,7 @@ func TestGenerate_FrankenPHPWorkersNoUserKey(t *testing.T) {
 			Queue:    []config.QueuePool{{Name: "default", Queues: []string{"default"}, Count: 1}},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -345,7 +347,7 @@ func TestGenerate_FPMWorkersNoSailUser(t *testing.T) {
 			Queue:    []config.QueuePool{{Name: "default", Queues: []string{"default"}, Count: 2}},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -372,7 +374,7 @@ func TestGenerate_QueuePassthroughFlags(t *testing.T) {
 			},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -395,7 +397,7 @@ func TestGenerate_QueuePassthroughOmittedWhenZero(t *testing.T) {
 			},
 		},
 	}
-	out, err := g.Generate(cfg, "myapp")
+	out, err := g.Generate(cfg, "myapp", false, 5173)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -407,7 +409,6 @@ func TestGenerate_QueuePassthroughOmittedWhenZero(t *testing.T) {
 }
 
 func TestValidatePorts_TCPUDPNoConflict(t *testing.T) {
-	// TCP and UDP on same port should not conflict
 	services := map[string]interface{}{
 		"app": map[string]interface{}{
 			"ports": []interface{}{"443:443", "443:443/udp"},
@@ -415,5 +416,19 @@ func TestValidatePorts_TCPUDPNoConflict(t *testing.T) {
 	}
 	if err := validatePorts(services); err != nil {
 		t.Errorf("TCP and UDP on same port should not conflict: %v", err)
+	}
+}
+
+func TestValidatePorts_ContainerOnlySkipped(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{"5432"},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{"5432"},
+		},
+	}
+	if err := validatePorts(services); err != nil {
+		t.Errorf("container-only ports should not conflict: %v", err)
 	}
 }
