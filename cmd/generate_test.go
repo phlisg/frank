@@ -3,7 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -352,6 +354,95 @@ func writeTestFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
 		t.Fatalf("writeFile %s: %v", name, err)
+	}
+}
+
+func TestGenerate_WorktreeIntegration(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	cleanEnv := os.Environ()
+	filtered := cleanEnv[:0]
+	for _, e := range cleanEnv {
+		if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") && !strings.HasPrefix(e, "GIT_INDEX_FILE=") {
+			filtered = append(filtered, e)
+		}
+	}
+
+	git := func(dir string, args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		c.Env = filtered
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s (%v)", args, out, err)
+		}
+	}
+
+	mainDir := filepath.Join(t.TempDir(), "main-project")
+	if err := os.MkdirAll(mainDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	git(mainDir, "init")
+	os.WriteFile(filepath.Join(mainDir, "frank.yaml"), []byte("version: 1\n"), 0644)
+	git(mainDir, "add", ".")
+	git(mainDir, "commit", "-m", "init")
+
+	wtDir := filepath.Join(t.TempDir(), "my-worktree")
+	git(mainDir, "worktree", "add", wtDir)
+
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql", "mailpit"},
+	}
+
+	// Generate in worktree — should get ephemeral ports.
+	if err := generate(cfg, wtDir, "dev"); err != nil {
+		t.Fatalf("generate in worktree: %v", err)
+	}
+
+	wtCompose := readTestFile(t, wtDir, ".frank/compose.yaml")
+	wtVite := readTestFile(t, wtDir, ".frank/vite-server.js")
+
+	// Worktree compose must have container-only ports (no host binding).
+	if strings.Contains(wtCompose, "5432:5432") {
+		t.Error("worktree compose should not have host-bound pgsql port")
+	}
+	if !strings.Contains(wtCompose, `"5432"`) {
+		t.Error("worktree compose should have container-only pgsql port")
+	}
+	if strings.Contains(wtCompose, "1025:1025") {
+		t.Error("worktree compose should not have host-bound mailpit port")
+	}
+
+	// Vite port should not be 5173.
+	expectedVitePort := config.ViteWorktreePort("my-worktree")
+	if !strings.Contains(wtCompose, fmt.Sprintf("%d:5173", expectedVitePort)) {
+		t.Errorf("worktree compose should map vite to port %d", expectedVitePort)
+	}
+	if !strings.Contains(wtVite, fmt.Sprintf("localhost:%d", expectedVitePort)) {
+		t.Errorf("worktree vite-server.js should reference port %d", expectedVitePort)
+	}
+
+	// Generate in main repo — should get normal host-bound ports.
+	if err := generate(cfg, mainDir, "dev"); err != nil {
+		t.Fatalf("generate in main: %v", err)
+	}
+
+	mainCompose := readTestFile(t, mainDir, ".frank/compose.yaml")
+	mainVite := readTestFile(t, mainDir, ".frank/vite-server.js")
+
+	if !strings.Contains(mainCompose, "5432:5432") {
+		t.Error("main compose should have host-bound pgsql port")
+	}
+	if !strings.Contains(mainCompose, "5173:5173") {
+		t.Error("main compose should have standard vite port")
+	}
+	if !strings.Contains(mainVite, "localhost:5173") {
+		t.Error("main vite-server.js should reference port 5173")
 	}
 }
 
