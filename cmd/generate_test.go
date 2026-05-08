@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -229,6 +230,129 @@ func readTestFile(t *testing.T, dir, name string) string {
 		return ""
 	}
 	return string(data)
+}
+
+func TestWriteMCPConfig(t *testing.T) {
+	t.Run("create_new", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := writeMCPConfig(dir); err != nil {
+			t.Fatalf("writeMCPConfig: %v", err)
+		}
+		root := readMCPJSON(t, dir)
+		assertFrankServer(t, root)
+	})
+
+	t.Run("merge_existing", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, ".mcp.json", `{
+  "mcpServers": {
+    "other-server": {
+      "command": "other",
+      "args": ["serve"]
+    }
+  }
+}`)
+		if err := writeMCPConfig(dir); err != nil {
+			t.Fatalf("writeMCPConfig: %v", err)
+		}
+		root := readMCPJSON(t, dir)
+		assertFrankServer(t, root)
+
+		servers := root["mcpServers"].(map[string]any)
+		if _, ok := servers["other-server"]; !ok {
+			t.Error("other-server entry was lost during merge")
+		}
+	})
+
+	t.Run("overwrite_frank", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, ".mcp.json", `{
+  "mcpServers": {
+    "frank": {
+      "command": "old-frank",
+      "args": ["old"]
+    }
+  }
+}`)
+		if err := writeMCPConfig(dir); err != nil {
+			t.Fatalf("writeMCPConfig: %v", err)
+		}
+		root := readMCPJSON(t, dir)
+		assertFrankServer(t, root)
+	})
+
+	t.Run("malformed_json", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, ".mcp.json", "this is not json")
+		if err := writeMCPConfig(dir); err != nil {
+			t.Fatalf("writeMCPConfig: %v", err)
+		}
+		root := readMCPJSON(t, dir)
+		assertFrankServer(t, root)
+	})
+
+	t.Run("preserves_other_top_level_keys", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, ".mcp.json", `{
+  "mcpServers": {"existing": {"command": "x"}},
+  "someOtherKey": "value"
+}`)
+		if err := writeMCPConfig(dir); err != nil {
+			t.Fatalf("writeMCPConfig: %v", err)
+		}
+		root := readMCPJSON(t, dir)
+		assertFrankServer(t, root)
+
+		servers := root["mcpServers"].(map[string]any)
+		if _, ok := servers["existing"]; !ok {
+			t.Error("existing server entry was lost during merge")
+		}
+		if v, ok := root["someOtherKey"]; !ok || v != "value" {
+			t.Errorf("someOtherKey lost or changed: got %v", v)
+		}
+	})
+}
+
+// readMCPJSON reads and parses .mcp.json from dir.
+func readMCPJSON(t *testing.T, dir string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, ".mcp.json"))
+	if err != nil {
+		t.Fatalf("read .mcp.json: %v", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("parse .mcp.json: %v\ncontent: %s", err, data)
+	}
+	return root
+}
+
+// assertFrankServer verifies the frank entry in mcpServers has the expected shape.
+func assertFrankServer(t *testing.T, root map[string]any) {
+	t.Helper()
+	servers, ok := root["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatal("mcpServers key missing or not an object")
+	}
+	frank, ok := servers["frank"].(map[string]any)
+	if !ok {
+		t.Fatal("mcpServers.frank missing or not an object")
+	}
+	if frank["command"] != "frank" {
+		t.Errorf("frank command: got %v, want frank", frank["command"])
+	}
+	args, ok := frank["args"].([]any)
+	if !ok || len(args) != 1 || args[0] != "mcp" {
+		t.Errorf("frank args: got %v, want [mcp]", frank["args"])
+	}
+}
+
+// writeTestFile is a test helper that writes content to dir/name.
+func writeTestFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+		t.Fatalf("writeFile %s: %v", name, err)
+	}
 }
 
 // extractTestKeys returns all active (non-comment, non-disabled) key names from a .env string.
