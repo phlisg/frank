@@ -238,7 +238,41 @@ func generate(cfg *config.Config, dir, version string) error {
 		}
 	}
 
+	// Write .mcp.json at project root (merge with existing entries).
+	if err := writeMCPConfig(dir); err != nil {
+		return fmt.Errorf("write .mcp.json: %w", err)
+	}
+	output.Detail("wrote .mcp.json")
+
 	return nil
+}
+
+// writeMCPConfig writes or merges the frank MCP server entry into .mcp.json.
+func writeMCPConfig(dir string) error {
+	path := filepath.Join(dir, ".mcp.json")
+
+	root := make(map[string]any)
+	if data, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(data, &root); err != nil {
+			root = make(map[string]any)
+		}
+	}
+
+	servers, ok := root["mcpServers"].(map[string]any)
+	if !ok {
+		servers = make(map[string]any)
+	}
+	servers["frank"] = map[string]any{
+		"command": "frank",
+		"args":    []string{"mcp"},
+	}
+	root["mcpServers"] = servers
+
+	out, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(out, '\n'), 0644)
 }
 
 func buildViteServerJS(cfg *config.Config) string {

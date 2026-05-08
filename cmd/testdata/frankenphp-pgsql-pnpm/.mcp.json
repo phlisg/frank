@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "frank": {
+      "args": [
+        "mcp"
+      ],
+      "command": "frank"
+    }
+  }
+}
