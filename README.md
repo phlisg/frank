@@ -61,7 +61,11 @@ Frank gives you a full Laravel dev environment from a single `frank.yaml` — no
 
 ## Install
 
-### Homebrew (macOS & Linux)
+### Prerequisites
+
+You will need a working installation of [Docker](https://www.docker.com/get-started/) and optionally (but recommended) install [mkcert](https://github.com/filosottile/mkcert) for local HTTPS support.
+
+### Homebrew (macOS & Linux/WSL)
 
 ```bash
 brew install phlisg/tap/frank
@@ -134,11 +138,10 @@ npm run dev
 
 ```bash
 git clone … && cd my-app
-frank generate
 frank up -d
 ```
 
-`frank generate` rebuilds the Docker files from `frank.yaml`. Then `frank up` starts containers, runs migrations — same environment, every machine.
+`frank up` regenerates frank files, starts containers, runs migrations — same environment, every machine.
 
 ---
 
