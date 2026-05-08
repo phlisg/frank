@@ -39,7 +39,7 @@ var worktreeRemoveCmd = &cobra.Command{
 		_ = client.Down()
 
 		// Remove the git worktree.
-		gitCmd := exec.Command("git", "worktree", "remove", absPath)
+		gitCmd := exec.Command("git", "worktree", "remove", "--force", absPath)
 		if out, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git worktree remove failed: %s", out)
 		}

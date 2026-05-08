@@ -317,7 +317,14 @@ func generateAppKey(dir string) error {
 	if err != nil {
 		return err
 	}
-	updated := strings.Replace(string(data), "APP_KEY=", "APP_KEY="+value, 1)
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "APP_KEY=") {
+			lines[i] = "APP_KEY=" + value
+			break
+		}
+	}
+	updated := strings.Join(lines, "\n")
 	output.Detail("generated APP_KEY")
 	return os.WriteFile(path, []byte(updated), 0644)
 }
