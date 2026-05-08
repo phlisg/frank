@@ -27,6 +27,6 @@ var mcpCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		client := docker.New(dir)
-		return mcpserver.Serve(client, cfg, rootCmd.Version)
+		return mcpserver.Serve(client, cfg, rootCmd.Version, dir)
 	},
 }

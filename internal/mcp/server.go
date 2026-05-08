@@ -5,10 +5,10 @@ import (
 	"github.com/phlisg/frank/internal/config"
 )
 
-func Serve(client dockerClient, cfg *config.Config, version string) error {
+func Serve(client dockerClient, cfg *config.Config, version, dir string) error {
 	s := server.NewMCPServer("frank", version)
 
-	h := &handlers{client: client, cfg: cfg}
+	h := &handlers{client: client, cfg: cfg, dir: dir}
 
 	s.AddTool(statusTool, h.handleStatus)
 	s.AddTool(configTool, h.handleConfig)

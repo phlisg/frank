@@ -206,7 +206,20 @@ func IsWorktree(dir string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.TrimSpace(string(gdOut)) != strings.TrimSpace(string(cdOut))
+	gd := strings.TrimSpace(string(gdOut))
+	cd := strings.TrimSpace(string(cdOut))
+	// Resolve to absolute — git may return relative for one and absolute for the other.
+	base := dir
+	if base == "" {
+		base, _ = os.Getwd()
+	}
+	if !filepath.IsAbs(gd) {
+		gd = filepath.Join(base, gd)
+	}
+	if !filepath.IsAbs(cd) {
+		cd = filepath.Join(base, cd)
+	}
+	return filepath.Clean(gd) != filepath.Clean(cd)
 }
 
 func cleanGitEnv() []string {

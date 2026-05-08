@@ -13,6 +13,7 @@ import (
 type handlers struct {
 	client dockerClient
 	cfg    *config.Config
+	dir    string
 }
 
 func textResult(text string) *mcp.CallToolResult {
@@ -54,7 +55,18 @@ func (h *handlers) handleStatus(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 		services = append(services, b)
 	}
 
-	result, _ := json.MarshalIndent(services, "", "  ")
+	response := map[string]any{
+		"services": services,
+	}
+	if config.IsWorktree(h.dir) {
+		projectName := config.ProjectName(h.dir)
+		response["worktree"] = map[string]any{
+			"active":   true,
+			"vitePort": config.ViteWorktreePort(projectName),
+		}
+	}
+
+	result, _ := json.MarshalIndent(response, "", "  ")
 	return textResult(string(result)), nil
 }
 
