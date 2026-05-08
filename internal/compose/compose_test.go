@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -416,6 +417,47 @@ func TestValidatePorts_TCPUDPNoConflict(t *testing.T) {
 	}
 	if err := validatePorts(services); err != nil {
 		t.Errorf("TCP and UDP on same port should not conflict: %v", err)
+	}
+}
+
+func TestGenerate_EphemeralPorts(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "latest"},
+		Services: []string{"pgsql", "mailpit"},
+	}
+
+	vitePort := 5182
+	out, err := g.Generate(cfg, "worktree-test", true, vitePort)
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+
+	mustContain := []string{
+		"- \"443\"",
+		"443/udp",
+		fmt.Sprintf("%d:5173", vitePort),
+		"- \"5432\"",
+		"- \"1025\"",
+		"- \"8025\"",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in ephemeral output:\n%s", want, out)
+		}
+	}
+
+	mustNotContain := []string{
+		`443:443`,
+		`5432:5432`,
+		`1025:1025`,
+		`8025:8025`,
+	}
+	for _, bad := range mustNotContain {
+		if strings.Contains(out, bad) {
+			t.Errorf("ephemeral output must not contain host-bound %q:\n%s", bad, out)
+		}
 	}
 }
 
