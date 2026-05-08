@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -72,9 +73,17 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		composeArgs = append([]string{"-d"}, composeArgs...)
 	}
 
-	// Pre-flight: ensure .frank/ has been generated
+	// Pre-flight: auto-generate .frank/ if frank.yaml exists but .frank/ doesn't.
 	if _, err := os.Stat(filepath.Join(dir, ".frank", "compose.yaml")); os.IsNotExist(err) {
-		return fmt.Errorf("no Docker config found — run frank generate first")
+		cfg, loadErr := config.Load(dir)
+		if loadErr != nil {
+			return fmt.Errorf("no Docker config found — run frank generate first")
+		}
+		output.Group("Generating Docker files", "frank.yaml found but .frank/ missing")
+		if err := generate(cfg, dir, rootCmd.Version); err != nil {
+			return fmt.Errorf("auto-generate failed: %w", err)
+		}
+		composeArgs = append(composeArgs, "--build")
 	}
 
 	// Pre-flight: detect stale .frank/ (version mismatch or config change) and auto-regenerate.
@@ -158,6 +167,19 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
+		if needsAppKey(dir) {
+			output.Detail("generating APP_KEY")
+			if output.GetLevel() == output.Verbose {
+				if err := client.Exec("laravel.test", "php", "artisan", "key:generate", "--force", "--no-interaction"); err != nil {
+					output.Warning(fmt.Sprintf("key:generate failed: %v", err))
+				}
+			} else {
+				if _, err := client.ExecQuiet("laravel.test", "php", "artisan", "key:generate", "--force", "--no-interaction"); err != nil {
+					output.Warning(fmt.Sprintf("key:generate failed: %v", err))
+				}
+			}
+		}
+
 		if output.GetLevel() == output.Verbose {
 			if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
 				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
@@ -264,6 +286,20 @@ func autoRegenerate(dir, currentVersion string) (bool, error) {
 	stopGen(nil)
 
 	return true, nil
+}
+
+// needsAppKey returns true when .env exists but APP_KEY is empty.
+func needsAppKey(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "APP_KEY=" {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldRunWatcher decides whether `frank up` should spawn a watcher.

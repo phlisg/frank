@@ -24,5 +24,9 @@ migrate:
         echo "[frank.migrate] composer install"
         composer install --no-interaction --prefer-dist --no-progress
       fi
+      if grep -q '^APP_KEY=$' .env 2>/dev/null; then
+        echo "[frank.migrate] generating APP_KEY"
+        php artisan key:generate --force --no-interaction
+      fi
       echo "[frank.migrate] artisan migrate --force"
       php artisan migrate --force
