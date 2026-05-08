@@ -193,6 +193,10 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 
 	stopPost(nil)
 
+	if config.IsWorktree(dir) {
+		output.Group("Worktree mode", "ports are ephemeral — use `frank compose port <service> <port>` to find mapped ports")
+	}
+
 	if detach && showNextSteps {
 		var steps []string
 		pm := "npm"

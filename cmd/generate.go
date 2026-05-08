@@ -69,7 +69,7 @@ func generate(cfg *config.Config, dir, version string) error {
 	vitePort := 5173
 	if ephemeralPorts {
 		vitePort = config.ViteWorktreePort(projectName)
-		output.Group("Worktree detected", "using ephemeral ports — run frank compose port <service> <port> for mapped ports")
+		output.Detail("worktree detected — using ephemeral ports")
 	}
 
 	// Create .frank/ directory first.
