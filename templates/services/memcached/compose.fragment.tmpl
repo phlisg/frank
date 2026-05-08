@@ -1,6 +1,10 @@
 memcached:
   image: "memcached:{{.Version}}"
   ports:
+{{- if .EphemeralPorts}}
+    - "11211"
+{{- else}}
     - "{{.Port}}:11211"
+{{- end}}
   networks:
     - frank

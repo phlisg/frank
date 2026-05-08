@@ -51,6 +51,7 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 		HTTPS:      cfg.Server.IsHTTPS(),
 		ServerPort: cfg.Server.EffectivePort(),
 		CustomPort: cfg.Server.Port != 0,
+		VitePort:   5173,
 	})
 	if err != nil {
 		return "", fmt.Errorf("runtime fragment: %w", err)

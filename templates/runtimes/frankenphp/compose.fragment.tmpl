@@ -5,6 +5,15 @@ laravel.test:
     args:
       WWWGROUP: ${GID:-1000}
   ports:
+{{- if .EphemeralPorts}}
+{{- if .HTTPS}}
+    - "443"
+    - "443/udp"
+{{- else}}
+    - "80"
+{{- end}}
+    - "{{.VitePort}}:5173"
+{{- else}}
 {{- if .HTTPS}}
 {{- if .CustomPort}}
     - "{{.ServerPort}}:443"
@@ -21,7 +30,8 @@ laravel.test:
     - "80:80"
 {{- end}}
 {{- end}}
-    - "5173:5173"
+    - "{{.VitePort}}:5173"
+{{- end}}
   networks:
     - frank
   volumes:
