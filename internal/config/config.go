@@ -191,7 +191,7 @@ type ServiceConfig struct {
 
 // IsWorktree reports whether dir is inside a git worktree (not the main working tree).
 func IsWorktree(dir string) bool {
-	env := cleanGitEnv()
+	env := CleanGitEnv()
 	gitDir := exec.Command("git", "rev-parse", "--git-dir")
 	gitDir.Dir = dir
 	gitDir.Env = env
@@ -222,7 +222,10 @@ func IsWorktree(dir string) bool {
 	return filepath.Clean(gd) != filepath.Clean(cd)
 }
 
-func cleanGitEnv() []string {
+// CleanGitEnv returns os.Environ() with GIT_DIR, GIT_WORK_TREE, and
+// GIT_INDEX_FILE stripped. Prevents lefthook/hook env vars from interfering
+// with git commands that need to inspect the real worktree layout.
+func CleanGitEnv() []string {
 	var env []string
 	for _, e := range os.Environ() {
 		if strings.HasPrefix(e, "GIT_DIR=") || strings.HasPrefix(e, "GIT_WORK_TREE=") || strings.HasPrefix(e, "GIT_INDEX_FILE=") {
