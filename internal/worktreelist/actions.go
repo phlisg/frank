@@ -56,13 +56,27 @@ func removeWorktree(path, branch string) error {
 }
 
 func upContainers(path string) error {
-	_, err := docker.New(path).RunQuiet("up", "-d")
-	return err
+	frank, err := os.Executable()
+	if err != nil {
+		frank = "frank"
+	}
+	out, err := exec.Command(frank, "up", "-d", "--dir", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("frank up: %s", out)
+	}
+	return nil
 }
 
 func downContainers(path string) error {
-	_, err := docker.New(path).RunQuiet("down")
-	return err
+	frank, err := os.Executable()
+	if err != nil {
+		frank = "frank"
+	}
+	out, err := exec.Command(frank, "down", "--dir", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("frank down: %s", out)
+	}
+	return nil
 }
 
 func openEditor(path string) error {
