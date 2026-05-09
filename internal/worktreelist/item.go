@@ -23,17 +23,18 @@ const (
 )
 
 var (
-	itemTitle        = lipgloss.NewStyle().Bold(true)
-	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
-	itemDesc         = lipgloss.NewStyle().Faint(true)
-	itemDescSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
-	itemPath         = lipgloss.NewStyle().Faint(true)
-	itemPathSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
+	itemTitle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#5f24a3"))
+	itemDesc  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#5f24a3"))
+	itemPath  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#5f24a3"))
 
-	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	indicatorStoppedStyle       = lipgloss.NewStyle().Faint(true)
-	indicatorNotConfiguredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
+	itemDescSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))
+	itemPathSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+
+	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
+	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
+	indicatorStoppedStyle       = lipgloss.NewStyle().Faint(true)                     // dim/gray
+	indicatorNotConfiguredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
 
 	busyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 )
@@ -48,8 +49,8 @@ type ItemDelegate struct {
 
 var _ list.ItemDelegate = ItemDelegate{}
 
-func (d ItemDelegate) Height() int  { return 3 }
-func (d ItemDelegate) Spacing() int { return 1 }
+func (d ItemDelegate) Height() int                             { return 3 }
+func (d ItemDelegate) Spacing() int                            { return 1 }
 func (d ItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
 func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
@@ -107,7 +108,11 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		path = itemPath.Render(path)
 	}
 
-	fmt.Fprintf(w, "  %s\n  %s\n  %s", title, descLine, path)
+	prefix := "  "
+	if selected {
+		prefix = "> "
+	}
+	fmt.Fprintf(w, "%s%s\n%s%s\n%s%s", prefix, title, prefix, descLine, prefix, path)
 }
 
 func statusIndicator(wt WorktreeItem) (string, lipgloss.Style) {
