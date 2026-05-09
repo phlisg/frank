@@ -64,6 +64,8 @@ Frank gives you a full Laravel dev environment from a single `frank.yaml` — no
 - [frank.yaml](#frankyaml)
 - [Supported Services](#supported-services)
 - [CLI Commands](#cli-commands)
+- [Git worktrees](#git-worktrees)
+- [MCP Integration](#mcp-integration)
 - [Further Reading](#further-reading)
 
 ---
