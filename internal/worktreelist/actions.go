@@ -41,7 +41,7 @@ func openBrowser(item WorktreeItem) error {
 	return exec.Command(opener, url).Start()
 }
 
-func removeWorktree(path, branch string) error {
+func RemoveWorktree(path, branch string) error {
 	_ = docker.New(path).Down()
 
 	out, err := exec.Command("git", "worktree", "remove", "--force", path).CombinedOutput()
@@ -96,7 +96,7 @@ func tailLogs(path string) error {
 	return docker.New(path).Run("logs", "-f", "--tail", "50")
 }
 
-func createWorktree(repoDir, wtPath, branch string) error {
+func CreateWorktree(repoDir, wtPath, branch string) error {
 	cmd := exec.Command("git", "worktree", "add", wtPath, "-b", branch)
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()

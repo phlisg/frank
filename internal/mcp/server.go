@@ -14,6 +14,7 @@ func Serve(client dockerClient, cfg *config.Config, version, dir string) error {
 	s.AddTool(configTool, h.handleConfig)
 	s.AddTool(logsTool, h.handleLogs)
 	s.AddTool(execTool, h.handleExec)
+	s.AddTool(worktreesTool, h.handleWorktrees)
 
 	return server.ServeStdio(s)
 }

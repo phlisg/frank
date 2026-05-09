@@ -62,7 +62,7 @@ func newKeyBinding(k, help string) key.Binding {
 
 var nonAlphanumDash = regexp.MustCompile(`[^a-z0-9-]+`)
 
-func branchToKebab(branch string) string {
+func BranchToKebab(branch string) string {
 	s := strings.ToLower(branch)
 	s = strings.ReplaceAll(s, "/", "-")
 	s = strings.ReplaceAll(s, "_", "-")
@@ -267,13 +267,13 @@ func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.creating = false
 
 		projectName := config.ProjectName(m.dir)
-		kebab := branchToKebab(branch)
+		kebab := BranchToKebab(branch)
 		parentDir := filepath.Dir(m.dir)
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
 
 		m.statusMsg = fmt.Sprintf("creating %s...", kebab)
 		return m, tea.Batch(m.runAction(func() error {
-			return createWorktree(m.dir, wtPath, branch)
+			return CreateWorktree(m.dir, wtPath, branch)
 		}), spinnerTick())
 
 	case tea.KeyEsc:
@@ -298,7 +298,7 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "removing worktree..."
 		return m, tea.Batch(m.runAction(func() error {
-			return removeWorktree(item.Path, item.Branch)
+			return RemoveWorktree(item.Path, item.Branch)
 		}), spinnerTick())
 
 	default:

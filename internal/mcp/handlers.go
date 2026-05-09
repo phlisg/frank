@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/phlisg/frank/internal/config"
+	"github.com/phlisg/frank/internal/worktreelist"
 )
 
 type handlers struct {
@@ -110,6 +112,76 @@ func (h *handlers) handleExec(_ context.Context, req mcp.CallToolRequest) (*mcp.
 		return errorResult(err.Error()), nil
 	}
 	return textResult(out), nil
+}
+
+func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	action := req.GetString("action", "list")
+
+	switch action {
+	case "list":
+		items, err := worktreelist.Discover(h.dir)
+		if err != nil {
+			return errorResult(fmt.Sprintf("discover: %v", err)), nil
+		}
+		type wtJSON struct {
+			Path     string `json:"path"`
+			Branch   string `json:"branch"`
+			HasFrank bool   `json:"hasFrank"`
+			Status   string `json:"status"`
+			Ports    string `json:"ports,omitempty"`
+		}
+		var result []wtJSON
+		for _, item := range items {
+			result = append(result, wtJSON{
+				Path:     item.Path,
+				Branch:   item.Branch,
+				HasFrank: item.HasFrank,
+				Status:   item.StatusLabel(),
+				Ports:    item.PortSummary(),
+			})
+		}
+		b, _ := json.MarshalIndent(result, "", "  ")
+		return textResult(string(b)), nil
+
+	case "remove":
+		path := req.GetString("path", "")
+		if path == "" {
+			return errorResult("path required for remove"), nil
+		}
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return errorResult(fmt.Sprintf("resolve path: %v", err)), nil
+		}
+		items, _ := worktreelist.Discover(h.dir)
+		var branch string
+		for _, item := range items {
+			if item.Path == absPath {
+				branch = item.Branch
+				break
+			}
+		}
+		if err := worktreelist.RemoveWorktree(absPath, branch); err != nil {
+			return errorResult(fmt.Sprintf("remove: %v", err)), nil
+		}
+		return textResult(fmt.Sprintf("removed worktree %s", absPath)), nil
+
+	case "create":
+		branch := req.GetString("branch", "")
+		if branch == "" {
+			return errorResult("branch required for create"), nil
+		}
+		projectName := config.ProjectName(h.dir)
+		kebab := worktreelist.BranchToKebab(branch)
+		parentDir := filepath.Dir(h.dir)
+		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
+		if err := worktreelist.CreateWorktree(h.dir, wtPath, branch); err != nil {
+			return errorResult(fmt.Sprintf("create: %v", err)), nil
+		}
+		return textResult(fmt.Sprintf("created worktree at %s", wtPath)), nil
+
+	default:
+		return errorResult(fmt.Sprintf("unknown action: %s", action)), nil
+	}
 }
 
 // splitLines splits a string into non-empty lines.
