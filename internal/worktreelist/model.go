@@ -2,12 +2,18 @@ package worktreelist
 
 import (
 	"fmt"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/phlisg/frank/internal/config"
 )
 
 // PostQuitAction describes what to run after the TUI exits.
@@ -28,6 +34,8 @@ type Model struct {
 	list          list.Model
 	dir           string
 	confirmRemove bool
+	creating      bool
+	branchInput   textinput.Model
 	statusMsg     string
 	postQuit      *PostQuitAction
 	quitting      bool
@@ -52,10 +60,27 @@ func newKeyBinding(k, help string) key.Binding {
 	return key.NewBinding(key.WithKeys(k), key.WithHelp(k, help))
 }
 
+var nonAlphanumDash = regexp.MustCompile(`[^a-z0-9-]+`)
+
+func branchToKebab(branch string) string {
+	s := strings.ToLower(branch)
+	s = strings.ReplaceAll(s, "/", "-")
+	s = strings.ReplaceAll(s, "_", "-")
+	s = nonAlphanumDash.ReplaceAllString(s, "")
+	s = strings.Trim(s, "-")
+	return s
+}
+
 // New creates a Model from discovered worktree items.
 func New(items []WorktreeItem, dir string) Model {
 	s := &shared{busyIdx: -1}
-	m := Model{dir: dir, shared: s}
+
+	ti := textinput.New()
+	ti.Placeholder = "feature/my-branch"
+	ti.CharLimit = 100
+	ti.Width = 40
+
+	m := Model{dir: dir, shared: s, branchInput: ti}
 
 	listItems := make([]list.Item, len(items))
 	for i, item := range items {
@@ -77,6 +102,7 @@ func New(items []WorktreeItem, dir string) Model {
 			newKeyBinding("o", "open"),
 			newKeyBinding("u", "up"),
 			newKeyBinding("d", "down"),
+			newKeyBinding("c", "create"),
 			newKeyBinding("r", "remove"),
 			newKeyBinding("l", "logs"),
 			newKeyBinding("g", "generate"),
@@ -99,6 +125,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.creating {
+			return m.handleCreateKey(msg)
+		}
+
 		if m.list.FilterState() == list.Filtering {
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)
@@ -140,15 +170,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	item, ok := m.selectedItem()
-	if !ok {
-		var cmd tea.Cmd
-		m.list, cmd = m.list.Update(msg)
-		return m, cmd
-	}
-
 	switch msg.String() {
+	case "c":
+		m.creating = true
+		m.branchInput.Reset()
+		m.branchInput.Focus()
+		m.statusMsg = ""
+		return m, m.branchInput.Cursor.BlinkCmd()
+
 	case "o":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		err := openBrowser(item)
 		if err != nil {
 			m.statusMsg = fmt.Sprintf("browser: %v", err)
@@ -156,11 +190,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "r":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.confirmRemove = true
 		m.statusMsg = fmt.Sprintf("remove %s? (y/n)", item.Branch)
 		return m, nil
 
 	case "u":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "starting containers..."
 		return m, tea.Batch(m.runAction(func() error {
@@ -168,6 +210,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}), spinnerTick())
 
 	case "d":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "stopping containers..."
 		return m, tea.Batch(m.runAction(func() error {
@@ -175,11 +221,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}), spinnerTick())
 
 	case "l":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.postQuit = &PostQuitAction{Kind: "logs", Path: item.Path}
 		m.quitting = true
 		return m, tea.Quit
 
 	case "g":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "regenerating..."
 		return m, tea.Batch(m.runAction(func() error {
@@ -187,6 +241,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}), spinnerTick())
 
 	case "e":
+		item, ok := m.selectedItem()
+		if !ok {
+			break
+		}
 		m.postQuit = &PostQuitAction{Kind: "editor", Path: item.Path}
 		m.quitting = true
 		return m, tea.Quit
@@ -194,6 +252,38 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		branch := strings.TrimSpace(m.branchInput.Value())
+		if branch == "" {
+			m.creating = false
+			m.statusMsg = ""
+			return m, nil
+		}
+		m.creating = false
+
+		projectName := config.ProjectName(m.dir)
+		kebab := branchToKebab(branch)
+		parentDir := filepath.Dir(m.dir)
+		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
+
+		m.statusMsg = fmt.Sprintf("creating %s...", kebab)
+		return m, tea.Batch(m.runAction(func() error {
+			return createWorktree(m.dir, wtPath, branch)
+		}), spinnerTick())
+
+	case tea.KeyEsc:
+		m.creating = false
+		m.statusMsg = ""
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.branchInput, cmd = m.branchInput.Update(msg)
 	return m, cmd
 }
 
@@ -257,6 +347,9 @@ func (m Model) selectedItem() (WorktreeItem, bool) {
 func (m Model) View() string {
 	if m.quitting {
 		return ""
+	}
+	if m.creating {
+		return m.list.View() + "\n\n  Branch name: " + m.branchInput.View()
 	}
 	if m.statusMsg != "" {
 		m.list.NewStatusMessage(m.statusMsg)

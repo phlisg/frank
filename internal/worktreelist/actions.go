@@ -96,6 +96,16 @@ func tailLogs(path string) error {
 	return docker.New(path).Run("logs", "-f", "--tail", "50")
 }
 
+func createWorktree(repoDir, wtPath, branch string) error {
+	cmd := exec.Command("git", "worktree", "add", wtPath, "-b", branch)
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree add: %s", out)
+	}
+	return nil
+}
+
 func regenerate(path string) error {
 	frank, err := os.Executable()
 	if err != nil {
