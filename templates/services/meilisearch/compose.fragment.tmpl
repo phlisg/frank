@@ -1,7 +1,11 @@
 meilisearch:
   image: "getmeili/meilisearch:{{.Version}}"
   ports:
+{{- if .EphemeralPorts}}
+    - "7700"
+{{- else}}
     - "{{.Port}}:7700"
+{{- end}}
   networks:
     - frank
   volumes:

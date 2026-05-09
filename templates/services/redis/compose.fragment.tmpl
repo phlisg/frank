@@ -1,7 +1,11 @@
 redis:
   image: "redis:{{.Version}}"
   ports:
+{{- if .EphemeralPorts}}
+    - "6379"
+{{- else}}
     - "{{.Port}}:6379"
+{{- end}}
   networks:
     - frank
   volumes:

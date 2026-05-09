@@ -136,7 +136,7 @@ func TestRenderRuntimeCaddyfile(t *testing.T) {
 
 func TestRenderServiceCompose_PgsqlDefaults(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceCompose("pgsql", config.ServiceConfig{}, "myapp")
+	out, err := e.RenderServiceCompose("pgsql", config.ServiceConfig{}, "myapp", false)
 	if err != nil {
 		t.Fatalf("RenderServiceCompose error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestRenderServiceCompose_PgsqlDefaults(t *testing.T) {
 
 func TestRenderServiceCompose_PgsqlOverride(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceCompose("pgsql", config.ServiceConfig{Version: "16", Port: 5433}, "myapp")
+	out, err := e.RenderServiceCompose("pgsql", config.ServiceConfig{Version: "16", Port: 5433}, "myapp", false)
 	if err != nil {
 		t.Fatalf("RenderServiceCompose error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestRenderServiceCompose_PgsqlOverride(t *testing.T) {
 
 func TestRenderServiceEnv_Pgsql(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceEnv("pgsql", config.ServiceConfig{}, "my-project")
+	out, err := e.RenderServiceEnv("pgsql", config.ServiceConfig{}, "my-project", false)
 	if err != nil {
 		t.Fatalf("RenderServiceEnv error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestRenderServiceEnv_Pgsql(t *testing.T) {
 
 func TestRenderServiceEnv_Sqlite(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceEnv("sqlite", config.ServiceConfig{}, "myapp")
+	out, err := e.RenderServiceEnv("sqlite", config.ServiceConfig{}, "myapp", false)
 	if err != nil {
 		t.Fatalf("RenderServiceEnv error: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestRenderServiceEnv_Sqlite(t *testing.T) {
 
 func TestRenderServiceCompose_Mailpit(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceCompose("mailpit", config.ServiceConfig{}, "myapp")
+	out, err := e.RenderServiceCompose("mailpit", config.ServiceConfig{}, "myapp", false)
 	if err != nil {
 		t.Fatalf("RenderServiceCompose error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestRenderServiceCompose_Mailpit(t *testing.T) {
 
 func TestRenderServiceEnv_Redis(t *testing.T) {
 	e := newTestEngine(t)
-	out, err := e.RenderServiceEnv("redis", config.ServiceConfig{}, "myapp")
+	out, err := e.RenderServiceEnv("redis", config.ServiceConfig{}, "myapp", false)
 	if err != nil {
 		t.Fatalf("RenderServiceEnv error: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestAllServicesHaveEnvTemplate(t *testing.T) {
 	e := newTestEngine(t)
 	services := []string{"pgsql", "mysql", "mariadb", "sqlite", "redis", "memcached", "meilisearch", "mailpit"}
 	for _, svc := range services {
-		_, err := e.RenderServiceEnv(svc, config.ServiceConfig{}, "testapp")
+		_, err := e.RenderServiceEnv(svc, config.ServiceConfig{}, "testapp", false)
 		if err != nil {
 			t.Errorf("service %q env template error: %v", svc, err)
 		}
@@ -245,7 +245,7 @@ func TestNonSqliteServicesHaveComposeFragment(t *testing.T) {
 	e := newTestEngine(t)
 	services := []string{"pgsql", "mysql", "mariadb", "redis", "memcached", "meilisearch", "mailpit"}
 	for _, svc := range services {
-		_, err := e.RenderServiceCompose(svc, config.ServiceConfig{}, "testapp")
+		_, err := e.RenderServiceCompose(svc, config.ServiceConfig{}, "testapp", false)
 		if err != nil {
 			t.Errorf("service %q compose fragment error: %v", svc, err)
 		}

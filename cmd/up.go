@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -94,6 +96,14 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		quick = false
 	}
 
+	// Pre-flight: generate APP_KEY before containers start so docker's
+	// env_file picks it up at container creation time.
+	if needsAppKey(dir) {
+		if err := generateAppKey(dir); err != nil {
+			output.Warning(fmt.Sprintf("could not generate APP_KEY: %v", err))
+		}
+	}
+
 	// Resolve watcher intent once so fg + -d paths share the decision.
 	cfg, _ := config.Load(dir)
 
@@ -167,19 +177,6 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
-		if needsAppKey(dir) {
-			output.Detail("generating APP_KEY")
-			if output.GetLevel() == output.Verbose {
-				if err := client.Exec("laravel.test", "php", "artisan", "key:generate", "--force", "--no-interaction"); err != nil {
-					output.Warning(fmt.Sprintf("key:generate failed: %v", err))
-				}
-			} else {
-				if _, err := client.ExecQuiet("laravel.test", "php", "artisan", "key:generate", "--force", "--no-interaction"); err != nil {
-					output.Warning(fmt.Sprintf("key:generate failed: %v", err))
-				}
-			}
-		}
-
 		if output.GetLevel() == output.Verbose {
 			if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
 				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
@@ -192,6 +189,10 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	stopPost(nil)
+
+	if config.IsWorktree(dir) {
+		output.Group("Worktree mode", "ports are ephemeral — use `frank compose port <service> <port>` to find mapped ports")
+	}
 
 	if detach && showNextSteps {
 		var steps []string
@@ -300,6 +301,32 @@ func needsAppKey(dir string) bool {
 		}
 	}
 	return false
+}
+
+// generateAppKey writes a random APP_KEY into .env before containers start,
+// so docker's env_file directive picks it up at container creation time.
+func generateAppKey(dir string) error {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return err
+	}
+	value := "base64:" + base64.StdEncoding.EncodeToString(key)
+
+	path := filepath.Join(dir, ".env")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "APP_KEY=") {
+			lines[i] = "APP_KEY=" + value
+			break
+		}
+	}
+	updated := strings.Join(lines, "\n")
+	output.Detail("generated APP_KEY")
+	return os.WriteFile(path, []byte(updated), 0644)
 }
 
 // shouldRunWatcher decides whether `frank up` should spawn a watcher.

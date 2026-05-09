@@ -2,7 +2,9 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -634,6 +636,37 @@ aliases:
 	}
 }
 
+func TestViteWorktreePort(t *testing.T) {
+	// Deterministic: same input → same output.
+	for i := 0; i < 10; i++ {
+		if ViteWorktreePort("my-project") != ViteWorktreePort("my-project") {
+			t.Fatal("ViteWorktreePort is not deterministic")
+		}
+	}
+
+	// All results in range 5174–5199.
+	inputs := []string{
+		"alpha", "bravo", "charlie", "delta", "echo",
+		"foxtrot", "golf", "hotel", "india", "juliet",
+	}
+	for _, name := range inputs {
+		port := ViteWorktreePort(name)
+		if port < 5174 || port > 5199 {
+			t.Errorf("ViteWorktreePort(%q) = %d, out of range [5174,5199]", name, port)
+		}
+	}
+
+	// Different inputs produce mostly different outputs (at least 3 distinct
+	// values out of 5 inputs — pigeonhole allows some collisions in 26 slots).
+	seen := make(map[int]bool)
+	for _, name := range inputs[:5] {
+		seen[ViteWorktreePort(name)] = true
+	}
+	if len(seen) < 3 {
+		t.Errorf("expected at least 3 distinct ports from 5 inputs, got %d", len(seen))
+	}
+}
+
 func TestValidateAliases_Valid(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, `
@@ -653,5 +686,47 @@ aliases:
 	}
 	if len(cfg.Aliases) != 4 {
 		t.Errorf("Aliases count = %d, want 4", len(cfg.Aliases))
+	}
+}
+
+func TestIsWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	main := t.TempDir()
+
+	cleanEnv := os.Environ()
+	filtered := cleanEnv[:0]
+	for _, e := range cleanEnv {
+		if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") && !strings.HasPrefix(e, "GIT_INDEX_FILE=") {
+			filtered = append(filtered, e)
+		}
+	}
+
+	run := func(dir string, args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		c.Env = filtered
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s (%v)", args, out, err)
+		}
+	}
+
+	run(main, "init")
+	run(main, "commit", "--allow-empty", "-m", "init")
+
+	wt := filepath.Join(t.TempDir(), "wt")
+	run(main, "worktree", "add", wt)
+
+	if IsWorktree(main) {
+		t.Error("main repo reported as worktree")
+	}
+	if !IsWorktree(wt) {
+		t.Error("worktree not detected")
+	}
+	if IsWorktree(t.TempDir()) {
+		t.Error("non-git dir reported as worktree")
 	}
 }

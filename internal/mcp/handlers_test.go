@@ -63,15 +63,29 @@ func TestHandleStatus_Success(t *testing.T) {
 
 	text := contentText(t, result)
 
-	var services []map[string]any
-	if err := json.Unmarshal([]byte(text), &services); err != nil {
+	var response map[string]any
+	if err := json.Unmarshal([]byte(text), &response); err != nil {
 		t.Fatalf("failed to parse result JSON: %v", err)
 	}
-	if len(services) != 2 {
-		t.Fatalf("expected 2 services, got %d", len(services))
+
+	svcList, ok := response["services"].([]any)
+	if !ok {
+		t.Fatal("expected services array")
+	}
+	if len(svcList) != 2 {
+		t.Fatalf("expected 2 services, got %d", len(svcList))
 	}
 
-	// Verify first service
+	// No worktree key when dir is empty (not a worktree).
+	if _, has := response["worktree"]; has {
+		t.Error("worktree key should be absent for non-worktree")
+	}
+
+	services := make([]map[string]any, len(svcList))
+	for i, s := range svcList {
+		services[i] = s.(map[string]any)
+	}
+
 	if services[0]["Name"] != "laravel.test" {
 		t.Errorf("expected Name=laravel.test, got %v", services[0]["Name"])
 	}
@@ -86,7 +100,6 @@ func TestHandleStatus_Success(t *testing.T) {
 		t.Error("expected non-empty Publishers for laravel.test")
 	}
 
-	// Verify second service
 	if services[1]["Name"] != "pgsql" {
 		t.Errorf("expected Name=pgsql, got %v", services[1]["Name"])
 	}

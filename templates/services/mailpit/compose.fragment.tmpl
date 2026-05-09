@@ -1,8 +1,13 @@
 mailpit:
   image: "axllent/mailpit:{{.Version}}"
   ports:
+{{- if .EphemeralPorts}}
+    - "1025"
+    - "8025"
+{{- else}}
     - "{{.Port}}:1025"
     - "{{.DashboardPort}}:8025"
+{{- end}}
   networks:
     - frank
   healthcheck:

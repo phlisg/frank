@@ -41,16 +41,18 @@ func New(engine *template.Engine) *Generator {
 }
 
 // Generate produces a compose.yaml string for the given config and project name.
-func (g *Generator) Generate(cfg *config.Config, projectName string) (string, error) {
+func (g *Generator) Generate(cfg *config.Config, projectName string, ephemeralPorts bool, vitePort int) (string, error) {
 	services := map[string]interface{}{}
 	volumes := map[string]interface{}{}
 
 	// 1. Render and merge runtime compose fragment.
 	runtimeFrag, err := g.engine.RenderRuntime(cfg.PHP.Runtime, "compose.fragment.tmpl", template.Data{
-		PHPVersion: cfg.PHP.Version,
-		HTTPS:      cfg.Server.IsHTTPS(),
-		ServerPort: cfg.Server.EffectivePort(),
-		CustomPort: cfg.Server.Port != 0,
+		PHPVersion:     cfg.PHP.Version,
+		HTTPS:          cfg.Server.IsHTTPS(),
+		ServerPort:     cfg.Server.EffectivePort(),
+		CustomPort:     cfg.Server.Port != 0,
+		EphemeralPorts: ephemeralPorts,
+		VitePort:       vitePort,
 	})
 	if err != nil {
 		return "", fmt.Errorf("runtime fragment: %w", err)
@@ -65,7 +67,7 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 			continue // sqlite has no compose fragment
 		}
 		svcCfg := cfg.Config[svc]
-		frag, err := g.engine.RenderServiceCompose(svc, svcCfg, projectName)
+		frag, err := g.engine.RenderServiceCompose(svc, svcCfg, projectName, ephemeralPorts)
 		if err != nil {
 			return "", fmt.Errorf("service %q fragment: %w", svc, err)
 		}
@@ -118,8 +120,8 @@ func (g *Generator) Generate(cfg *config.Config, projectName string) (string, er
 }
 
 // Write generates compose.yaml and writes it to .frank/ inside dir.
-func (g *Generator) Write(cfg *config.Config, projectName, dir string) error {
-	content, err := g.Generate(cfg, projectName)
+func (g *Generator) Write(cfg *config.Config, projectName, dir string, ephemeralPorts bool, vitePort int) error {
+	content, err := g.Generate(cfg, projectName, ephemeralPorts, vitePort)
 	if err != nil {
 		return err
 	}
@@ -289,6 +291,9 @@ func validatePorts(services map[string]interface{}) error {
 				continue
 			}
 			key := hostPortKey(portStr)
+			if key == "" {
+				continue
+			}
 			if prev, conflict := seen[key]; conflict {
 				return fmt.Errorf("port conflict on %s: services %q and %q both bind the same host port", key, prev, svcName)
 			}
@@ -305,6 +310,9 @@ func hostPortKey(mapping string) string {
 	if idx := strings.Index(mapping, "/"); idx != -1 {
 		proto = mapping[idx+1:]
 		mapping = mapping[:idx]
+	}
+	if !strings.Contains(mapping, ":") {
+		return ""
 	}
 	host := strings.SplitN(mapping, ":", 2)[0]
 	return host + "/" + proto

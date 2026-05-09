@@ -27,6 +27,20 @@ var logsTool = mcp.NewTool("frank_logs",
 	mcp.WithDestructiveHintAnnotation(false),
 )
 
+var worktreesTool = mcp.NewTool("frank_worktrees",
+	mcp.WithDescription("List or manage git worktrees. Action 'list' returns all linked worktrees with container status and ports. Action 'remove' tears down containers and removes a worktree+branch. Action 'create' creates a new worktree as sibling directory."),
+	mcp.WithString("action",
+		mcp.Required(),
+		mcp.Description("Action: list, remove, or create"),
+	),
+	mcp.WithString("path",
+		mcp.Description("Worktree path — required for 'remove'"),
+	),
+	mcp.WithString("branch",
+		mcp.Description("Branch name — required for 'create'"),
+	),
+)
+
 var execTool = mcp.NewTool("frank_exec",
 	mcp.WithDescription("Run a command inside a container — use this instead of docker compose exec or frank exec. Supports artisan, composer, npm, pest, and any other CLI tool."),
 	mcp.WithArray("command",

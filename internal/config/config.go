@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -185,6 +187,53 @@ type Laravel struct {
 type ServiceConfig struct {
 	Port    int    `yaml:"port"`
 	Version string `yaml:"version"`
+}
+
+// IsWorktree reports whether dir is inside a git worktree (not the main working tree).
+func IsWorktree(dir string) bool {
+	env := CleanGitEnv()
+	gitDir := exec.Command("git", "rev-parse", "--git-dir")
+	gitDir.Dir = dir
+	gitDir.Env = env
+	gdOut, err := gitDir.Output()
+	if err != nil {
+		return false
+	}
+	commonDir := exec.Command("git", "rev-parse", "--git-common-dir")
+	commonDir.Dir = dir
+	commonDir.Env = env
+	cdOut, err := commonDir.Output()
+	if err != nil {
+		return false
+	}
+	gd := strings.TrimSpace(string(gdOut))
+	cd := strings.TrimSpace(string(cdOut))
+	// Resolve to absolute — git may return relative for one and absolute for the other.
+	base := dir
+	if base == "" {
+		base, _ = os.Getwd()
+	}
+	if !filepath.IsAbs(gd) {
+		gd = filepath.Join(base, gd)
+	}
+	if !filepath.IsAbs(cd) {
+		cd = filepath.Join(base, cd)
+	}
+	return filepath.Clean(gd) != filepath.Clean(cd)
+}
+
+// CleanGitEnv returns os.Environ() with GIT_DIR, GIT_WORK_TREE, and
+// GIT_INDEX_FILE stripped. Prevents lefthook/hook env vars from interfering
+// with git commands that need to inspect the real worktree layout.
+func CleanGitEnv() []string {
+	var env []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "GIT_DIR=") || strings.HasPrefix(e, "GIT_WORK_TREE=") || strings.HasPrefix(e, "GIT_INDEX_FILE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	return env
 }
 
 // ProjectName derives the project name from the target directory basename.
@@ -497,4 +546,13 @@ func (cfg *Config) Database() string {
 		}
 	}
 	return ""
+}
+
+// ViteWorktreePort maps a project name to a deterministic port in 5174–5199
+// using FNV-1a hashing, for use in worktree mode where the default 5173 may
+// conflict with the main project.
+func ViteWorktreePort(projectName string) int {
+	h := fnv.New32a()
+	h.Write([]byte(projectName))
+	return 5174 + int(h.Sum32()%26)
 }
