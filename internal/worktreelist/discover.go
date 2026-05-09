@@ -176,7 +176,7 @@ func parsePorcelainBlock(block string) worktreeEntry {
 
 // composePSEntry matches the JSON output from `docker compose ps --format json`.
 type composePSEntry struct {
-	Name       string `json:"Name"`
+	Service    string `json:"Service"`
 	State      string `json:"State"`
 	Publishers []struct {
 		URL           string `json:"URL"`
@@ -204,7 +204,7 @@ func probeServices(worktreePath string) []ServiceInfo {
 			continue
 		}
 		services = append(services, ServiceInfo{
-			Name:  entry.Name,
+			Name:  entry.Service,
 			State: entry.State,
 			Ports: formatPorts(entry),
 		})
@@ -213,9 +213,11 @@ func probeServices(worktreePath string) []ServiceInfo {
 }
 
 func formatPorts(entry composePSEntry) string {
+	seen := make(map[int]bool)
 	var parts []string
 	for _, p := range entry.Publishers {
-		if p.PublishedPort > 0 {
+		if p.PublishedPort > 0 && !seen[p.PublishedPort] {
+			seen[p.PublishedPort] = true
 			parts = append(parts, fmt.Sprintf(":%d", p.PublishedPort))
 		}
 	}
