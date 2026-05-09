@@ -41,12 +41,16 @@ func openBrowser(item WorktreeItem) error {
 	return exec.Command(opener, url).Start()
 }
 
-func removeWorktree(path string) error {
+func removeWorktree(path, branch string) error {
 	_ = docker.New(path).Down()
 
 	out, err := exec.Command("git", "worktree", "remove", "--force", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree remove: %s", out)
+	}
+
+	if branch != "" && branch != "(detached)" {
+		_ = exec.Command("git", "branch", "-D", branch).Run()
 	}
 	return nil
 }

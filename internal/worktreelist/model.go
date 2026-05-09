@@ -168,7 +168,7 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.statusMsg = "removing worktree..."
 		return m, m.runAction(func() error {
-			return removeWorktree(item.Path)
+			return removeWorktree(item.Path, item.Branch)
 		})
 
 	default:

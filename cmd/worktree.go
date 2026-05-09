@@ -4,11 +4,25 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
+
+func branchForPath(porcelain, path string) string {
+	var current string
+	for _, line := range strings.Split(porcelain, "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			current = strings.TrimPrefix(line, "worktree ")
+		}
+		if current == path && strings.HasPrefix(line, "branch refs/heads/") {
+			return strings.TrimPrefix(line, "branch refs/heads/")
+		}
+	}
+	return ""
+}
 
 func init() {
 	rootCmd.AddCommand(worktreeCmd)
@@ -38,10 +52,19 @@ var worktreeRemoveCmd = &cobra.Command{
 		client := docker.New(absPath)
 		_ = client.Down()
 
+		// Resolve branch name before removing.
+		branchCmd := exec.Command("git", "worktree", "list", "--porcelain")
+		branchOut, _ := branchCmd.Output()
+		branch := branchForPath(string(branchOut), absPath)
+
 		// Remove the git worktree.
 		gitCmd := exec.Command("git", "worktree", "remove", "--force", absPath)
 		if out, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git worktree remove failed: %s", out)
+		}
+
+		if branch != "" {
+			_ = exec.Command("git", "branch", "-D", branch).Run()
 		}
 
 		output.Group("Worktree removed", absPath)
