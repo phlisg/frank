@@ -23,13 +23,13 @@ const (
 )
 
 var (
-	itemTitle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#5f24a3"))
-	itemDesc  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#5f24a3"))
-	itemPath  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#5f24a3"))
+	itemTitle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9086a6"))
+	itemDesc  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#9086a6"))
+	itemPath  = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#9086a6"))
 
-	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
-	itemDescSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))
-	itemPathSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7d68f2"))
+	itemDescSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	itemPathSelected  = lipgloss.NewStyle().Foreground(lipgloss.Color("#7d68f2"))
 
 	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
 	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
@@ -110,9 +110,9 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	prefix := "  "
 	if selected {
-		prefix = "> "
+		prefix = "→ "
 	}
-	fmt.Fprintf(w, "%s%s\n%s%s\n%s%s", prefix, title, prefix, descLine, prefix, path)
+	fmt.Fprintf(w, "%s%s\n%s\n%s", prefix, title, descLine, path)
 }
 
 func statusIndicator(wt WorktreeItem) (string, lipgloss.Style) {
