@@ -24,11 +24,11 @@ const (
 
 var (
 	itemTitle        = lipgloss.NewStyle().Bold(true)
-	itemTitleSelected = lipgloss.NewStyle().Bold(true).Reverse(true)
+	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
 	itemDesc         = lipgloss.NewStyle().Faint(true)
-	itemDescSelected = lipgloss.NewStyle().Reverse(true)
+	itemDescSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
 	itemPath         = lipgloss.NewStyle().Faint(true)
-	itemPathSelected = lipgloss.NewStyle().Faint(true).Reverse(true)
+	itemPathSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("13"))
 
 	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))

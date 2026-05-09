@@ -16,6 +16,13 @@ type PostQuitAction struct {
 	Path string
 }
 
+// shared holds state that the ItemDelegate needs to read during Render.
+// Allocated on the heap so pointers survive bubbletea's value-copy of Model.
+type shared struct {
+	busyIdx      int
+	spinnerFrame int
+}
+
 // Model is the root bubbletea model for frank worktree list.
 type Model struct {
 	list          list.Model
@@ -24,8 +31,7 @@ type Model struct {
 	statusMsg     string
 	postQuit      *PostQuitAction
 	quitting      bool
-	busyIdx       int
-	spinnerFrame  int
+	shared        *shared
 }
 
 type actionDoneMsg struct {
@@ -48,7 +54,8 @@ func newKeyBinding(k, help string) key.Binding {
 
 // New creates a Model from discovered worktree items.
 func New(items []WorktreeItem, dir string) Model {
-	m := Model{dir: dir, busyIdx: -1}
+	s := &shared{busyIdx: -1}
+	m := Model{dir: dir, shared: s}
 
 	listItems := make([]list.Item, len(items))
 	for i, item := range items {
@@ -56,8 +63,8 @@ func New(items []WorktreeItem, dir string) Model {
 	}
 
 	delegate := ItemDelegate{
-		BusyIdx:      &m.busyIdx,
-		SpinnerFrame: &m.spinnerFrame,
+		BusyIdx:      &s.busyIdx,
+		SpinnerFrame: &s.spinnerFrame,
 	}
 	l := list.New(listItems, delegate, 80, 24)
 	l.Title = "Worktrees"
@@ -104,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case actionDoneMsg:
-		m.busyIdx = -1
+		m.shared.busyIdx = -1
 		if msg.err != nil {
 			m.statusMsg = fmt.Sprintf("error: %v", msg.err)
 		} else {
@@ -116,8 +123,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.doRefresh()
 
 	case spinnerTickMsg:
-		if m.busyIdx >= 0 {
-			m.spinnerFrame++
+		if m.shared.busyIdx >= 0 {
+			m.shared.spinnerFrame++
 			return m, spinnerTick()
 		}
 		return m, nil
@@ -129,7 +136,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.busyIdx >= 0 {
+	if m.shared.busyIdx >= 0 {
 		return m, nil
 	}
 
@@ -154,14 +161,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "u":
-		m.busyIdx = m.list.Index()
+		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "starting containers..."
 		return m, tea.Batch(m.runAction(func() error {
 			return upContainers(item.Path)
 		}), spinnerTick())
 
 	case "d":
-		m.busyIdx = m.list.Index()
+		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "stopping containers..."
 		return m, tea.Batch(m.runAction(func() error {
 			return downContainers(item.Path)
@@ -173,7 +180,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "g":
-		m.busyIdx = m.list.Index()
+		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "regenerating..."
 		return m, tea.Batch(m.runAction(func() error {
 			return regenerate(item.Path)
@@ -198,7 +205,7 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			return m, nil
 		}
-		m.busyIdx = m.list.Index()
+		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "removing worktree..."
 		return m, tea.Batch(m.runAction(func() error {
 			return removeWorktree(item.Path, item.Branch)
