@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
+	"github.com/phlisg/frank/internal/worktreelist"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +28,7 @@ func branchForPath(porcelain, path string) string {
 
 func init() {
 	rootCmd.AddCommand(worktreeCmd)
+	worktreeCmd.AddCommand(worktreeCreateCmd)
 	worktreeCmd.AddCommand(worktreeRemoveCmd)
 }
 
@@ -33,6 +36,33 @@ var worktreeCmd = &cobra.Command{
 	Use:   "worktree",
 	Short: "Manage git worktrees",
 	ValidArgsFunction: cobra.NoFileCompletions,
+}
+
+var worktreeCreateCmd = &cobra.Command{
+	Use:               "create <branch>",
+	Short:             "Create a new git worktree as a sibling directory",
+	Args:              cobra.ExactArgs(1),
+	SilenceUsage:      true,
+	ValidArgsFunction: cobra.NoFileCompletions,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dir := resolveDir()
+		branch := args[0]
+		projectName := config.ProjectName(dir)
+		kebab := worktreelist.BranchToKebab(branch)
+		parentDir := filepath.Dir(dir)
+		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
+
+		if err := worktreelist.CreateWorktree(dir, wtPath, branch); err != nil {
+			return err
+		}
+
+		output.Group("Worktree created", wtPath)
+		output.NextSteps([]string{
+			fmt.Sprintf("cd %s", wtPath),
+			"frank up",
+		})
+		return nil
+	},
 }
 
 var worktreeRemoveCmd = &cobra.Command{
