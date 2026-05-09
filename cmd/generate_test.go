@@ -386,6 +386,8 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 	}
 
 	git(mainDir, "init")
+	git(mainDir, "config", "user.email", "test@test.com")
+	git(mainDir, "config", "user.name", "Test")
 	os.WriteFile(filepath.Join(mainDir, "frank.yaml"), []byte("version: 1\n"), 0644)
 	git(mainDir, "add", ".")
 	git(mainDir, "commit", "-m", "init")

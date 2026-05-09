@@ -715,6 +715,8 @@ func TestIsWorktree(t *testing.T) {
 	}
 
 	run(main, "init")
+	run(main, "config", "user.email", "test@test.com")
+	run(main, "config", "user.name", "Test")
 	run(main, "commit", "--allow-empty", "-m", "init")
 
 	wt := filepath.Join(t.TempDir(), "wt")
