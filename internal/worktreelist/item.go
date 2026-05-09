@@ -11,13 +11,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Ensure WorktreeItem satisfies list.Item.
 var _ list.Item = WorktreeItem{}
 
-// FilterValue implements list.Item. Returns the branch name for filtering.
 func (w WorktreeItem) FilterValue() string { return w.Branch }
 
-// Status indicator symbols.
 const (
 	indicatorRunning       = "●"
 	indicatorPartial       = "◐"
@@ -25,37 +22,36 @@ const (
 	indicatorNotConfigured = "✗"
 )
 
-// Lipgloss styles for the item delegate.
 var (
 	itemTitle        = lipgloss.NewStyle().Bold(true)
-	itemTitleSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("13"))
+	itemTitleSelected = lipgloss.NewStyle().Bold(true).Reverse(true)
 	itemDesc         = lipgloss.NewStyle().Faint(true)
-	itemDescSelected = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("13"))
+	itemDescSelected = lipgloss.NewStyle().Reverse(true)
 	itemPath         = lipgloss.NewStyle().Faint(true)
-	itemPathSelected = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("13"))
+	itemPathSelected = lipgloss.NewStyle().Faint(true).Reverse(true)
 
-	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))  // green
-	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))  // yellow
-	indicatorStoppedStyle       = lipgloss.NewStyle().Faint(true)                      // dim/gray
-	indicatorNotConfiguredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))  // red
+	indicatorRunningStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	indicatorPartialStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	indicatorStoppedStyle       = lipgloss.NewStyle().Faint(true)
+	indicatorNotConfiguredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+
+	busyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 )
 
-// ItemDelegate renders WorktreeItem entries as 3-line blocks with 1-line spacing.
-type ItemDelegate struct{}
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
-// Ensure ItemDelegate satisfies list.ItemDelegate.
+// ItemDelegate renders WorktreeItem entries as 3-line blocks with 1-line spacing.
+type ItemDelegate struct {
+	BusyIdx      *int
+	SpinnerFrame *int
+}
+
 var _ list.ItemDelegate = ItemDelegate{}
 
-// Height returns the item height (3 visible lines).
-func (d ItemDelegate) Height() int { return 3 }
-
-// Spacing returns the gap between items (1 blank line).
+func (d ItemDelegate) Height() int  { return 3 }
 func (d ItemDelegate) Spacing() int { return 1 }
-
-// Update is a no-op — items are read-only.
 func (d ItemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
-// Render writes the 3-line item view to w.
 func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	wt, ok := item.(WorktreeItem)
 	if !ok {
@@ -63,9 +59,17 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	selected := index == m.Index()
+	busy := d.BusyIdx != nil && *d.BusyIdx == index
 
 	// Line 1: branch name
 	title := wt.Branch
+	if busy {
+		frame := spinnerFrames[0]
+		if d.SpinnerFrame != nil {
+			frame = spinnerFrames[*d.SpinnerFrame%len(spinnerFrames)]
+		}
+		title = busyStyle.Render(frame) + " " + title
+	}
 	if selected {
 		title = itemTitleSelected.Render(title)
 	} else {
@@ -78,7 +82,9 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	ports := wt.PortSummary()
 
 	var descParts []string
-	descParts = append(descParts, indicatorStyle.Render(indicator))
+	if !busy {
+		descParts = append(descParts, indicatorStyle.Render(indicator))
+	}
 	if selected {
 		descParts = append(descParts, itemDescSelected.Render(label))
 	} else {
@@ -104,7 +110,6 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	fmt.Fprintf(w, "  %s\n  %s\n  %s", title, descLine, path)
 }
 
-// statusIndicator returns the symbol and style for a worktree's status.
 func statusIndicator(wt WorktreeItem) (string, lipgloss.Style) {
 	if !wt.HasFrank {
 		return indicatorNotConfigured, indicatorNotConfiguredStyle
@@ -127,7 +132,6 @@ func statusIndicator(wt WorktreeItem) (string, lipgloss.Style) {
 	return indicatorPartial, indicatorPartialStyle
 }
 
-// shortenHome replaces the user's home directory prefix with ~.
 func shortenHome(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {

@@ -2,6 +2,7 @@ package worktreelist
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -23,6 +24,8 @@ type Model struct {
 	statusMsg     string
 	postQuit      *PostQuitAction
 	quitting      bool
+	busyIdx       int
+	spinnerFrame  int
 }
 
 type actionDoneMsg struct {
@@ -31,18 +34,31 @@ type actionDoneMsg struct {
 
 type refreshMsg struct{}
 
+type spinnerTickMsg struct{}
+
+func spinnerTick() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(_ time.Time) tea.Msg {
+		return spinnerTickMsg{}
+	})
+}
+
 func newKeyBinding(k, help string) key.Binding {
 	return key.NewBinding(key.WithKeys(k), key.WithHelp(k, help))
 }
 
 // New creates a Model from discovered worktree items.
 func New(items []WorktreeItem, dir string) Model {
+	m := Model{dir: dir, busyIdx: -1}
+
 	listItems := make([]list.Item, len(items))
 	for i, item := range items {
 		listItems[i] = item
 	}
 
-	delegate := ItemDelegate{}
+	delegate := ItemDelegate{
+		BusyIdx:      &m.busyIdx,
+		SpinnerFrame: &m.spinnerFrame,
+	}
 	l := list.New(listItems, delegate, 80, 24)
 	l.Title = "Worktrees"
 	l.SetShowStatusBar(true)
@@ -61,7 +77,8 @@ func New(items []WorktreeItem, dir string) Model {
 		}
 	}
 
-	return Model{list: l, dir: dir}
+	m.list = l
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -87,6 +104,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case actionDoneMsg:
+		m.busyIdx = -1
 		if msg.err != nil {
 			m.statusMsg = fmt.Sprintf("error: %v", msg.err)
 		} else {
@@ -96,6 +114,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshMsg:
 		return m.doRefresh()
+
+	case spinnerTickMsg:
+		if m.busyIdx >= 0 {
+			m.spinnerFrame++
+			return m, spinnerTick()
+		}
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -104,6 +129,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.busyIdx >= 0 {
+		return m, nil
+	}
+
 	item, ok := m.selectedItem()
 	if !ok {
 		var cmd tea.Cmd
@@ -125,16 +154,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "u":
+		m.busyIdx = m.list.Index()
 		m.statusMsg = "starting containers..."
-		return m, m.runAction(func() error {
+		return m, tea.Batch(m.runAction(func() error {
 			return upContainers(item.Path)
-		})
+		}), spinnerTick())
 
 	case "d":
+		m.busyIdx = m.list.Index()
 		m.statusMsg = "stopping containers..."
-		return m, m.runAction(func() error {
+		return m, tea.Batch(m.runAction(func() error {
 			return downContainers(item.Path)
-		})
+		}), spinnerTick())
 
 	case "l":
 		m.postQuit = &PostQuitAction{Kind: "logs", Path: item.Path}
@@ -142,10 +173,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "g":
+		m.busyIdx = m.list.Index()
 		m.statusMsg = "regenerating..."
-		return m, m.runAction(func() error {
+		return m, tea.Batch(m.runAction(func() error {
 			return regenerate(item.Path)
-		})
+		}), spinnerTick())
 
 	case "e":
 		m.postQuit = &PostQuitAction{Kind: "editor", Path: item.Path}
@@ -166,10 +198,11 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			return m, nil
 		}
+		m.busyIdx = m.list.Index()
 		m.statusMsg = "removing worktree..."
-		return m, m.runAction(func() error {
+		return m, tea.Batch(m.runAction(func() error {
 			return removeWorktree(item.Path, item.Branch)
-		})
+		}), spinnerTick())
 
 	default:
 		m.confirmRemove = false
@@ -225,12 +258,10 @@ func (m Model) View() string {
 	return m.list.View()
 }
 
-// PostQuit returns the action to execute after the TUI exits, or nil.
 func (m Model) PostQuit() *PostQuitAction {
 	return m.postQuit
 }
 
-// Run starts the TUI and handles post-quit actions.
 func Run(dir string, items []WorktreeItem) error {
 	m := New(items, dir)
 	p := tea.NewProgram(m, tea.WithAltScreen())
