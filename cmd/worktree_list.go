@@ -25,7 +25,7 @@ var worktreeListCmd = &cobra.Command{
 		}
 		if len(items) == 0 {
 			fmt.Println("No linked worktrees found.")
-			fmt.Println("Create one with: git worktree add <path> -b <branch>")
+			fmt.Println("Create one with: frank worktree create <branch>")
 			return nil
 		}
 
