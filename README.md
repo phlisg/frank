@@ -41,6 +41,15 @@ Frank gives you a full Laravel dev environment from a single `frank.yaml` — no
 - **_Lefthook_** pre-commit hooks: auto-fix on commit, analyze before push 
 - `frank tool add <name>` to install tools on existing projects - `frank generate` reconciles tools for new devs cloning the repo$
 
+**Git Worktrees**
+- Run multiple branches in parallel with isolated containers and ephemeral ports
+- `frank worktree create` / `remove` / `list` — create, tear down, or browse worktrees
+- Interactive TUI with keybindings to start, stop, open, or remove worktrees
+
+**AI Integration (MCP)**
+- Built-in [MCP](https://modelcontextprotocol.io/) server — AI assistants can check status, read config, tail logs, run commands, and manage worktrees without shelling out
+- Auto-generated `.mcp.json` — Claude Code, Cursor, and Windsurf discover it automatically
+
 **Interop**
 - Import existing Laravel Sail projects (`frank import`)
 - Hand off to Sail anytime (`frank eject`)
@@ -242,6 +251,30 @@ config:
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
 | `frank version [--check\|--update]` | Print version and check for updates. `--check` shows update status; `--update` self-updates via Homebrew or `go install` |
+
+---
+
+## Git Worktrees
+
+Frank detects git worktrees automatically. Each worktree gets isolated containers with ephemeral ports — no conflicts with your main project or other worktrees.
+
+```bash
+frank worktree create feature/auth    # creates ../myapp-feature-auth
+cd ../myapp-feature-auth
+frank up                              # containers start with random ports
+```
+
+`frank worktree list` opens an interactive TUI to browse, start, stop, or remove worktrees. See [`docs/worktrees.md`](docs/worktrees.md) for details.
+
+## MCP Integration
+
+Frank ships a built-in MCP server that AI coding assistants can use to interact with your containers directly — no need to shell out to docker compose.
+
+```bash
+frank generate   # creates .mcp.json — IDEs discover it automatically
+```
+
+Available tools: `frank_status`, `frank_config`, `frank_logs`, `frank_exec`, `frank_worktrees`. See [`docs/mcp.md`](docs/mcp.md) for setup and usage.
 
 ---
 
