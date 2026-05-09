@@ -231,6 +231,9 @@ config:
 | `frank worker stop [--all]` | Stop ad-hoc workers; `--all` also stops declared ones |
 | `frank worker logs [name] [-f]` | Tail logs for one or all workers |
 | `frank worker top [--live] [--min-pane-width N]` | Live multi-pane CCTV view of every worker; `--live` reconciles ad-hoc churn |
+| `frank worktree create <branch>` | Create a new git worktree as a sibling directory — see [`docs/worktrees.md`](docs/worktrees.md) |
+| `frank worktree remove <path>` | Tear down containers, remove worktree and branch |
+| `frank worktree list` | Interactive TUI for browsing worktrees — see [`docs/worktrees.md`](docs/worktrees.md) |
 | `frank watch [--status\|--stop]` | Run the code-reload watcher in the foreground, or inspect/stop the detached one |
 | `frank config show` | Show resolved configuration — see [`docs/config.md`](docs/config.md) |
 | `frank config edit` | Open frank.yaml in your editor — see [`docs/config.md`](docs/config.md) |
@@ -251,5 +254,7 @@ config:
 - Project and PHP tools — [`docs/tools.md`](docs/tools.md)
 - PHP runtimes — [`docs/runtimes.md`](docs/runtimes.md)
 - Shell aliases — [`docs/shell.md`](docs/shell.md)
+- Worktrees — [`docs/worktrees.md`](docs/worktrees.md)
+- MCP integration — [`docs/mcp.md`](docs/mcp.md)
 - Sail interop — [`docs/sail-interop.md`](docs/sail-interop.md)
 - Contributing — [`docs/contributing.md`](docs/contributing.md)

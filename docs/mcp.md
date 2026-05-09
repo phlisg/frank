@@ -29,6 +29,7 @@ IDEs that support project-scoped MCP servers (Claude Code, Cursor) will discover
 | `frank_config` | Fully resolved `frank.yaml` configuration as JSON |
 | `frank_logs` | Tail container logs (all services or a specific one) |
 | `frank_exec` | Run a command inside a container (artisan, composer, npm, etc.) |
+| `frank_worktrees` | List, create, or remove git worktrees — see below |
 
 ## Usage
 
@@ -51,6 +52,32 @@ When running from a git worktree, `frank_status` includes a `worktree` object:
 ```
 
 This tells the AI assistant that ports are ephemeral and provides the deterministic Vite port.
+
+### `frank_worktrees` Tool
+
+Manages git worktrees programmatically. Takes an `action` parameter:
+
+| Action | Parameters | Description |
+|--------|-----------|-------------|
+| `list` | — | Returns all linked worktrees with branch, status, and ports as JSON |
+| `create` | `branch` (required) | Creates a new worktree as a sibling directory (`../<project>-<kebab-branch>`) |
+| `remove` | `path` (required) | Tears down containers, removes the worktree directory, and deletes the branch |
+
+Example response from `list`:
+
+```json
+[
+  {
+    "path": "/home/user/code/myapp-feature-auth",
+    "branch": "feature/auth",
+    "hasFrank": true,
+    "status": "running (3/3)",
+    "ports": ":32771 :32768 :5191"
+  }
+]
+```
+
+This lets AI assistants create isolated worktrees, start/stop their containers, and clean them up when done — without shelling out to git or docker.
 
 ## Manual Use
 
