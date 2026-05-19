@@ -16,8 +16,6 @@ laravel.test:
     - PSYSH_CONFIG=/var/www/html/.psysh.php
     - PSYSH_HOME=/var/www/html/storage/psysh
     - WWWUSER=${UID:-1000}
-  env_file:
-    - .env
   working_dir: /var/www/html
   tty: true
   stdin_open: true

@@ -10,8 +10,6 @@ services:
                 WWWGROUP: ${GID:-1000}
             context: .
             dockerfile: .frank/Dockerfile
-        env_file:
-            - .env
         environment:
             - APP_ENV=local
             - APP_DEBUG=true
