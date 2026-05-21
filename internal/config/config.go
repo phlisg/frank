@@ -245,6 +245,27 @@ func ProjectName(dir string) string {
 	return filepath.Base(abs)
 }
 
+// MainProjectName returns the project name of the main working tree.
+// For non-worktrees this equals ProjectName(dir). For worktrees it
+// resolves via git's common-dir (parent of the .git/worktrees/ dir).
+func MainProjectName(dir string) string {
+	if !IsWorktree(dir) {
+		return ProjectName(dir)
+	}
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
+	cmd.Dir = dir
+	cmd.Env = CleanGitEnv()
+	out, err := cmd.Output()
+	if err != nil {
+		return ProjectName(dir)
+	}
+	cd := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(cd) {
+		cd = filepath.Join(dir, cd)
+	}
+	return filepath.Base(filepath.Dir(filepath.Clean(cd)))
+}
+
 // Load reads frank.yaml from dir, applies defaults, and validates.
 func Load(dir string) (*Config, error) {
 	path := filepath.Join(dir, ConfigFileName)

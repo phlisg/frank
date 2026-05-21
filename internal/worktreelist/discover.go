@@ -22,9 +22,17 @@ type WorktreeItem struct {
 
 // ServiceInfo holds one container's name, state, and port mappings.
 type ServiceInfo struct {
-	Name  string
-	State string
-	Ports string
+	Name       string
+	State      string
+	Ports      string
+	Publishers []Publisher
+}
+
+// Publisher is a single port mapping from docker compose ps.
+type Publisher struct {
+	TargetPort    int
+	PublishedPort int
+	Protocol      string
 }
 
 // StatusLabel returns a human-readable status string.
@@ -203,10 +211,21 @@ func probeServices(worktreePath string) []ServiceInfo {
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			continue
 		}
+		var pubs []Publisher
+		for _, p := range entry.Publishers {
+			if p.PublishedPort > 0 {
+				pubs = append(pubs, Publisher{
+					TargetPort:    p.TargetPort,
+					PublishedPort: p.PublishedPort,
+					Protocol:      p.Protocol,
+				})
+			}
+		}
 		services = append(services, ServiceInfo{
-			Name:  entry.Service,
-			State: entry.State,
-			Ports: formatPorts(entry),
+			Name:       entry.Service,
+			State:      entry.State,
+			Ports:      formatPorts(entry),
+			Publishers: pubs,
 		})
 	}
 	return services
@@ -224,18 +243,19 @@ func formatPorts(entry composePSEntry) string {
 	return strings.Join(parts, " ")
 }
 
-// WebPort returns the first published port from the laravel.test service,
-// or 0 if none found. Used for browser URL construction.
+// WebPort returns the published TCP port for the web server (443 or 80)
+// from the laravel.test service, or 0 if none found.
 func (w WorktreeItem) WebPort() int {
 	for _, s := range w.Services {
-		if s.Name == "laravel.test" && s.Ports != "" {
-			// Parse first port from ":NNNNN" format
-			ports := strings.Fields(s.Ports)
-			if len(ports) > 0 {
-				port := strings.TrimPrefix(ports[0], ":")
-				var p int
-				fmt.Sscanf(port, "%d", &p)
-				return p
+		if s.Name != "laravel.test" {
+			continue
+		}
+		// Prefer 443/tcp, fall back to 80/tcp.
+		for _, target := range []int{443, 80} {
+			for _, p := range s.Publishers {
+				if p.TargetPort == target && p.Protocol == "tcp" {
+					return p.PublishedPort
+				}
 			}
 		}
 	}

@@ -2,14 +2,58 @@ package worktreelist
 
 import "testing"
 
-func TestWebPort_WithLaravelTest(t *testing.T) {
+func TestWebPort_HTTPS(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":443 :5173"},
+			{Name: "laravel.test", State: "running", Ports: ":32771 :32770 :5173", Publishers: []Publisher{
+				{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+				{TargetPort: 443, PublishedPort: 32770, Protocol: "udp"},
+				{TargetPort: 5173, PublishedPort: 5173, Protocol: "tcp"},
+			}},
 		},
 	}
-	if got := item.WebPort(); got != 443 {
-		t.Errorf("WebPort() = %d, want 443", got)
+	if got := item.WebPort(); got != 32771 {
+		t.Errorf("WebPort() = %d, want 32771 (443/tcp)", got)
+	}
+}
+
+func TestWebPort_HTTP(t *testing.T) {
+	item := WorktreeItem{
+		Services: []ServiceInfo{
+			{Name: "laravel.test", State: "running", Ports: ":8080", Publishers: []Publisher{
+				{TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
+			}},
+		},
+	}
+	if got := item.WebPort(); got != 8080 {
+		t.Errorf("WebPort() = %d, want 8080 (80/tcp)", got)
+	}
+}
+
+func TestWebPort_PrefersHTTPS(t *testing.T) {
+	item := WorktreeItem{
+		Services: []ServiceInfo{
+			{Name: "laravel.test", State: "running", Ports: ":32771 :8080", Publishers: []Publisher{
+				{TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
+				{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+			}},
+		},
+	}
+	if got := item.WebPort(); got != 32771 {
+		t.Errorf("WebPort() = %d, want 32771 (443/tcp preferred over 80/tcp)", got)
+	}
+}
+
+func TestWebPort_SkipsUDP(t *testing.T) {
+	item := WorktreeItem{
+		Services: []ServiceInfo{
+			{Name: "laravel.test", State: "running", Ports: ":32770", Publishers: []Publisher{
+				{TargetPort: 443, PublishedPort: 32770, Protocol: "udp"},
+			}},
+		},
+	}
+	if got := item.WebPort(); got != 0 {
+		t.Errorf("WebPort() = %d, want 0 (only UDP available)", got)
 	}
 }
 
@@ -27,7 +71,7 @@ func TestWebPort_NoLaravelTest(t *testing.T) {
 func TestWebPort_NoPorts(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ""},
+			{Name: "laravel.test", State: "running"},
 		},
 	}
 	if got := item.WebPort(); got != 0 {

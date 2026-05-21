@@ -204,7 +204,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.shared.busyIdx = m.list.Index()
-		m.statusMsg = "starting containers..."
+		if needsGenerate(item.Path) {
+			m.statusMsg = "generating + starting containers..."
+		} else {
+			m.statusMsg = "starting containers..."
+		}
 		return m, tea.Batch(m.runAction(func() error {
 			return upContainers(item.Path)
 		}), spinnerTick())

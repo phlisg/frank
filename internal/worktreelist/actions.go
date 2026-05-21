@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"github.com/phlisg/frank/internal/config"
@@ -55,7 +56,17 @@ func RemoveWorktree(path, branch string) error {
 	return nil
 }
 
+func needsGenerate(path string) bool {
+	_, err := os.Stat(filepath.Join(path, ".frank", "compose.yaml"))
+	return os.IsNotExist(err)
+}
+
 func upContainers(path string) error {
+	if needsGenerate(path) {
+		if err := regenerate(path); err != nil {
+			return err
+		}
+	}
 	frank, err := os.Executable()
 	if err != nil {
 		frank = "frank"
@@ -103,7 +114,24 @@ func CreateWorktree(repoDir, wtPath, branch string) error {
 	if err != nil {
 		return fmt.Errorf("git worktree add: %s", out)
 	}
+
+	copyIfExists(repoDir, wtPath, "auth.json")
+
 	return nil
+}
+
+func copyIfExists(srcDir, dstDir, name string) {
+	src := filepath.Join(srcDir, name)
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return
+	}
+	info, _ := os.Stat(src)
+	perm := os.FileMode(0644)
+	if info != nil {
+		perm = info.Mode().Perm()
+	}
+	_ = os.WriteFile(filepath.Join(dstDir, name), data, perm)
 }
 
 func regenerate(path string) error {

@@ -62,6 +62,7 @@ var generateCmd = &cobra.Command{
 // Called by both `frank generate` and at the end of `frank new`.
 func generate(cfg *config.Config, dir, version string) error {
 	projectName := config.ProjectName(dir)
+	mainProjectName := config.MainProjectName(dir)
 	engine := template.New(TemplateFS)
 	gen := compose.New(engine)
 
@@ -97,7 +98,7 @@ func generate(cfg *config.Config, dir, version string) error {
 		}
 	}
 
-	if err := gen.Write(cfg, projectName, dir, ephemeralPorts, vitePort); err != nil {
+	if err := gen.Write(cfg, projectName, mainProjectName, dir, ephemeralPorts, vitePort); err != nil {
 		return fmt.Errorf("generate compose.yaml: %w", err)
 	}
 	output.Detail("wrote .frank/compose.yaml")

@@ -41,7 +41,7 @@ func New(engine *template.Engine) *Generator {
 }
 
 // Generate produces a compose.yaml string for the given config and project name.
-func (g *Generator) Generate(cfg *config.Config, projectName string, ephemeralPorts bool, vitePort int) (string, error) {
+func (g *Generator) Generate(cfg *config.Config, projectName, mainProjectName string, ephemeralPorts bool, vitePort int) (string, error) {
 	services := map[string]interface{}{}
 	volumes := map[string]interface{}{}
 
@@ -59,6 +59,16 @@ func (g *Generator) Generate(cfg *config.Config, projectName string, ephemeralPo
 	}
 	if err := mergeFragment(services, runtimeFrag); err != nil {
 		return "", fmt.Errorf("merge runtime fragment: %w", err)
+	}
+
+	// 1b. Worktree: add cache_from so builds reuse layers from the main project image.
+	if ephemeralPorts {
+		if lt, ok := services["laravel.test"].(map[string]interface{}); ok {
+			if build, ok := lt["build"].(map[string]interface{}); ok {
+				mainImage := fmt.Sprintf("%s-laravel.test", mainProjectName)
+				build["cache_from"] = []string{mainImage}
+			}
+		}
 	}
 
 	// 2. Render and merge each service compose fragment.
@@ -120,8 +130,8 @@ func (g *Generator) Generate(cfg *config.Config, projectName string, ephemeralPo
 }
 
 // Write generates compose.yaml and writes it to .frank/ inside dir.
-func (g *Generator) Write(cfg *config.Config, projectName, dir string, ephemeralPorts bool, vitePort int) error {
-	content, err := g.Generate(cfg, projectName, ephemeralPorts, vitePort)
+func (g *Generator) Write(cfg *config.Config, projectName, mainProjectName, dir string, ephemeralPorts bool, vitePort int) error {
+	content, err := g.Generate(cfg, projectName, mainProjectName, ephemeralPorts, vitePort)
 	if err != nil {
 		return err
 	}
