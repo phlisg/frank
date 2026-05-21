@@ -42,8 +42,8 @@ laravel.test:
   environment:
     - APP_ENV=local
     - APP_DEBUG=true
-    - PSYSH_CONFIG=/var/www/html/.psysh.php
     - PSYSH_HOME=/var/www/html/storage/psysh
+    - XDG_CONFIG_HOME=/var/www/html/storage/psysh
     - WWWUSER=${UID:-1000}
   working_dir: /var/www/html
   tty: true

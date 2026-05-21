@@ -136,6 +136,7 @@ var defaultWatchFiles = []string{".env", "composer.lock"}
 var baselineIgnorePatterns = []string{
 	".git/**",
 	".frank/**",
+	"bootstrap/cache/**",
 	"*.swp",
 	"*.swx",
 	"*~",
