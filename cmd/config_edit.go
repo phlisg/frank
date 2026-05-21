@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,9 @@ var configEditCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := resolveDir()
 		path := filepath.Join(dir, config.ConfigFileName)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("no %s found in %s — run frank setup to create one", config.ConfigFileName, dir)
+		}
 		editor := os.Getenv("EDITOR")
 		if editor == "" {
 			editor = os.Getenv("VISUAL")

@@ -84,6 +84,47 @@ func Activate(cfg *config.Config) string {
 	return sb.String()
 }
 
+// AliasEntry describes a single alias for display purposes.
+type AliasEntry struct {
+	Name    string
+	Cmd     string
+	Note    string // e.g. "pgsql", "host", ""
+	Custom  bool
+}
+
+// ListAliases returns all active aliases for the given config.
+func ListAliases(cfg *config.Config) []AliasEntry {
+	var entries []AliasEntry
+	for _, a := range aliasTable {
+		if a.service != "" && !cfg.HasService(a.service) {
+			continue
+		}
+		note := ""
+		if a.service != "" {
+			note = a.service
+		}
+		entries = append(entries, AliasEntry{Name: a.name, Cmd: a.cmd, Note: note})
+	}
+
+	var customNames []string
+	for name := range cfg.Aliases {
+		customNames = append(customNames, name)
+	}
+	sort.Strings(customNames)
+	for _, name := range customNames {
+		a := cfg.Aliases[name]
+		cmd := a.Cmd
+		note := ""
+		if a.Host {
+			note = "host"
+		} else {
+			cmd = execSail + " " + cmd
+		}
+		entries = append(entries, AliasEntry{Name: name, Cmd: cmd, Note: note, Custom: true})
+	}
+	return entries
+}
+
 // Deactivate returns shell commands to remove all frank-managed aliases.
 func Deactivate() string {
 	return `for _a in $_FRANK_ALIASES; do unalias $_a 2>/dev/null; done
