@@ -9,4 +9,7 @@ pre-commit:
     
     vet:
       run: go vet ./...
+
+    staticcheck:
+      run: go tool staticcheck ./...
       

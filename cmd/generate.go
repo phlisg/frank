@@ -327,21 +327,6 @@ func viteConfigHasFrankServer(dir string) bool {
 	return false
 }
 
-func generatedFileCount(cfg *config.Config) int {
-	count := 6 // compose.yaml + .env + .env.example + Dockerfile + .state + README.md
-	switch cfg.PHP.Runtime {
-	case "frankenphp":
-		count++ // Caddyfile
-	case "fpm":
-		count += 2 // nginx.conf + nginx.Dockerfile
-	}
-	db := cfg.Database()
-	if db != "" && db != "sqlite" {
-		count++ // init script
-	}
-	return count
-}
-
 func ensureGitignoreLine(path, line string) error {
 	data, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {

@@ -338,7 +338,7 @@ func waitForLogsFor(paneID string, r *LogsReader) tea.Cmd {
 		if !ok {
 			return StateMsg{PaneID: paneID, State: StateExited}
 		}
-		return LogLineMsg{PaneID: line.PaneID, Line: line.Line}
+		return LogLineMsg(line)
 	}
 }
 

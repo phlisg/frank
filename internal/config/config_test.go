@@ -639,7 +639,7 @@ aliases:
 func TestViteWorktreePort(t *testing.T) {
 	// Deterministic: same input → same output.
 	for i := 0; i < 10; i++ {
-		if ViteWorktreePort("my-project") != ViteWorktreePort("my-project") {
+		if p := ViteWorktreePort("my-project"); p != ViteWorktreePort("my-project") {
 			t.Fatal("ViteWorktreePort is not deterministic")
 		}
 	}
