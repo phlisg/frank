@@ -1,0 +1,72 @@
+name: Bug Report
+description: Report a bug with Frank
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please fill in as much as you can.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Run `frank new myapp`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: frank-yaml
+    attributes:
+      label: frank.yaml
+      description: Paste your frank.yaml (remove anything sensitive).
+      render: yaml
+
+  - type: input
+    id: frank-version
+    attributes:
+      label: Frank version
+      description: Output of `frank --version`
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker version
+      description: Output of `docker --version`
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Linux
+        - Windows (WSL)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any error output or logs.
+      render: shell
