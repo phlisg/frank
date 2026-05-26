@@ -148,10 +148,7 @@ func TestGenerate_Success(t *testing.T) {
 func TestGenerate_MkcertRunFails(t *testing.T) {
 	fs := &mockFS{
 		existsFn: func(path string) bool {
-			if path == "/home/user/.local/share/mkcert/rootCA.pem" {
-				return true
-			}
-			return false
+			return path == "/home/user/.local/share/mkcert/rootCA.pem"
 		},
 		mkdirAllFn: func(path string, perm os.FileMode) error { return nil },
 	}
