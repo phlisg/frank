@@ -263,6 +263,19 @@ func patchViteConfig(dir string) error {
 	}
 
 	content := string(data)
+
+	// Migrate old static import → dynamic import with fallback.
+	oldImport := "import frankServer from './.frank/vite-server.js';"
+	newImport := "const frankServer = await import('./.frank/vite-server.js').then(m => m.default).catch(() => ({}));"
+	if strings.Contains(content, oldImport) {
+		content = strings.Replace(content, oldImport, newImport, 1)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+			return err
+		}
+		output.Detail("migrated vite.config (dynamic import)")
+		return nil
+	}
+
 	if strings.Contains(content, "vite-server") {
 		return nil
 	}
@@ -279,7 +292,7 @@ func patchViteConfig(dir string) error {
 	if lastImport == -1 {
 		return fmt.Errorf("no import lines found")
 	}
-	importLine := "import frankServer from './.frank/vite-server.js';"
+	importLine := "const frankServer = await import('./.frank/vite-server.js').then(m => m.default).catch(() => ({}));"
 	lines = append(lines[:lastImport+1], append([]string{importLine}, lines[lastImport+1:]...)...)
 
 	// Insert server: frankServer before closing });

@@ -50,7 +50,7 @@ var generateCmd = &cobra.Command{
 			output.Detail(fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 		}
 
-		if cfg.Server.IsHTTPS() {
+		if err := patchViteConfig(dir); err != nil && cfg.Server.IsHTTPS() {
 			printViteHTTPSHint(dir)
 		}
 		output.NextSteps([]string{"frank up -d"})
@@ -308,7 +308,7 @@ func printViteHTTPSHint(dir string) {
 	}
 	output.Warning(`HTTPS enabled — add to your vite.config.js/ts:
 
-  import frankServer from './.frank/vite-server.js';
+  const frankServer = await import('./.frank/vite-server.js').then(m => m.default).catch(() => ({}));
 
   // inside defineConfig:
   server: frankServer,`)
