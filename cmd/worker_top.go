@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	workerTopCmd.Flags().BoolVar(&workerTopLive, "live", false,
+	workerTopCmd.Flags().BoolVar(&workerTopLive, "live", true,
 		"Reconcile ad-hoc workers every 2s (add/remove panes as they spawn/exit)")
 	workerTopCmd.Flags().IntVar(&workerTopMinPaneWidth, "min-pane-width", 30,
 		"Minimum column width before pane titles truncate")

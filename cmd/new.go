@@ -749,6 +749,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Services []string                        `yaml:"services"`
 		Config   map[string]config.ServiceConfig `yaml:"config,omitempty"`
 		Workers  *config.Workers                 `yaml:"workers,omitempty"`
+		Server   *config.Server                  `yaml:"server,omitempty"`
 		Node     *config.Node                    `yaml:"node,omitempty"`
 		Tools    []string                        `yaml:"tools,omitempty"`
 		Aliases  map[string]config.Alias         `yaml:"aliases,omitempty"`
@@ -764,6 +765,10 @@ func marshalConfig(cfg *config.Config) (string, error) {
 	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
 		w := cfg.Workers
 		out.Workers = &w
+	}
+	if cfg.Server.HTTPS != nil || cfg.Server.Port != 0 {
+		s := cfg.Server
+		out.Server = &s
 	}
 	if cfg.Node.PackageManager != "" && cfg.Node.PackageManager != "npm" {
 		n := cfg.Node

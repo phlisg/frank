@@ -57,7 +57,7 @@ frank worker stop                            # stop ad-hoc workers
 frank worker stop --all                      # stop declared workers too
 ```
 
-Ad-hoc workers are labelled `frank.worker=adhoc` so `frank down` cleans them up automatically — no orphans.
+Ad-hoc workers are labelled `frank.worker=adhoc` so `frank down` cleans them up automatically — no orphans. They use `--restart=unless-stopped`, so they survive code restarts and host reboots; `frank worker stop` or `frank down` removes them.
 
 ## Live multi-pane view: `frank worker top`
 
@@ -67,8 +67,8 @@ declared queue pool, and a trailing row for any ad-hoc workers. Memory
 usage sits in each pane's title bar.
 
 ```bash
-frank worker top                       # snapshot layout — ad-hoc changes ignored
-frank worker top --live                # poll for new/removed ad-hoc workers every 2s
+frank worker top                       # live by default — ad-hoc adds/removes reflected every 2s
+frank worker top --live=false          # snapshot layout — ad-hoc changes ignored
 frank worker top --min-pane-width 40   # force denser panes on ultrawide terminals
 ```
 
@@ -81,10 +81,10 @@ frank worker top --min-pane-width 40   # force denser panes on ultrawide termina
 | `Enter`             | Zoom focused pane full-screen          |
 | Left-click pane     | Focus + zoom that pane in one shot     |
 | `Esc`               | Return from zoom to grid (click zoomed pane also unzooms) |
+| `r`                 | Restart all declared workers           |
+| `R`                 | Restart focused worker only            |
 | `PgUp`, `PgDn`      | Scroll back through logs (zoom only)   |
 | `g`, `G`            | Jump to top / bottom of scrollback     |
-
-The TUI is read-only: it never starts, stops, or restarts a container.
 If no workers are running when you launch, it exits with a hint pointing
 you at `frank.yaml` or `frank worker queue`.
 

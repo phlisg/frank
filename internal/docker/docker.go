@@ -110,7 +110,7 @@ func (c *Client) Down() error {
 // from the `laravel.test` service. cmdArgs are appended verbatim after the
 // service name (e.g. ["php", "artisan", "queue:work", "--queue=default"]).
 func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []string) error {
-	args := []string{"run", "-d", "--name", name}
+	args := []string{"run", "-d", "--no-deps", "--restart=unless-stopped", "--name", name}
 	// Sort label keys for deterministic arg order (makes tests + user output stable).
 	keys := make([]string, 0, len(labels))
 	for k := range labels {
@@ -259,7 +259,7 @@ func (c *Client) InspectContainer(name string) (string, int, string, error) {
 		// `docker inspect` on a missing container exits non-zero with
 		// "No such object" on stderr. Treat that as a missing container,
 		// not an error.
-		if strings.Contains(stderr.String(), "No such object") {
+		if strings.Contains(strings.ToLower(stderr.String()), "no such object") {
 			return "", 0, "", nil
 		}
 		return "", 0, "", fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
