@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/phlisg/frank/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 func TestApplyWorkersFromInitNone(t *testing.T) {
@@ -122,6 +123,65 @@ func TestMarshalConfigEmitsNonDefaultNode(t *testing.T) {
 	}
 	if !strings.Contains(out, "packageManager: pnpm") {
 		t.Errorf("expected packageManager: pnpm, got:\n%s", out)
+	}
+}
+
+func TestMarshalConfigRoundtripPreservesAllFields(t *testing.T) {
+	httpsOff := false
+	cfg := config.New()
+	cfg.Aliases = map[string]config.Alias{
+		"migrate": {Cmd: "php artisan migrate"},
+		"tinker":  {Cmd: "php artisan tinker"},
+	}
+	cfg.Server = config.Server{HTTPS: &httpsOff, Port: 8443}
+	cfg.Node.PackageManager = "pnpm"
+	applyWorkersFromInit(cfg, true, 3)
+	cfg.Tools = []string{"pint", "phpstan"}
+
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+
+	// Parse back and verify nothing was dropped.
+	var roundtripped config.Config
+	clean := stripComments(out)
+	if err := yaml.Unmarshal([]byte(clean), &roundtripped); err != nil {
+		t.Fatalf("unmarshal roundtripped yaml: %v", err)
+	}
+
+	// Aliases
+	if len(roundtripped.Aliases) != 2 {
+		t.Errorf("aliases count = %d, want 2", len(roundtripped.Aliases))
+	}
+	if a, ok := roundtripped.Aliases["migrate"]; !ok || a.Cmd != "php artisan migrate" {
+		t.Errorf("alias migrate = %+v", roundtripped.Aliases["migrate"])
+	}
+
+	// Server
+	if roundtripped.Server.HTTPS == nil || *roundtripped.Server.HTTPS != false {
+		t.Errorf("server.https = %v, want false", roundtripped.Server.HTTPS)
+	}
+	if roundtripped.Server.Port != 8443 {
+		t.Errorf("server.port = %d, want 8443", roundtripped.Server.Port)
+	}
+
+	// Node
+	if roundtripped.Node.PackageManager != "pnpm" {
+		t.Errorf("node.packageManager = %q, want pnpm", roundtripped.Node.PackageManager)
+	}
+
+	// Workers
+	if !roundtripped.Workers.Schedule {
+		t.Error("workers.schedule should be true")
+	}
+	if len(roundtripped.Workers.Queue) != 1 || roundtripped.Workers.Queue[0].Count != 3 {
+		t.Errorf("workers.queue = %+v", roundtripped.Workers.Queue)
+	}
+
+	// Tools
+	if len(roundtripped.Tools) != 2 {
+		t.Errorf("tools = %v, want [pint phpstan]", roundtripped.Tools)
 	}
 }
 

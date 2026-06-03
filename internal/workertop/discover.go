@@ -65,7 +65,8 @@ type containerInspector interface {
 	// ("", 0, "", nil) — no error.
 	InspectContainer(name string) (status string, exitCode int, id string, err error)
 	// AdhocWorkerNames returns container names labelled frank.worker=adhoc
-	// for the given compose project, including stopped ones.
+	// for the given compose project. Only running containers are returned
+	// so the TUI does not show stale exited panes on startup.
 	AdhocWorkerNames(projectName string) ([]string, error)
 }
 

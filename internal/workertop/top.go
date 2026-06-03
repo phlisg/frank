@@ -575,7 +575,7 @@ func (m *TopModel) handleReconcile(evt ReconcileEvent) tea.Cmd {
 		if p, ok := m.panesByID[evt.Spec.Name]; ok {
 			p.Update(StateMsg{PaneID: evt.Spec.Name, State: StateExited})
 		}
-		cmds = append(cmds, cleanupAfter(evt.Spec.Name, 10*time.Second))
+		cmds = append(cmds, cleanupAfter(evt.Spec.Name, 2*time.Second))
 	}
 
 	cmds = append(cmds, waitForReconcile(m.reconciler))
@@ -977,7 +977,15 @@ func (d *dockerInspector) InspectContainer(name string) (string, int, string, er
 }
 
 func (d *dockerInspector) AdhocWorkerNames(projectName string) ([]string, error) {
-	return d.c.AdhocWorkerNames(projectName)
+	workers, err := d.c.ListAdhocWorkersWithIDs(projectName)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(workers))
+	for i, w := range workers {
+		names[i] = w.Name
+	}
+	return names, nil
 }
 
 // dockerLister adapts *docker.Client to the adhocLister interface that

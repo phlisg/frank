@@ -106,7 +106,7 @@ Worker fragment invariants (in the templates themselves):
 - `healthcheck: disable: true` — workers reuse the laravel.test image but never start Caddy/nginx, so the inherited healthcheck always fails otherwise.
 - `depends_on: { laravel.test: service_started, laravel.migrate: service_completed_successfully }` — the migrate dependency is load-bearing: queue:work checks the queue:restart signal via the cache store on startup, and Laravel 11+'s default database cache driver crash-loops without the `cache` table.
 
-Ad-hoc workers (from `frank worker queue|schedule`) are launched via `docker compose run -d --name <name> --label frank.worker=adhoc laravel.test …`. They are **not** in compose.yaml, so `frank down` must clean them explicitly (`docker.Client.AdhocWorkerNames` → `StopContainers`). That cleanup lives in `cmd/down.go`; do not move it back into compose.
+Ad-hoc workers (from `frank worker queue|schedule`) are launched via `docker compose run -d --no-deps --restart=unless-stopped --name <name> --label frank.worker=adhoc laravel.test …`. They survive code restarts and host reboots. They are **not** in compose.yaml, so `frank down` must clean them explicitly (`docker.Client.AdhocWorkerNames` → `StopContainers`). That cleanup lives in `cmd/down.go`; do not move it back into compose.
 
 ## Worker Top TUI
 
@@ -117,13 +117,13 @@ File responsibilities:
 - `layout.go` — pure `ComputeLayout(w, h, rows, minPaneWidth)`. Header/footer=1 each; budget split among rows min 5; col widths `w/count`; <20 cols paginates horizontally; <minPaneWidth (default 30) sets `TruncateTitles`.
 - `stats.go` — `Hub` polls `docker stats --no-stream --format '{{.ID}} {{.MemPerc}} {{.MemUsage}}' <ids...>` every 2s. **Always scope to explicit IDs** — bare `docker stats` dumps every container on the host.
 - `logs.go` — one `LogsReader` subprocess per pane. Declared → `docker compose --project-directory . -f .frank/compose.yaml logs -f --no-log-prefix --tail 25 <svc>`; adhoc → `docker logs -f --tail 25 <name>`. `--tail 25` skips historic flood on launch.
-- `reconciler.go` — `--live` only. 2s poll of `docker ps --filter label=frank.worker=adhoc` via `adhocLister` interface; diff emits `EventAdd`/`EventRemove`. Seeded with initial adhoc panes so pre-existing ones don't spuriously re-emit.
+- `reconciler.go` — active by default (`--live=true`). 2s poll of `docker ps --filter label=frank.worker=adhoc` via `adhocLister` interface; diff emits `EventAdd`/`EventRemove`. Seeded with initial adhoc panes so pre-existing ones don't spuriously re-emit. Removed panes get a 2s grace window before cleanup.
 - `pane.go` — per-pane bubbletea model: viewport + 500-line FIFO, stats snapshot, state. PaneID-filtered msgs (`LogLineMsg`, `StatsMsg`, `ResizeMsg`, `FocusMsg`, `StateMsg`).
 - `top.go` — root `TopModel`. Owns rows/panes, statsHub, reconciler, per-pane LogsReaders, focus/zoom, paneBounds (for mouse hit-tests). Keys: q/ctrl+c quit, tab/arrows focus, enter zoom, esc back, pgup/pgdn + g/G scrollback (zoom only). Mouse: left-click zoom toggle, wheel scroll pane under cursor.
 - `style.go` — lipgloss theme vars. Focus border = thick magenta (13), not cyan — avoids ambiguity with green running.
 - `cmd/worker_top.go` — cobra wiring; flags `--live`, `--min-pane-width` (default 30).
 
-TUI is strictly read-only: never starts, stops, or restarts containers. Discovery empty-set exits early with a hint (exit 0, not error).
+TUI supports restart (`r` = all declared, `R` = focused only) but never creates or removes containers. Discovery empty-set exits early with a hint (exit 0, not error).
 
 Worker fragment invariant for this feature: `tty: true` on `queue.fragment.tmpl` + `schedule.fragment.tmpl` (NOT `init.fragment.tmpl` — that's the one-shot laravel.migrate). Needed so Laravel's `queue:work`/`schedule:work` emit ANSI color, which the TUI passes through unchanged.
 

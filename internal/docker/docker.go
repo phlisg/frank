@@ -110,7 +110,7 @@ func (c *Client) Down() error {
 // from the `laravel.test` service. cmdArgs are appended verbatim after the
 // service name (e.g. ["php", "artisan", "queue:work", "--queue=default"]).
 func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []string) error {
-	args := []string{"run", "-d", "--name", name}
+	args := []string{"run", "-d", "--no-deps", "--restart=unless-stopped", "--name", name}
 	// Sort label keys for deterministic arg order (makes tests + user output stable).
 	keys := make([]string, 0, len(labels))
 	for k := range labels {
