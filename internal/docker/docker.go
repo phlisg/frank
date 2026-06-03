@@ -259,7 +259,7 @@ func (c *Client) InspectContainer(name string) (string, int, string, error) {
 		// `docker inspect` on a missing container exits non-zero with
 		// "No such object" on stderr. Treat that as a missing container,
 		// not an error.
-		if strings.Contains(stderr.String(), "No such object") {
+		if strings.Contains(strings.ToLower(stderr.String()), "no such object") {
 			return "", 0, "", nil
 		}
 		return "", 0, "", fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
