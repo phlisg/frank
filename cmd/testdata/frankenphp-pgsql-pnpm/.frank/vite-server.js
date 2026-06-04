@@ -9,4 +9,7 @@ export default {
     },
     origin: 'https://localhost:5173',
     cors: true,
+    watch: {
+        ignored: ['**/vendor/**', '**/node_modules/**', '**/storage/**', '**/public/**', '**/.frank/**', '**/.git/**'],
+    },
 };
