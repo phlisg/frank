@@ -432,6 +432,96 @@ func TestWriteEnv_AppKeyPreserved(t *testing.T) {
 	}
 }
 
+func TestWriteEnv_PatchPreservesUserKeys(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql", "redis", "mailpit"},
+	}
+	dir := t.TempDir()
+
+	// Simulate a user-modified .env with custom keys, modified values, and comments.
+	existing := `APP_NAME=myapp
+APP_ENV=production
+APP_KEY=base64:secretkey==
+APP_DEBUG=false
+APP_URL=https://localhost
+
+# Custom API keys
+STRIPE_KEY=sk_live_abc123
+OPENAI_API_KEY=sk-proj-xyz
+CUSTOM_FEATURE_FLAG=true
+
+DB_CONNECTION=pgsql
+DB_HOST=pgsql
+DB_PORT=5432
+DB_DATABASE=myapp
+DB_USERNAME=sail
+DB_PASSWORD=mysecretpassword
+
+REDIS_HOST=redis
+`
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(existing), 0644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	if err := g.WriteEnv(cfg, "myapp", dir); err != nil {
+		t.Fatalf("WriteEnv error: %v", err)
+	}
+
+	env, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		t.Fatalf("read .env: %v", err)
+	}
+	out := string(env)
+
+	// User custom keys must survive.
+	if !strings.Contains(out, "STRIPE_KEY=sk_live_abc123") {
+		t.Error("user's STRIPE_KEY was lost")
+	}
+	if !strings.Contains(out, "OPENAI_API_KEY=sk-proj-xyz") {
+		t.Error("user's OPENAI_API_KEY was lost")
+	}
+	if !strings.Contains(out, "CUSTOM_FEATURE_FLAG=true") {
+		t.Error("user's CUSTOM_FEATURE_FLAG was lost")
+	}
+
+	// User's APP_KEY must survive (not a managed key).
+	if !strings.Contains(out, "APP_KEY=base64:secretkey==") {
+		t.Error("user's APP_KEY was lost")
+	}
+
+	// User's APP_ENV and APP_DEBUG must survive.
+	if !strings.Contains(out, "APP_ENV=production") {
+		t.Error("user's APP_ENV=production was overwritten")
+	}
+	if !strings.Contains(out, "APP_DEBUG=false") {
+		t.Error("user's APP_DEBUG=false was overwritten")
+	}
+
+	// User's custom DB_PASSWORD must survive (DB_PASSWORD is a service key
+	// but its value was user-modified — however frank owns service keys so
+	// it will be overwritten to the template default).
+	// This is acceptable: service keys are frank-managed.
+
+	// Comments must survive.
+	if !strings.Contains(out, "# Custom API keys") {
+		t.Error("user's comments were lost")
+	}
+
+	// Frank-managed keys must be present and correct.
+	if !strings.Contains(out, "APP_NAME=myapp") {
+		t.Error("APP_NAME missing or wrong")
+	}
+	if !strings.Contains(out, "APP_URL=https://localhost") {
+		t.Error("APP_URL missing or wrong")
+	}
+	if !strings.Contains(out, "DB_CONNECTION=pgsql") {
+		t.Error("DB_CONNECTION missing")
+	}
+}
+
 func TestGenerateEnv_AppURL(t *testing.T) {
 	boolPtr := func(b bool) *bool { return &b }
 

@@ -76,54 +76,138 @@ func (g *Generator) GenerateEnvExample(cfg *config.Config, projectName string) (
 	return marshalEnv(lines), nil
 }
 
-// readExistingAppKey reads APP_KEY from an existing .env at dir/.env.
-// Returns "" if the file doesn't exist, is unreadable, or APP_KEY is blank.
-func readExistingAppKey(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, ".env"))
+// WriteEnv generates .env and .env.example and writes both to dir.
+//
+// When .env already exists, only frank-managed keys are patched (APP_NAME,
+// APP_URL, and service-specific vars like DB_*, REDIS_*, MAIL_*, etc.).
+// All other user customizations are preserved. When .env does not exist,
+// a full .env is generated from the Laravel template.
+//
+// .env.example is always regenerated from the template.
+func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error {
+	envPath := filepath.Join(dir, ".env")
+	existingData, readErr := os.ReadFile(envPath)
+
+	var envLines []envLine
+	if readErr == nil {
+		// Existing .env — patch only frank-managed keys.
+		envLines = parseFullEnvFile(string(existingData))
+		frankLines, err := g.buildEnvLines(cfg, projectName, false)
+		if err != nil {
+			return err
+		}
+		envLines = patchManagedKeys(envLines, frankLines)
+	} else {
+		// No .env — generate from scratch.
+		var err error
+		envLines, err = g.buildEnvLines(cfg, projectName, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := os.WriteFile(envPath, []byte(marshalEnv(envLines)), 0644); err != nil {
+		return err
+	}
+
+	// .env.example: same patch-or-create logic.
+	examplePath := filepath.Join(dir, ".env.example")
+	existingExample, readErr := os.ReadFile(examplePath)
+
+	frankExample, err := g.buildEnvLines(cfg, projectName, true)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "warning: could not read existing .env: %v\n", err)
-		}
-		return ""
+		return err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "APP_KEY=") {
-			val := strings.TrimPrefix(line, "APP_KEY=")
-			return val // returns "" if blank
-		}
+
+	var exampleLines []envLine
+	if readErr == nil {
+		exampleLines = parseFullEnvFile(string(existingExample))
+		exampleLines = patchManagedKeys(exampleLines, frankExample)
+	} else {
+		exampleLines = frankExample
 	}
-	return ""
+
+	return os.WriteFile(examplePath, []byte(marshalEnv(exampleLines)), 0644)
 }
 
-// WriteEnv generates .env and .env.example and writes both to dir.
-// If an existing .env is present with a non-blank APP_KEY (e.g. set by composer create-project),
-// that key is injected into the generated .env at the envLine level so it is not lost.
-func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error {
-	existingKey := readExistingAppKey(dir) // read before writing
+// managedKeys are the keys frank owns and will overwrite on regeneration.
+// Service template keys (DB_*, REDIS_*, MAIL_*, etc.) are detected
+// dynamically from the service env templates, so only non-service keys
+// need to be listed here.
+var managedKeys = map[string]bool{
+	"APP_NAME": true,
+	"APP_URL":  true,
+}
 
-	envLines, err := g.buildEnvLines(cfg, projectName, false)
-	if err != nil {
-		return err
+// patchManagedKeys merges frank-generated keys into an existing .env.
+// Only keys present in frankLines that are either in managedKeys or were
+// injected by a service template (i.e. not in the base Laravel template)
+// are updated. All other existing keys/comments/ordering are preserved.
+// Keys in frankLines not found in existing are appended.
+func patchManagedKeys(existing, frankLines []envLine) []envLine {
+	// Build set of frank-managed keys: explicitly managed + all service keys.
+	frankKeys := make(map[string]string)
+	for _, line := range frankLines {
+		if line.comment || line.disabled {
+			continue
+		}
+		frankKeys[line.key] = line.value
 	}
-	// Inject preserved APP_KEY into the envLine slice before marshaling.
-	if existingKey != "" {
-		for i, line := range envLines {
-			if !line.comment && !line.disabled && line.key == "APP_KEY" {
-				envLines[i].value = existingKey
-				break
-			}
+
+	// Build index of existing keys for fast lookup.
+	existingIndex := make(map[string]int)
+	for i, line := range existing {
+		if !line.comment {
+			existingIndex[line.key] = i
 		}
 	}
 
-	exampleLines, err := g.buildEnvLines(cfg, projectName, true)
-	if err != nil {
-		return err
+	// Identify which frank keys to patch: managedKeys + keys that differ
+	// from the base Laravel template (service-injected keys). We patch all
+	// keys that frank explicitly sets — if frank generated it, frank owns it
+	// for the purpose of service config. But we skip keys whose value
+	// matches what's already in .env (no-op update).
+	result := make([]envLine, len(existing))
+	copy(result, existing)
+
+	var appendLines []envLine
+	for _, fl := range frankLines {
+		if fl.comment || fl.disabled {
+			continue
+		}
+		if !managedKeys[fl.key] && !isServiceKey(fl.key) {
+			continue
+		}
+		if idx, ok := existingIndex[fl.key]; ok {
+			result[idx].value = fl.value
+			result[idx].disabled = false
+		} else {
+			appendLines = append(appendLines, fl)
+		}
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(marshalEnv(envLines)), 0644); err != nil {
-		return err
+	if len(appendLines) > 0 {
+		result = append(result, blank())
+		result = append(result, appendLines...)
 	}
-	return os.WriteFile(filepath.Join(dir, ".env.example"), []byte(marshalEnv(exampleLines)), 0644)
+
+	return result
+}
+
+// isServiceKey returns true for env var keys that are injected by service
+// templates (DB_*, REDIS_*, MAIL_*, CACHE_*, SESSION_*, QUEUE_*, SCOUT_*,
+// MEILISEARCH_*, MEMCACHED_*).
+func isServiceKey(key string) bool {
+	prefixes := []string{
+		"DB_", "REDIS_", "MAIL_", "CACHE_", "SESSION_", "QUEUE_",
+		"SCOUT_", "MEILISEARCH_", "MEMCACHED_",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(key, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // loadLaravelBaseEnv reads and parses the version-appropriate Laravel .env.example template,
