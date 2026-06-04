@@ -109,8 +109,11 @@ func (c *Client) Down() error {
 // given name and labels. The container inherits image/env/network/entrypoint
 // from the `laravel.test` service. cmdArgs are appended verbatim after the
 // service name (e.g. ["php", "artisan", "queue:work", "--queue=default"]).
+//
+// Restart policy is applied via `docker update` after creation because
+// `docker compose run` does not support the --restart flag.
 func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []string) error {
-	args := []string{"run", "-d", "--no-deps", "--restart=unless-stopped", "--name", name}
+	args := []string{"run", "-d", "--no-deps", "--name", name}
 	// Sort label keys for deterministic arg order (makes tests + user output stable).
 	keys := make([]string, 0, len(labels))
 	for k := range labels {
@@ -122,7 +125,12 @@ func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []strin
 	}
 	args = append(args, "laravel.test")
 	args = append(args, cmdArgs...)
-	return c.Run(args...)
+	if err := c.Run(args...); err != nil {
+		return err
+	}
+	cmd := exec.Command("docker", "update", "--restart=unless-stopped", name)
+	cmd.Dir = c.dir
+	return runCmd(cmd)
 }
 
 // StopContainers stops + removes containers by name using `docker rm -f`.
