@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,6 +17,45 @@ import (
 	"github.com/phlisg/frank/internal/tool"
 	"github.com/spf13/cobra"
 )
+
+// frankState is the schema of .frank/.state — persisted generation inputs used
+// by autoRegenerate to detect staleness. ConfigHash is the sha256 of the raw
+// frank.yaml bytes; any config edit flips it (see autoRegenerate Tier 1).
+type frankState struct {
+	PHPVersion   string `json:"phpVersion"`
+	Runtime      string `json:"runtime"`
+	FrankVersion string `json:"frankVersion"`
+	ConfigHash   string `json:"configHash"`
+}
+
+// dockerfileData builds the template.Data used to render the Dockerfile (and the
+// runtime's Caddyfile/nginx configs). It is the SINGLE source of truth for the
+// Dockerfile render inputs: generate() and autoRegenerate()'s build-staleness
+// check both call it, so the two renders can never drift and produce a spurious
+// diff. Only image-relevant fields belong here — EphemeralPorts/VitePort are
+// compose-only inputs and must NOT be added.
+func dockerfileData(cfg *config.Config, projectName string) template.Data {
+	return template.Data{
+		PHPVersion:  cfg.PHP.Version,
+		ProjectName: projectName,
+		HTTPS:       cfg.Server.IsHTTPS(),
+		ServerPort:  cfg.Server.EffectivePort(),
+		CustomPort:  cfg.Server.Port != 0,
+	}
+}
+
+// frankConfigHash returns the hex sha256 of the raw frank.yaml bytes in dir, or
+// "" if the file can't be read. Raw bytes (not normalized) so a real semantic
+// change can never be missed; the cost of a comment-only false positive is one
+// cheap compose-only regen.
+func frankConfigHash(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, "frank.yaml"))
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
@@ -109,13 +150,7 @@ func generate(cfg *config.Config, dir, version string) error {
 	output.Detail("wrote .env")
 	output.Detail("wrote .env.example")
 
-	data := template.Data{
-		PHPVersion:  cfg.PHP.Version,
-		ProjectName: projectName,
-		HTTPS:       cfg.Server.IsHTTPS(),
-		ServerPort:  cfg.Server.EffectivePort(),
-		CustomPort:  cfg.Server.Port != 0,
-	}
+	data := dockerfileData(cfg, projectName)
 
 	dockerfile, err := engine.RenderRuntime(cfg.PHP.Runtime, "Dockerfile.tmpl", data)
 	if err != nil {
@@ -158,15 +193,11 @@ func generate(cfg *config.Config, dir, version string) error {
 	}
 
 	// Write .frank/.state JSON.
-	type frankState struct {
-		PHPVersion   string `json:"phpVersion"`
-		Runtime      string `json:"runtime"`
-		FrankVersion string `json:"frankVersion"`
-	}
 	stateJSON, _ := json.Marshal(frankState{
 		PHPVersion:   cfg.PHP.Version,
 		Runtime:      cfg.PHP.Runtime,
 		FrankVersion: version,
+		ConfigHash:   frankConfigHash(dir),
 	})
 	if err := os.WriteFile(filepath.Join(frankDir, ".state"), stateJSON, 0644); err != nil {
 		return fmt.Errorf("write .frank/.state: %w", err)

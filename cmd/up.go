@@ -18,6 +18,7 @@ import (
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
+	"github.com/phlisg/frank/internal/template"
 	"github.com/phlisg/frank/internal/watch"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
@@ -89,10 +90,12 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	// Pre-flight: detect stale .frank/ (version mismatch or config change) and auto-regenerate.
-	if regenerated, err := autoRegenerate(dir, rootCmd.Version); err != nil {
+	if regenerated, needsBuild, err := autoRegenerate(dir, rootCmd.Version); err != nil {
 		return err
 	} else if regenerated {
-		composeArgs = append(composeArgs, "--build")
+		if needsBuild {
+			composeArgs = append(composeArgs, "--build")
+		}
 		quick = false
 	}
 
@@ -215,27 +218,33 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	return nil
 }
 
-// autoRegenerate checks .frank/.state for staleness (frank version mismatch
-// or PHP version/runtime change) and regenerates if needed. Returns true if
-// regeneration occurred.
-func autoRegenerate(dir, currentVersion string) (bool, error) {
+// autoRegenerate detects a stale .frank/ and regenerates it. Two tiers:
+//
+//   Tier 1 (should we regenerate at all?): stale if .state is missing/corrupt,
+//   the frank version bumped, this is a "dev" build, or sha256(frank.yaml) no
+//   longer matches the stored configHash. The hash check subsumes the old
+//   explicit php.version/runtime comparison — those fields live in frank.yaml,
+//   so any change to them flips the hash.
+//
+//   Tier 2 (does the image need a rebuild?): only when regenerating, and BEFORE
+//   generate() overwrites the on-disk Dockerfile — see dockerfileChanged.
+//
+// Returns (regenerated, needsBuild, err). On a config-load failure it skips
+// gracefully, returning (false, false, nil) so the normal up flow proceeds.
+func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, err error) {
 	stateFile := filepath.Join(dir, ".frank", ".state")
-	stateData, err := os.ReadFile(stateFile)
+	stateData, readErr := os.ReadFile(stateFile)
 
-	var state struct {
-		PHPVersion   string `json:"phpVersion"`
-		Runtime      string `json:"runtime"`
-		FrankVersion string `json:"frankVersion"`
-	}
+	var state frankState
 
 	stale := false
 	reason := ""
 
-	if err != nil {
+	if readErr != nil {
 		// No .state file — existing project upgrading to this frank version.
 		stale = true
 		reason = ".frank/.state missing"
-	} else if err := json.Unmarshal(stateData, &state); err != nil {
+	} else if jsonErr := json.Unmarshal(stateData, &state); jsonErr != nil {
 		stale = true
 		reason = ".frank/.state corrupt"
 	} else {
@@ -255,38 +264,75 @@ func autoRegenerate(dir, currentVersion string) (bool, error) {
 			}
 		}
 
-		// Check PHP version/runtime change (even if frank version matches).
+		// Check frank.yaml config drift via content hash (subsumes the old
+		// php.version/runtime comparison). Empty hash means frank.yaml is
+		// unreadable — treat as not-drifted; the regen path below will surface
+		// a real config error if there is one.
 		if !stale {
-			cfg, err := config.Load(dir)
-			if err == nil {
-				if state.PHPVersion != cfg.PHP.Version || state.Runtime != cfg.PHP.Runtime {
-					stale = true
-					reason = "PHP version or runtime changed"
-				}
+			if h := frankConfigHash(dir); h != "" && h != state.ConfigHash {
+				stale = true
+				reason = "frank.yaml changed"
 			}
 		}
 	}
 
 	if !stale {
-		return false, nil
+		return false, false, nil
 	}
 
 	// Need to regenerate — load config.
-	cfg, err := config.Load(dir)
-	if err != nil {
+	cfg, cfgErr := config.Load(dir)
+	if cfgErr != nil {
 		// Config can't load — skip auto-regen, let normal flow handle it.
-		output.Detail(fmt.Sprintf("skipping auto-regenerate (%s): %v", reason, err))
-		return false, nil
+		output.Detail(fmt.Sprintf("skipping auto-regenerate (%s): %v", reason, cfgErr))
+		return false, false, nil
 	}
 
+	// Decide rebuild BEFORE generate() rewrites the on-disk Dockerfile.
+	needsBuild = dockerfileChanged(dir, cfg)
+
 	stopGen := output.Spin(fmt.Sprintf("Regenerating .frank/ (%s)", reason))
-	if err := generate(cfg, dir, currentVersion); err != nil {
-		stopGen(err)
-		return false, fmt.Errorf("auto-regenerate failed: %w", err)
+	if genErr := generate(cfg, dir, currentVersion); genErr != nil {
+		stopGen(genErr)
+		return false, false, fmt.Errorf("auto-regenerate failed: %w", genErr)
 	}
 	stopGen(nil)
 
-	return true, nil
+	return true, needsBuild, nil
+}
+
+// dockerfileChanged reports whether re-rendering the runtime's Dockerfile(s)
+// from cfg would differ from the copies currently on disk in .frank/. It is the
+// SINGLE source of truth for "did image inputs change": there is deliberately no
+// hardcoded list of image-affecting config fields — the set is implicitly
+// whatever the Dockerfile templates reference, so a future Dockerfile input
+// triggers a rebuild automatically with nothing to remember. A missing on-disk
+// file or any render error returns true (fail safe toward a rebuild, never
+// toward a stale image).
+//
+// Only reachable after Tier 1 has already decided to regenerate; a missing
+// Dockerfile alone does not trigger regeneration.
+func dockerfileChanged(dir string, cfg *config.Config) bool {
+	engine := template.New(TemplateFS)
+	data := dockerfileData(cfg, config.ProjectName(dir))
+	frankDir := filepath.Join(dir, ".frank")
+
+	dockerfiles := []struct{ tmpl, file string }{{"Dockerfile.tmpl", "Dockerfile"}}
+	if cfg.PHP.Runtime == "fpm" {
+		dockerfiles = append(dockerfiles, struct{ tmpl, file string }{"nginx.Dockerfile.tmpl", "nginx.Dockerfile"})
+	}
+
+	for _, d := range dockerfiles {
+		rendered, err := engine.RenderRuntime(cfg.PHP.Runtime, d.tmpl, data)
+		if err != nil {
+			return true
+		}
+		onDisk, err := os.ReadFile(filepath.Join(frankDir, d.file))
+		if err != nil || string(onDisk) != rendered {
+			return true
+		}
+	}
+	return false
 }
 
 // needsAppKey returns true when .env exists but APP_KEY is empty.
