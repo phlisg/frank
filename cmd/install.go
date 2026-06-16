@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -83,17 +82,15 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	if output.GetLevel() == output.Verbose {
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-	} else {
-		c.Stdout = io.Discard
-		c.Stderr = io.Discard
-	}
+	region := output.Region("Installing Laravel")
+	c.Stdout = region
+	c.Stderr = region
 
 	if err := c.Run(); err != nil {
+		region.Stop(err)
 		return fmt.Errorf("laravel-init container: %w", err)
 	}
+	region.Stop(nil)
 
 	if err := patchComposerPHPVersion(dir, cfg.PHP.Version); err != nil {
 		output.Warning(fmt.Sprintf("could not patch composer.json: %v", err))
@@ -141,15 +138,12 @@ func composerRequireDev(dir string, packages []string) error {
 	output.Detail(fmt.Sprintf("composer require --dev %d packages", len(packages)))
 
 	c := exec.Command("docker", args...)
-	if output.GetLevel() == output.Verbose {
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-	} else {
-		c.Stdout = io.Discard
-		c.Stderr = io.Discard
-	}
-
-	return c.Run()
+	region := output.Region("Installing dev dependencies")
+	c.Stdout = region
+	c.Stderr = region
+	err = c.Run()
+	region.Stop(err)
+	return err
 }
 
 // runSailInstall runs composer require laravel/sail and php artisan sail:install
@@ -189,17 +183,15 @@ php artisan sail:install --with="$1" --php="$2"
 
 	c := exec.Command("docker", dockerArgs...)
 	c.Stdin = strings.NewReader(script)
-	if output.GetLevel() == output.Verbose {
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-	} else {
-		c.Stdout = io.Discard
-		c.Stderr = io.Discard
-	}
+	region := output.Region("Installing Sail")
+	c.Stdout = region
+	c.Stderr = region
 
 	if err := c.Run(); err != nil {
+		region.Stop(err)
 		return fmt.Errorf("sail-install container: %w", err)
 	}
+	region.Stop(nil)
 	return nil
 }
 

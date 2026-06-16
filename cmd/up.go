@@ -136,13 +136,8 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		}
 	}
 
-	stopSpin := output.Spin("Starting containers")
-	var upErr error
-	if output.GetLevel() == output.Verbose {
-		upErr = client.Up(composeArgs...)
-	} else {
-		_, upErr = client.RunQuiet(append([]string{"up"}, composeArgs...)...)
-	}
+	region := output.Region("Starting containers")
+	upErr := client.RunStream(region, append([]string{"up"}, composeArgs...)...)
 
 	if stopWatcher != nil {
 		if err := stopWatcher(); err != nil && !errors.Is(err, context.Canceled) {
@@ -150,7 +145,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		}
 	}
 
-	stopSpin(upErr)
+	region.Stop(upErr)
 	if upErr != nil {
 		return upErr
 	}
@@ -159,39 +154,31 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		return nil
 	}
 
-	stopPost := output.Spin("Running post-start tasks")
-	output.Detail("waiting for laravel.test to be ready")
+	stopWait := output.Spin("Waiting for laravel.test")
 	if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
+		stopWait(err)
 		output.Warning(fmt.Sprintf("%v — skipping post-start tasks", err))
-		stopPost(nil)
 		return nil
 	}
+	stopWait(nil)
 
 	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
-		if output.GetLevel() == output.Verbose {
-			if err := client.Exec("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-				output.Warning(fmt.Sprintf("composer install failed: %v", err))
-			}
-		} else {
-			if _, err := client.ExecQuiet("laravel.test", "composer", "install", "--no-interaction"); err != nil {
-				output.Warning(fmt.Sprintf("composer install failed: %v", err))
-			}
+		region := output.Region("Installing Composer dependencies")
+		err := client.ExecStream(region, "laravel.test", "composer", "install", "--no-interaction")
+		region.Stop(err)
+		if err != nil {
+			output.Warning(fmt.Sprintf("composer install failed: %v", err))
 		}
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
-		if output.GetLevel() == output.Verbose {
-			if err := client.Exec("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
-			}
-		} else {
-			if _, err := client.ExecQuiet("laravel.test", "php", "artisan", "migrate", "--force"); err != nil {
-				output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
-			}
+		region := output.Region("Running migrations")
+		err := client.ExecStream(region, "laravel.test", "php", "artisan", "migrate", "--force")
+		region.Stop(err)
+		if err != nil {
+			output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
 		}
 	}
-
-	stopPost(nil)
 
 	if config.IsWorktree(dir) {
 		output.Group("Worktree mode", "ports are ephemeral — use `frank compose port <service> <port>` to find mapped ports")

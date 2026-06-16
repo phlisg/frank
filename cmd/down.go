@@ -6,6 +6,7 @@ import (
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
+	"github.com/phlisg/frank/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +26,10 @@ var downCmd = &cobra.Command{
 		// Stop the detached watcher first so it doesn't fire one last
 		// queue:restart against the containers we're about to remove.
 		// Non-fatal: a missing pidfile just means no watcher.
-		if err := runWatchStop(dir); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not stop watcher: %v\n", err)
+		if stopped, _, err := runWatchStop(dir); err != nil {
+			output.Warning(fmt.Sprintf("could not stop watcher: %v", err))
+		} else if stopped {
+			output.Group("Stopped file watcher", "")
 		}
 
 		// Stop ad-hoc workers so `docker compose down` doesn't leave
@@ -39,6 +42,9 @@ var downCmd = &cobra.Command{
 			}
 		}
 
-		return client.Down()
+		region := output.Region("Stopping containers")
+		err := client.RunStream(region, "down")
+		region.Stop(err)
+		return err
 	},
 }

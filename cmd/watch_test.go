@@ -53,7 +53,7 @@ func TestRunWatchStop_StaleDeadPidCleansUp(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	if err := runWatchStop(root); err != nil {
+	if _, _, err := runWatchStop(root); err != nil {
 		t.Fatalf("runWatchStop: %v", err)
 	}
 	if _, err := os.Stat(watch.PidfilePath(root)); !errors.Is(err, os.ErrNotExist) {
@@ -64,7 +64,7 @@ func TestRunWatchStop_StaleDeadPidCleansUp(t *testing.T) {
 // TestRunWatchStop_NoPidfile: no pidfile → return nil (nothing to stop).
 func TestRunWatchStop_NoPidfile(t *testing.T) {
 	root := t.TempDir()
-	if err := runWatchStop(root); err != nil {
+	if _, _, err := runWatchStop(root); err != nil {
 		t.Fatalf("runWatchStop on empty dir: %v", err)
 	}
 }
@@ -81,7 +81,7 @@ func TestRunWatchStop_MalformedPidfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := runWatchStop(root); err == nil {
+	if _, _, err := runWatchStop(root); err == nil {
 		t.Fatalf("expected error for malformed pidfile")
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {

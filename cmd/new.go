@@ -294,25 +294,17 @@ func runNewUp(dir string, cfg *config.Config) error {
 			pm = cfg.Node.PackageManager
 		}
 
-		stopNpm := output.Spin(fmt.Sprintf("Installing %s dependencies", pm))
-
 		// Wait for container to be ready
 		if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
 			output.Warning(fmt.Sprintf("container not ready for %s install: %v", pm, err))
-			stopNpm(nil)
 			return nil
 		}
 
-		var npmErr error
-		if output.GetLevel() == output.Verbose {
-			npmErr = client.Exec("laravel.test", pm, "install")
-		} else {
-			_, npmErr = client.ExecQuiet("laravel.test", pm, "install")
-		}
+		region := output.Region(fmt.Sprintf("Installing %s dependencies", pm))
+		npmErr := client.ExecStream(region, "laravel.test", pm, "install")
+		region.Stop(npmErr)
 		if npmErr != nil {
-			stopNpm(fmt.Errorf("%s install failed: %w", pm, npmErr))
-		} else {
-			stopNpm(nil)
+			output.Warning(fmt.Sprintf("%s install failed: %v", pm, npmErr))
 		}
 	}
 
@@ -700,12 +692,9 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	}
 	stopGen(nil)
 
-	stopLaravel := output.Spin("Installing Laravel")
 	if err := installLaravel(dir, cfg, true); err != nil {
-		stopLaravel(err)
 		return err
 	}
-	stopLaravel(nil)
 
 	// Patch vite.config to import .frank/vite-server.js (known default shape after create-project).
 	if err := patchViteConfig(dir); err != nil {
@@ -716,12 +705,8 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		phpTools := tool.PHPTools(cfg.Tools)
 		packages := tool.ComposerDevPackages(dir, phpTools)
 		if len(packages) > 0 {
-			stopReq := output.Spin("Installing dev dependencies")
 			if err := composerRequireDev(dir, packages); err != nil {
-				stopReq(err)
 				output.Warning(fmt.Sprintf("composer require --dev failed: %v", err))
-			} else {
-				stopReq(nil)
 			}
 		}
 

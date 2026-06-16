@@ -51,16 +51,22 @@ func runEject(cmd *cobra.Command, args []string) error {
 	}
 	withList := strings.Join(sailServices, ",")
 
-	if err := client.Exec("laravel.test", "composer", "require", "laravel/sail", "--dev"); err != nil {
+	reqRegion := output.Region("Installing Sail")
+	if err := client.ExecStream(reqRegion, "laravel.test", "composer", "require", "laravel/sail", "--dev"); err != nil {
+		reqRegion.Stop(err)
 		return fmt.Errorf("composer require laravel/sail failed: %w", err)
 	}
+	reqRegion.Stop(nil)
 
-	if err := client.Exec("laravel.test", "php", "artisan", "sail:install",
+	installRegion := output.Region("Configuring Sail")
+	if err := client.ExecStream(installRegion, "laravel.test", "php", "artisan", "sail:install",
 		"--with="+withList,
 		"--php="+cfg.PHP.Version,
 	); err != nil {
+		installRegion.Stop(err)
 		return fmt.Errorf("sail:install failed: %w", err)
 	}
+	installRegion.Stop(nil)
 
 	// Restore phpunit.xml to Laravel defaults (sqlite/:memory:).
 	if err := compose.RestorePHPUnitXML(dir); err != nil {
