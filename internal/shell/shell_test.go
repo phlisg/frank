@@ -16,7 +16,7 @@ func TestActivate(t *testing.T) {
 		cfg := testConfig("pgsql", "mailpit")
 		output := Activate(cfg)
 
-		for _, name := range []string{"artisan", "composer", "php", "tinker", "npm", "bun"} {
+		for _, name := range []string{"artisan", "composer", "php", "tinker", "npm", "bun", "corepack"} {
 			if !strings.Contains(output, "alias "+name+"=") {
 				t.Errorf("expected core alias %q in output:\n%s", name, output)
 			}
@@ -96,7 +96,7 @@ func TestActivate_FRANK_ALIASES(t *testing.T) {
 	end := strings.Index(output[start:], `"`)
 	aliasLine := output[start : start+end]
 
-	for _, name := range []string{"artisan", "composer", "php", "tinker", "npm", "bun", "psql", "pest"} {
+	for _, name := range []string{"artisan", "composer", "php", "tinker", "npm", "bun", "corepack", "psql", "pest"} {
 		if !strings.Contains(aliasLine, name) {
 			t.Errorf("_FRANK_ALIASES missing %q, got: %s", name, aliasLine)
 		}
