@@ -29,6 +29,7 @@ var aliasTable = []struct {
 	{"npm", execSail + " npm", ""},
 	{"pnpm", execSail + " pnpm", ""},
 	{"bun", execSail + " bun", ""},
+	{"corepack", execSail + " corepack", ""}, // pin pkg mgr: `corepack use pnpm@11` stamps package.json
 	// Service-conditional aliases
 	{"psql", dc + " exec pgsql psql -U sail", "pgsql"},
 	{"mysql", dc + " exec db mysql -u root -proot", "mysql"},

@@ -23,12 +23,26 @@ Your prompt gains a `(frank)` prefix so you always know aliases are active. Run 
 | `php` | `docker compose exec app php` |
 | `tinker` | `docker compose exec app php artisan tinker` |
 | `npm` | `docker compose exec app npm` |
+| `pnpm` | `docker compose exec app pnpm` |
 | `bun` | `docker compose exec app bun` |
+| `corepack` | `docker compose exec app corepack` |
 | `psql` | `docker compose exec db psql …` *(pgsql only)* |
 | `mysql` | `docker compose exec db mysql …` *(mysql/mariadb only)* |
 | `redis-cli` | `docker compose exec redis redis-cli` *(redis only)* |
 
 The database aliases are only added when the matching service is configured, so `psql` won't appear in a MySQL project and vice versa.
+
+## Pinning the package manager
+
+By default the container's `npm`/`pnpm` resolve to whatever [corepack](https://nodejs.org/api/corepack.html) fetches on first use — i.e. the latest published version. To pin an exact, integrity-verified version, run `corepack use` once inside the project:
+
+```sh
+corepack use pnpm@11        # or: frank exec corepack use pnpm@11
+```
+
+This stamps the `packageManager` field in your `package.json` (e.g. `pnpm@11.2.1+sha256.<hash>`). From then on every install is hash-verified and reproducible. `package.json` is the source of truth — Frank does not track the version, so this is the standard corepack workflow, nothing Frank-specific.
+
+> **Note:** corepack manages `npm` and `pnpm`. `bun`'s version comes from the image build, not corepack — `corepack use bun@…` has no effect.
 
 ## Custom Aliases
 
