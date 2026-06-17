@@ -322,16 +322,13 @@ func setupRebuildPrompt(dir string) error {
 	}
 
 	if running {
-		if output.GetLevel() == output.Verbose {
-			return dc.Run("up", "-d", "--build")
-		}
-		_, err := dc.RunQuiet("up", "-d", "--build")
-		return err
+		// Reuse the up pipeline so the rebuild streams into a live region
+		// (and runs post-start tasks) instead of hanging silently.
+		return doUp(dir, true, false, []string{"--build"}, false)
 	}
 
-	if output.GetLevel() == output.Verbose {
-		return dc.Run("build")
-	}
-	_, err := dc.RunQuiet("build")
+	region := output.Region("Building image")
+	err := dc.RunStream(region, "build")
+	region.Stop(err)
 	return err
 }

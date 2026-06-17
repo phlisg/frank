@@ -51,7 +51,11 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 	switch {
 	case watchStop:
-		return runWatchStop(dir)
+		_, msg, err := runWatchStop(dir)
+		if msg != "" {
+			fmt.Println(msg)
+		}
+		return err
 	case watchStatus:
 		return runWatchStatus(dir)
 	default:
@@ -102,25 +106,26 @@ func runWatchForeground(projectRoot string) error {
 	return nil
 }
 
-func runWatchStop(projectRoot string) error {
+// runWatchStop SIGTERMs the detached watcher and unlinks its pidfile. Returns
+// (stopped, msg, err): stopped is true only when a live watcher was actually
+// signalled; msg is the human-readable status line for the standalone command.
+func runWatchStop(projectRoot string) (bool, string, error) {
 	path := watch.PidfilePath(projectRoot)
 	pid, err := watch.ReadPidfile(path)
 	if err != nil {
 		// Malformed pidfile: unlink + report.
 		_ = os.Remove(path)
-		return fmt.Errorf("stale or malformed pidfile removed: %w", err)
+		return false, "", fmt.Errorf("stale or malformed pidfile removed: %w", err)
 	}
 	if pid == 0 {
-		fmt.Println("frank watch: no watcher running")
-		return nil
+		return false, "frank watch: no watcher running", nil
 	}
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		if errors.Is(err, syscall.ESRCH) {
 			_ = os.Remove(path)
-			fmt.Printf("frank watch: stale pidfile (pid %d not running) removed\n", pid)
-			return nil
+			return false, fmt.Sprintf("frank watch: stale pidfile (pid %d not running) removed", pid), nil
 		}
-		return fmt.Errorf("SIGTERM %d: %w", pid, err)
+		return false, "", fmt.Errorf("SIGTERM %d: %w", pid, err)
 	}
 
 	// Give the watcher a moment to release the pidfile on its way out.
@@ -128,14 +133,12 @@ func runWatchStop(projectRoot string) error {
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-			fmt.Printf("frank watch: stopped (pid %d)\n", pid)
-			return nil
+			return true, fmt.Sprintf("frank watch: stopped (pid %d)", pid), nil
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	_ = os.Remove(path)
-	fmt.Printf("frank watch: sent SIGTERM to pid %d; pidfile force-unlinked after timeout\n", pid)
-	return nil
+	return true, fmt.Sprintf("frank watch: sent SIGTERM to pid %d; pidfile force-unlinked after timeout", pid), nil
 }
 
 func runWatchStatus(projectRoot string) error {

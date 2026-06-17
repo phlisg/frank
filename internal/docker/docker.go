@@ -69,6 +69,16 @@ func (c *Client) Run(args ...string) error {
 	return runCmd(cmd)
 }
 
+// RunStream executes `docker compose <args>` with stdout+stderr both written to
+// w as they arrive. Used to feed a live progress region (compose writes its
+// progress UI to stderr).
+func (c *Client) RunStream(w io.Writer, args ...string) error {
+	cmd := c.composeCmd(args...)
+	cmd.Stdout = w
+	cmd.Stderr = w
+	return runCmd(cmd)
+}
+
 // RunQuiet executes `docker compose <args>` and captures output,
 // returning it as a string. Used for state detection (e.g. ps).
 func (c *Client) RunQuiet(args ...string) (string, error) {
@@ -86,6 +96,13 @@ func (c *Client) RunQuiet(args ...string) (string, error) {
 func (c *Client) Exec(service string, command ...string) error {
 	args := append([]string{"exec", "--user", "sail", service}, command...)
 	return c.Run(args...)
+}
+
+// ExecStream runs `docker compose exec --user sail <service> <command...>` with
+// stdout+stderr both written to w as they arrive. For feeding a live region.
+func (c *Client) ExecStream(w io.Writer, service string, command ...string) error {
+	args := append([]string{"exec", "--user", "sail", service}, command...)
+	return c.RunStream(w, args...)
 }
 
 // ExecQuiet runs `docker compose exec --user sail <service> <command...>` and captures output.
