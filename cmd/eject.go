@@ -29,6 +29,7 @@ Requires containers to be running — run frank up first.`,
 
 func runEject(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
+	defer openSessionAppend(dir)()
 
 	cfg, err := config.Load(dir)
 	if err != nil {

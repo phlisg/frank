@@ -203,6 +203,17 @@ func printCommands(cmd *cobra.Command) {
 	fmt.Println()
 }
 
+// openSessionAppend opens .frank/debug.log in append mode (every command
+// except `frank up`, which truncates). Returns the close func for deferral:
+//
+//	defer openSessionAppend(dir)()
+func openSessionAppend(dir string) func() {
+	if err := output.OpenSessionLog(dir, rootCmd.Version, false); err != nil {
+		output.Warning(fmt.Sprintf("could not open debug.log: %v", err))
+	}
+	return output.CloseSessionLog
+}
+
 // resolveDir returns Dir if set, otherwise the current working directory.
 func resolveDir() string {
 	if Dir != "" {

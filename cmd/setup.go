@@ -31,6 +31,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	defer openSessionAppend(dir)()
 
 	// Require existing Laravel project.
 	if _, err := os.Stat(filepath.Join(dir, "artisan")); os.IsNotExist(err) {

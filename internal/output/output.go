@@ -36,6 +36,11 @@ var spinFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"
 // Format: "✓ label (detail)" or "✓ label" when detail is empty.
 // Use for instant completions; prefer Spin for long-running operations.
 func Group(label, detail string) {
+	if detail == "" {
+		logLine("OK %s", label)
+	} else {
+		logLine("OK %s (%s)", label, detail)
+	}
 	if current == Quiet {
 		return
 	}
@@ -88,6 +93,7 @@ func Spin(label string) func(err error) {
 
 // Detail prints a single operation line. Shown in Verbose only.
 func Detail(msg string) {
+	logLine("   %s", msg)
 	if current != Verbose {
 		return
 	}
@@ -108,5 +114,6 @@ func NextSteps(lines []string) {
 
 // Warning prints to stderr regardless of level.
 func Warning(msg string) {
+	logLine("WARN %s", msg)
 	fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
 }

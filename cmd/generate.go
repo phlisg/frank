@@ -68,6 +68,7 @@ var generateCmd = &cobra.Command{
 	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := resolveDir()
+		defer openSessionAppend(dir)()
 		cfg, err := config.Load(dir)
 		if err != nil {
 			return err

@@ -117,6 +117,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 
 	dir := target
+	defer openSessionAppend(dir)()
 
 	// --interactive delegates to the existing wizard
 	if flagInteractive {

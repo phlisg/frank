@@ -21,6 +21,7 @@ var downCmd = &cobra.Command{
 	ValidArgsFunction: cobra.NoFileCompletions,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := resolveDir()
+		defer openSessionAppend(dir)()
 		client := docker.New(dir)
 
 		// Stop the detached watcher first so it doesn't fire one last
