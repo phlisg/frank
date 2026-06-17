@@ -40,6 +40,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	defer openSessionAppend(dir)()
 
 	cfg, err := config.Load(dir)
 	if err != nil {

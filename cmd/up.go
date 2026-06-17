@@ -63,6 +63,12 @@ func upFlagError(cmd *cobra.Command, err error) error {
 func runUp(cmd *cobra.Command, args []string) error {
 	dir := resolveDir()
 
+	// `frank up` owns truncation of .frank/debug.log — fresh session.
+	if err := output.OpenSessionLog(dir, rootCmd.Version, true); err != nil {
+		output.Warning(fmt.Sprintf("could not open debug.log: %v", err))
+	}
+	defer output.CloseSessionLog()
+
 	composeArgs := splitPassthrough(cmd, args)
 
 	return doUp(dir, upDetach, upQuick, composeArgs, true)

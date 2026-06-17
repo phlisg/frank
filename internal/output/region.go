@@ -35,6 +35,9 @@ type LiveRegion struct {
 	lines    chan string
 	done     chan struct{}
 	finished chan struct{}
+
+	// session-log state (level-independent)
+	start time.Time
 }
 
 type regionMode int
@@ -48,7 +51,10 @@ const (
 
 // Region starts a live progress region with the given header label.
 func Region(label string) *LiveRegion {
-	r := &LiveRegion{label: label}
+	r := &LiveRegion{label: label, start: time.Now()}
+
+	// Session-log step marker — level-independent, written even in Quiet.
+	logLine("%s", stepHeader(label))
 
 	switch {
 	case current == Quiet:
@@ -69,6 +75,9 @@ func Region(label string) *LiveRegion {
 
 // Write implements io.Writer. Safe for concurrent callers (stdout + stderr).
 func (r *LiveRegion) Write(p []byte) (int, error) {
+	// Tee the raw stream into the session log regardless of terminal mode.
+	logWrite(p)
+
 	switch r.mode {
 	case regionPassthrough:
 		return os.Stdout.Write(p)
@@ -97,6 +106,13 @@ func (r *LiveRegion) Write(p []byte) (int, error) {
 
 // Stop collapses the region. err nil → green ✓, non-nil → red ✗.
 func (r *LiveRegion) Stop(err error) {
+	elapsed := time.Since(r.start).Round(100 * time.Millisecond)
+	if err != nil {
+		logLine("FAIL %s  (%s): %v", r.label, elapsed, err)
+	} else {
+		logLine("OK %s  (%s)", r.label, elapsed)
+	}
+
 	switch r.mode {
 	case regionDiscard:
 		return
