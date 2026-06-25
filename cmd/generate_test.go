@@ -37,7 +37,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "13.x"},
 			Services: []string{"pgsql", "mailpit"},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "fpm-mysql-redis",
@@ -46,7 +46,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "12.x"},
 			Services: []string{"mysql", "redis"},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "frankenphp-sqlite",
@@ -55,7 +55,7 @@ var integrationFixtures = []integrationFixture{
 			Laravel:  config.Laravel{Version: "13.x"},
 			Services: []string{"sqlite"},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "frankenphp-pgsql-pnpm",
@@ -65,7 +65,7 @@ var integrationFixtures = []integrationFixture{
 			Services: []string{"pgsql", "mailpit"},
 			Node:     config.Node{PackageManager: "pnpm"},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "frankenphp-pgsql-workers",
@@ -80,7 +80,7 @@ var integrationFixtures = []integrationFixture{
 				},
 			},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "fpm-mysql-redis-workers",
@@ -96,7 +96,7 @@ var integrationFixtures = []integrationFixture{
 				},
 			},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/nginx.conf", ".frank/nginx.Dockerfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 	{
 		name: "frankenphp-pgsql-no-https",
@@ -106,7 +106,7 @@ var integrationFixtures = []integrationFixture{
 			Services: []string{"pgsql", "mailpit"},
 			Server:   config.Server{HTTPS: new(bool)},
 		},
-		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
 }
 

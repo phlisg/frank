@@ -53,7 +53,10 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 	hash := Hash(rendered)
 	tag := Tag(cfg)
 
-	present, gotLabel, oldID := inspectBase(tag)
+	// oldID from this pre-lock inspect is intentionally discarded: it is
+	// re-captured under the lock below, and only the locked value is used for
+	// the post-build prune (the pre-lock ID could be stale by then anyway).
+	present, gotLabel, _ := inspectBase(tag)
 	if !needsBuild(present, gotLabel, hash) {
 		output.Detail(fmt.Sprintf("base image %s up to date", tag))
 		return nil
@@ -77,6 +80,7 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 
 	// Re-check under the lock: another holder may have finished building while
 	// we waited, so we don't rebuild needlessly.
+	var oldID string
 	present, gotLabel, oldID = inspectBase(tag)
 	if !needsBuild(present, gotLabel, hash) {
 		output.Detail(fmt.Sprintf("base image %s up to date", tag))
