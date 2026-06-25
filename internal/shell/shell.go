@@ -50,12 +50,14 @@ var aliasTable = []struct {
 // Custom aliases from cfg.Aliases are appended in sorted key order.
 func Activate(cfg *config.Config) string {
 	var sb strings.Builder
+
 	var names []string
 
 	for _, a := range aliasTable {
 		if a.service != "" && !cfg.HasService(a.service) {
 			continue
 		}
+
 		names = append(names, a.name)
 	}
 
@@ -64,6 +66,7 @@ func Activate(cfg *config.Config) string {
 	for name := range cfg.Aliases {
 		customNames = append(customNames, name)
 	}
+
 	sort.Strings(customNames)
 	names = append(names, customNames...)
 
@@ -77,6 +80,7 @@ func Activate(cfg *config.Config) string {
 		if a.service != "" && !cfg.HasService(a.service) {
 			continue
 		}
+
 		alias(&sb, a.name, a.cmd)
 	}
 
@@ -95,23 +99,26 @@ func Activate(cfg *config.Config) string {
 
 // AliasEntry describes a single alias for display purposes.
 type AliasEntry struct {
-	Name    string
-	Cmd     string
-	Note    string // e.g. "pgsql", "host", ""
-	Custom  bool
+	Name   string
+	Cmd    string
+	Note   string // e.g. "pgsql", "host", ""
+	Custom bool
 }
 
 // ListAliases returns all active aliases for the given config.
 func ListAliases(cfg *config.Config) []AliasEntry {
 	var entries []AliasEntry
+
 	for _, a := range aliasTable {
 		if a.service != "" && !cfg.HasService(a.service) {
 			continue
 		}
+
 		note := ""
 		if a.service != "" {
 			note = a.service
 		}
+
 		entries = append(entries, AliasEntry{Name: a.name, Cmd: a.cmd, Note: note})
 	}
 
@@ -119,18 +126,23 @@ func ListAliases(cfg *config.Config) []AliasEntry {
 	for name := range cfg.Aliases {
 		customNames = append(customNames, name)
 	}
+
 	sort.Strings(customNames)
+
 	for _, name := range customNames {
 		a := cfg.Aliases[name]
 		cmd := a.Cmd
+
 		note := ""
 		if a.Host {
 			note = "host"
 		} else {
 			cmd = execSail + " " + cmd
 		}
+
 		entries = append(entries, AliasEntry{Name: name, Cmd: cmd, Note: note, Custom: true})
 	}
+
 	return entries
 }
 
@@ -147,6 +159,7 @@ func ShellSetup(shell string) string {
 	if shell == "" {
 		shell = detectShell()
 	}
+
 	switch shell {
 	case "zsh":
 		return zshHook()
@@ -167,6 +180,7 @@ func detectShell() string {
 	if shellPath := os.Getenv("SHELL"); strings.Contains(shellPath, "zsh") {
 		return "zsh"
 	}
+
 	return "bash"
 }
 

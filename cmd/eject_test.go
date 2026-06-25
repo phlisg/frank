@@ -42,6 +42,7 @@ func TestFlattenDockerfile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
+
 			frankDir := filepath.Join(dir, ".frank")
 			if err := os.MkdirAll(frankDir, 0755); err != nil {
 				t.Fatal(err)
@@ -50,6 +51,7 @@ func TestFlattenDockerfile(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(frankDir, "Caddyfile"), []byte("# placeholder\n"), 0644); err != nil {
 				t.Fatal(err)
 			}
+
 			if err := os.WriteFile(filepath.Join(frankDir, "Dockerfile"), []byte("FROM frank/runtime:thin\n"), 0644); err != nil {
 				t.Fatal(err)
 			}
@@ -62,14 +64,17 @@ func TestFlattenDockerfile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			got := string(out)
 
 			if strings.Contains(got, "FROM frank/runtime") {
 				t.Errorf("flattened Dockerfile still contains FROM frank/runtime")
 			}
+
 			if !strings.Contains(got, tt.wantFrom) {
 				t.Errorf("flattened Dockerfile missing %q\n---\n%s", tt.wantFrom, got)
 			}
+
 			hasCaddy := strings.Contains(got, "COPY .frank/Caddyfile")
 			if hasCaddy != tt.wantCaddyCopy {
 				t.Errorf("Caddyfile COPY present=%v, want %v", hasCaddy, tt.wantCaddyCopy)

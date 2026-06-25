@@ -78,25 +78,31 @@ server:
 // the user had previously run `frank generate`. Returns the project dir.
 func seedFrankProject(t *testing.T, yaml, version string) string {
 	t.Helper()
+
 	dir := filepath.Join(t.TempDir(), "proj")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(dir, "frank.yaml"), []byte(yaml), 0644); err != nil {
 		t.Fatalf("write frank.yaml: %v", err)
 	}
+
 	cfg, err := config.Load(dir)
 	if err != nil {
 		t.Fatalf("seed config.Load: %v", err)
 	}
+
 	if err := generate(cfg, dir, version); err != nil {
 		t.Fatalf("seed generate: %v", err)
 	}
+
 	return dir
 }
 
 func writeYAML(t *testing.T, dir, yaml string) {
 	t.Helper()
+
 	if err := os.WriteFile(filepath.Join(dir, "frank.yaml"), []byte(yaml), 0644); err != nil {
 		t.Fatalf("rewrite frank.yaml: %v", err)
 	}
@@ -255,9 +261,11 @@ func TestAutoRegenerate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("autoRegenerate: %v", err)
 			}
+
 			if regen != tt.wantRegen {
 				t.Errorf("regenerated = %v, want %v", regen, tt.wantRegen)
 			}
+
 			if build != tt.wantBuild {
 				t.Errorf("needsBuild = %v, want %v", build, tt.wantBuild)
 			}
@@ -275,9 +283,11 @@ func TestAutoRegenerate_QueueRepro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("autoRegenerate: %v", err)
 	}
+
 	if !regen {
 		t.Fatal("expected regeneration after queue edit")
 	}
+
 	if build {
 		t.Error("queue edit must not force --build")
 	}
@@ -293,6 +303,7 @@ func TestAutoRegenerate_QueueRepro(t *testing.T) {
 // editing base.Dockerfile (leaving the primary Dockerfile intact) flips it true.
 func TestDockerfileChanged_BaseDockerfile(t *testing.T) {
 	dir := seedFrankProject(t, yamlFrankenphpBase, "1.0.0")
+
 	cfg, err := config.Load(dir)
 	if err != nil {
 		t.Fatalf("config.Load: %v", err)
@@ -307,6 +318,7 @@ func TestDockerfileChanged_BaseDockerfile(t *testing.T) {
 	if err := os.WriteFile(base, []byte("FROM scratch\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
+
 	if !dockerfileChanged(dir, cfg) {
 		t.Error("edited base.Dockerfile should report changed")
 	}
@@ -315,6 +327,7 @@ func TestDockerfileChanged_BaseDockerfile(t *testing.T) {
 	if err := os.Remove(base); err != nil {
 		t.Fatal(err)
 	}
+
 	if !dockerfileChanged(dir, cfg) {
 		t.Error("missing base.Dockerfile should report changed")
 	}
@@ -327,25 +340,30 @@ func TestFrankConfigHash_Deterministic(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
+
 	writeYAML(t, dir, yamlFrankenphpBase)
 
 	h1 := frankConfigHash(dir)
 	h2 := frankConfigHash(dir)
+
 	if h1 == "" {
 		t.Fatal("hash empty for present frank.yaml")
 	}
+
 	if h1 != h2 {
 		t.Errorf("hash not deterministic: %q != %q", h1, h2)
 	}
 
 	// A semantic change must flip the hash.
 	writeYAML(t, dir, yamlFrankenphpPHP85)
+
 	if h3 := frankConfigHash(dir); h3 == h1 {
 		t.Error("hash unchanged after editing frank.yaml")
 	}
 
 	// Missing file → empty hash (treated as not-drifted by Tier 1).
 	os.Remove(filepath.Join(dir, "frank.yaml"))
+
 	if h := frankConfigHash(dir); h != "" {
 		t.Errorf("missing frank.yaml should hash to empty, got %q", h)
 	}

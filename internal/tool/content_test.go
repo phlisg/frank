@@ -10,6 +10,7 @@ func TestPintJSON_Excludes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read pint.json: %v", err)
 	}
+
 	content := string(data)
 
 	for _, want := range []string{".phpstorm.meta.php", "_ide_helper.php"} {
@@ -24,6 +25,7 @@ func TestPhpstanNeon_Excludes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read phpstan.neon: %v", err)
 	}
+
 	content := string(data)
 
 	for _, want := range []string{".phpstorm.meta.php", "_ide_helper.php"} {
@@ -42,6 +44,7 @@ func TestRectorPHP_Paths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read rector.php: %v", err)
 	}
+
 	content := string(data)
 
 	dirs := []string{"app", "bootstrap", "config", "public", "resources", "routes", "tests"}

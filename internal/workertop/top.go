@@ -135,6 +135,7 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	if inspector == nil {
 		inspector = &dockerInspector{c: dc}
 	}
+
 	lister := opts.lister
 	if lister == nil {
 		lister = &dockerLister{c: dc, projectName: projectName}
@@ -145,6 +146,7 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	if err != nil {
 		return fmt.Errorf("workertop: discover: %w", err)
 	}
+
 	if len(specs) == 0 {
 		fmt.Fprintln(os.Stderr, "no workers running — declare in frank.yaml or run `frank worker queue`")
 		return nil
@@ -155,11 +157,13 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 
 	// 3. Stats hub for every pane with a resolved ID.
 	var ids []string
+
 	for _, s := range specs {
 		if s.ContainerID != "" {
 			ids = append(ids, s.ContainerID)
 		}
 	}
+
 	hub := NewHub(ids, DefaultInterval, opts.statsExec)
 
 	// 4. Per-pane log readers — only for running panes. Missing/exited
@@ -168,11 +172,14 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	if logsExec == nil {
 		logsExec = DefaultCmdStartFn
 	}
+
 	readers := make(map[string]*LogsReader, len(specs))
+
 	for _, s := range specs {
 		if s.State != StateRunning {
 			continue
 		}
+
 		readers[s.Name] = NewLogsReader(s, logsExec)
 	}
 
@@ -201,18 +208,22 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	// 7. Launch background services under a shared cancellable context.
 	//    On program exit we cancel and wait for everything to reap.
 	svcCtx, cancel := context.WithCancel(ctx)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
+
 	go func() { defer wg.Done(); hub.Run(svcCtx) }()
 
 	for _, r := range readers {
 		wg.Add(1)
+
 		go func(r *LogsReader) { defer wg.Done(); r.Run(svcCtx) }(r)
 	}
 
 	if rec != nil {
 		wg.Add(1)
+
 		go func() { defer wg.Done(); rec.Run(svcCtx) }()
 	}
 
@@ -234,6 +245,7 @@ func Run(ctx context.Context, cfg *config.Config, projectName string, dc *docker
 	if runErr != nil {
 		return fmt.Errorf("workertop: bubbletea run: %w", runErr)
 	}
+
 	return nil
 }
 
@@ -250,12 +262,14 @@ func buildRows(cfg *config.Config, specs []PaneSpec) ([]rowGroup, map[string]*Pa
 	// whatever hash order specs might otherwise fall in.
 	poolOrder := make([]string, 0, len(cfg.Workers.Queue))
 	poolIdx := make(map[string]int, len(cfg.Workers.Queue))
+
 	for i, p := range cfg.Workers.Queue {
 		poolOrder = append(poolOrder, p.Name)
 		poolIdx[p.Name] = i
 	}
 
 	var scheduleIDs, adhocIDs []string
+
 	poolIDs := make([][]string, len(poolOrder))
 
 	for _, s := range specs {
@@ -279,10 +293,12 @@ func buildRows(cfg *config.Config, specs []PaneSpec) ([]rowGroup, map[string]*Pa
 			paneIDs: scheduleIDs,
 		})
 	}
+
 	for i, name := range poolOrder {
 		if len(poolIDs[i]) == 0 {
 			continue
 		}
+
 		rows = append(rows, rowGroup{
 			kind:    KindQueue,
 			label:   "pool:" + name,
@@ -290,6 +306,7 @@ func buildRows(cfg *config.Config, specs []PaneSpec) ([]rowGroup, map[string]*Pa
 			paneIDs: poolIDs[i],
 		})
 	}
+
 	if len(adhocIDs) > 0 {
 		rows = append(rows, rowGroup{
 			kind:    KindAdhoc,
@@ -297,6 +314,7 @@ func buildRows(cfg *config.Config, specs []PaneSpec) ([]rowGroup, map[string]*Pa
 			paneIDs: adhocIDs,
 		})
 	}
+
 	return rows, panes
 }
 
@@ -308,9 +326,11 @@ func (m *TopModel) Init() tea.Cmd {
 	for id, r := range m.logsReaders {
 		cmds = append(cmds, waitForLogsFor(id, r))
 	}
+
 	if m.reconciler != nil {
 		cmds = append(cmds, waitForReconcile(m.reconciler))
 	}
+
 	return tea.Batch(cmds...)
 }
 
@@ -324,6 +344,7 @@ func waitForStats(h *Hub) tea.Cmd {
 		if !ok {
 			return nil
 		}
+
 		return StatsMsg(snap)
 	}
 }
@@ -338,6 +359,7 @@ func waitForLogsFor(paneID string, r *LogsReader) tea.Cmd {
 		if !ok {
 			return StateMsg{PaneID: paneID, State: StateExited}
 		}
+
 		return LogLineMsg(line)
 	}
 }
@@ -351,6 +373,7 @@ func waitForReconcile(r *Reconciler) tea.Cmd {
 		if !ok {
 			return nil
 		}
+
 		return reconcileMsg{evt: evt}
 	}
 }
@@ -359,11 +382,11 @@ func waitForReconcile(r *Reconciler) tea.Cmd {
 // messages are handled and which re-subscribe.
 func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.recomputeLayout()
+
 		return m, m.resizeAllCmd()
 
 	case tea.KeyMsg:
@@ -375,13 +398,16 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StatsMsg:
 		// Fan out to every pane, then re-subscribe.
 		var cmds []tea.Cmd
+
 		for _, p := range m.panesByID {
 			_, c := p.Update(msg)
 			if c != nil {
 				cmds = append(cmds, c)
 			}
 		}
+
 		cmds = append(cmds, waitForStats(m.statsHub))
+
 		return m, tea.Batch(cmds...)
 
 	case LogLineMsg:
@@ -393,6 +419,7 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if r, ok := m.logsReaders[msg.PaneID]; ok {
 			cmd = waitForLogsFor(msg.PaneID, r)
 		}
+
 		return m, cmd
 
 	case StateMsg:
@@ -402,6 +429,7 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// EOF → the reader's goroutine is done. Drop it from the map
 		// so we don't keep a dead subscription alive. No re-subscribe.
 		delete(m.logsReaders, msg.PaneID)
+
 		return m, nil
 
 	case restartSequenceMsg:
@@ -424,8 +452,10 @@ func (m *TopModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case paneCleanupMsg:
 		m.removePane(msg.paneID)
 		m.recomputeLayout()
+
 		return m, m.resizeAllCmd()
 	}
+
 	return m, nil
 }
 
@@ -434,6 +464,7 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.searching {
 		return m.handleSearchKey(msg)
 	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -450,28 +481,34 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focusedID != "" {
 			m.zoomedID = m.focusedID
 			m.recomputeLayout()
+
 			return m, m.resizeAllCmd()
 		}
+
 		return m, nil
 
 	case "esc":
 		if m.zoomedID != "" {
 			m.zoomedID = ""
 			m.recomputeLayout()
+
 			return m, m.resizeAllCmd()
 		}
+
 		return m, nil
 
 	case "r":
 		if m.restartStatus == "" {
 			return m, m.restartAllWorkersCmd()
 		}
+
 		return m, nil
 
 	case "R":
 		if m.restartStatus == "" && m.focusedID != "" {
 			return m, m.restartOneWorkerCmd(m.focusedID)
 		}
+
 		return m, nil
 
 	case "p":
@@ -480,6 +517,7 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				p.TogglePause()
 			}
 		}
+
 		return m, nil
 
 	case "/":
@@ -487,6 +525,7 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.searching = true
 			m.searchQuery = ""
 		}
+
 		return m, nil
 
 	case "pgup", "pgdown", "g", "G":
@@ -498,8 +537,10 @@ func (m *TopModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				p.viewport, _ = p.viewport.Update(msg)
 			}
 		}
+
 		return m, nil
 	}
+
 	return m, nil
 }
 
@@ -512,9 +553,11 @@ func (m *TopModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEsc:
 		m.searching = false
 		m.searchQuery = ""
+
 		if p, ok := m.panesByID[m.focusedID]; ok {
 			p.ClearSearch()
 		}
+
 		return m, nil
 
 	case tea.KeyEnter:
@@ -533,6 +576,7 @@ func (m *TopModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if p, ok := m.panesByID[m.focusedID]; ok {
 		p.SetSearch(m.searchQuery)
 	}
+
 	return m, nil
 }
 
@@ -575,10 +619,12 @@ func (m *TopModel) handleReconcile(evt ReconcileEvent) tea.Cmd {
 		if p, ok := m.panesByID[evt.Spec.Name]; ok {
 			p.Update(StateMsg{PaneID: evt.Spec.Name, State: StateExited})
 		}
+
 		cmds = append(cmds, cleanupAfter(evt.Spec.Name, 2*time.Second))
 	}
 
 	cmds = append(cmds, waitForReconcile(m.reconciler))
+
 	return tea.Batch(cmds...)
 }
 
@@ -598,8 +644,10 @@ func (m *TopModel) removePane(paneID string) {
 		// don't control here. The reader will reap when the container's
 		// docker logs subprocess hits EOF or when the outer ctx fires.
 		_ = r
+
 		delete(m.logsReaders, paneID)
 	}
+
 	delete(m.panesByID, paneID)
 
 	for i := range m.rowOrder {
@@ -613,16 +661,19 @@ func (m *TopModel) removePane(paneID string) {
 	}
 	// Drop now-empty rows so the layout doesn't render hollow space.
 	pruned := m.rowOrder[:0]
+
 	for _, row := range m.rowOrder {
 		if len(row.paneIDs) > 0 {
 			pruned = append(pruned, row)
 		}
 	}
+
 	m.rowOrder = pruned
 
 	if m.focusedID == paneID {
 		m.focusedID = m.firstPaneID()
 	}
+
 	if m.zoomedID == paneID {
 		m.zoomedID = ""
 	}
@@ -637,6 +688,7 @@ func (m *TopModel) appendAdhocRow(paneID string) {
 			return
 		}
 	}
+
 	m.rowOrder = append(m.rowOrder, rowGroup{
 		kind:    KindAdhoc,
 		label:   "adhoc",
@@ -651,13 +703,16 @@ func (m *TopModel) focusShift(delta int) {
 	if len(order) == 0 {
 		return
 	}
+
 	idx := 0
+
 	for i, id := range order {
 		if id == m.focusedID {
 			idx = i
 			break
 		}
 	}
+
 	idx = (idx + delta + len(order)) % len(order)
 	m.focusedID = order[idx]
 }
@@ -668,6 +723,7 @@ func (m *TopModel) flatPaneOrder() []string {
 	for _, row := range m.rowOrder {
 		out = append(out, row.paneIDs...)
 	}
+
 	return out
 }
 
@@ -679,6 +735,7 @@ func (m *TopModel) firstPaneID() string {
 			return row.paneIDs[0]
 		}
 	}
+
 	return ""
 }
 
@@ -687,6 +744,7 @@ func (m *TopModel) broadcastFocus() tea.Cmd {
 	for id, p := range m.panesByID {
 		p.Update(FocusMsg{PaneID: id, Focused: id == m.focusedID})
 	}
+
 	return nil
 }
 
@@ -697,6 +755,7 @@ func (m *TopModel) recomputeLayout() {
 	for i, r := range m.rowOrder {
 		specs[i] = RowSpec{Label: r.label, PaneCount: len(r.paneIDs)}
 	}
+
 	m.layout = ComputeLayout(m.width, m.height, specs, m.opts.MinPaneWidth)
 	m.recomputeBounds()
 }
@@ -710,26 +769,34 @@ func (m *TopModel) recomputeBounds() {
 		if h < 1 {
 			h = 1
 		}
+
 		m.paneBounds[m.zoomedID] = paneRect{
 			x: 0, y: m.layout.HeaderHeight, w: m.width, h: h,
 		}
+
 		return
 	}
+
 	y := m.layout.HeaderHeight
+
 	for i, row := range m.rowOrder {
 		if i >= len(m.layout.Rows) {
 			break
 		}
+
 		rl := m.layout.Rows[i]
 		x := 0
+
 		for j, paneID := range row.paneIDs {
 			if j >= len(rl.Panes) {
 				break
 			}
+
 			pl := rl.Panes[j]
 			m.paneBounds[paneID] = paneRect{x: x, y: y, w: pl.Width, h: rl.Height}
 			x += pl.Width
 		}
+
 		y += rl.Height
 	}
 }
@@ -743,20 +810,25 @@ func (m *TopModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if p := m.paneAt(msg.X, msg.Y); p != nil {
 			p.ScrollUp(3)
 		}
+
 		return m, nil
 	case tea.MouseButtonWheelDown:
 		if p := m.paneAt(msg.X, msg.Y); p != nil {
 			p.ScrollDown(3)
 		}
+
 		return m, nil
 	}
+
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return m, nil
 	}
+
 	for paneID, r := range m.paneBounds {
 		if !r.contains(msg.X, msg.Y) {
 			continue
 		}
+
 		if m.zoomedID == paneID {
 			// Click on zoomed pane → unzoom.
 			m.zoomedID = ""
@@ -764,9 +836,12 @@ func (m *TopModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.focusedID = paneID
 			m.zoomedID = paneID
 		}
+
 		m.recomputeLayout()
+
 		return m, tea.Batch(m.broadcastFocus(), m.resizeAllCmd())
 	}
+
 	return m, nil
 }
 
@@ -777,6 +852,7 @@ func (m *TopModel) paneAt(x, y int) *Pane {
 			return m.panesByID[paneID]
 		}
 	}
+
 	return nil
 }
 
@@ -793,12 +869,14 @@ func (m *TopModel) resizeAllCmd() tea.Cmd {
 		if h < 1 {
 			h = 1
 		}
+
 		p.Update(ResizeMsg{
 			PaneID:        m.zoomedID,
 			Width:         m.width,
 			Height:        h,
 			TruncateTitle: false,
 		})
+
 		return nil
 	}
 
@@ -807,11 +885,13 @@ func (m *TopModel) resizeAllCmd() tea.Cmd {
 		if i >= len(m.layout.Rows) {
 			break
 		}
+
 		rl := m.layout.Rows[i]
 		for j, paneID := range row.paneIDs {
 			if j >= len(rl.Panes) {
 				break
 			}
+
 			pl := rl.Panes[j]
 			if p, ok := m.panesByID[paneID]; ok {
 				p.Update(ResizeMsg{
@@ -823,12 +903,14 @@ func (m *TopModel) resizeAllCmd() tea.Cmd {
 			}
 		}
 	}
+
 	return nil
 }
 
 // View renders the header, grid (or zoom), and footer.
 func (m *TopModel) View() string {
 	var b strings.Builder
+
 	b.WriteString(m.header())
 	b.WriteByte('\n')
 
@@ -842,12 +924,15 @@ func (m *TopModel) View() string {
 			if i >= len(m.layout.Rows) {
 				break
 			}
+
 			panes := make([]string, 0, len(row.paneIDs))
+
 			for _, paneID := range row.paneIDs {
 				if p, ok := m.panesByID[paneID]; ok {
 					panes = append(panes, p.View())
 				}
 			}
+
 			if len(panes) > 0 {
 				b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, panes...))
 				b.WriteByte('\n')
@@ -856,6 +941,7 @@ func (m *TopModel) View() string {
 	}
 
 	b.WriteString(m.footer())
+
 	return b.String()
 }
 
@@ -865,11 +951,14 @@ func (m *TopModel) header() string {
 	if m.opts.Live {
 		mode = "live"
 	}
+
 	focus := m.focusedID
 	if focus == "" {
 		focus = "no focus"
 	}
+
 	text := fmt.Sprintf("frank worker top · %s · %s · %s", m.projectName, mode, focus)
+
 	return Header.Render(text)
 }
 
@@ -879,15 +968,18 @@ func (m *TopModel) footer() string {
 	if m.searching {
 		return Footer.Render("/" + m.searchQuery + "█  (esc cancel · enter keep)")
 	}
+
 	if m.restartStatus != "" {
 		return Footer.Render(RestartBanner.Render("restarting " + m.restartStatus + "..."))
 	}
+
 	var text string
 	if m.zoomedID != "" {
 		text = "esc back · pgup/pgdn scroll · / search · p pause · r/R restart all/one · q quit"
 	} else {
 		text = "q quit · tab focus · enter zoom · / search · p pause · r/R restart · esc back"
 	}
+
 	return Footer.Render(text)
 }
 
@@ -897,6 +989,7 @@ func (m *TopModel) restartOneWorkerCmd(paneID string) tea.Cmd {
 	if p, ok := m.panesByID[paneID]; ok && p.spec.Kind == KindAdhoc {
 		return nil
 	}
+
 	return func() tea.Msg {
 		return restartSequenceMsg{services: []string{paneID}}
 	}
@@ -907,15 +1000,19 @@ func (m *TopModel) restartOneWorkerCmd(paneID string) tea.Cmd {
 // compose services).
 func (m *TopModel) restartAllWorkersCmd() tea.Cmd {
 	var services []string
+
 	for _, row := range m.rowOrder {
 		if row.kind == KindAdhoc {
 			continue
 		}
+
 		services = append(services, row.paneIDs...)
 	}
+
 	if len(services) == 0 {
 		return nil
 	}
+
 	return func() tea.Msg {
 		return restartSequenceMsg{services: services}
 	}
@@ -932,7 +1029,9 @@ func restartOneCmd(services []string, idx int) tea.Cmd {
 	if idx >= len(services) {
 		return func() tea.Msg { return restartDoneMsg{} }
 	}
+
 	svc := services[idx]
+
 	return tea.Sequence(
 		func() tea.Msg { return restartingMsg{service: svc} },
 		func() tea.Msg {
@@ -940,6 +1039,7 @@ func restartOneCmd(services []string, idx int) tea.Cmd {
 			argv = append(argv, "restart", svc)
 			cmd := exec.Command(argv[0], argv[1:]...)
 			_ = cmd.Run()
+
 			return restartNextMsg{services: services, next: idx + 1}
 		},
 	)
@@ -981,10 +1081,12 @@ func (d *dockerInspector) AdhocWorkerNames(projectName string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
+
 	names := make([]string, len(workers))
 	for i, w := range workers {
 		names[i] = w.Name
 	}
+
 	return names, nil
 }
 
@@ -1001,9 +1103,11 @@ func (d *dockerLister) ListAdhocWorkers() ([]AdhocContainer, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	out := make([]AdhocContainer, len(workers))
 	for i, w := range workers {
 		out[i] = AdhocContainer{ID: w.ID, Name: w.Name}
 	}
+
 	return out, nil
 }

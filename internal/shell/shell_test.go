@@ -30,6 +30,7 @@ func TestActivate(t *testing.T) {
 		if !strings.Contains(output, "alias psql=") {
 			t.Errorf("expected psql alias when pgsql service present:\n%s", output)
 		}
+
 		if strings.Contains(output, "alias mysql=") {
 			t.Errorf("did not expect mysql alias without mysql service:\n%s", output)
 		}
@@ -70,9 +71,11 @@ func TestActivate(t *testing.T) {
 		aaIdx := strings.Index(output, "alias aa=")
 		mmIdx := strings.Index(output, "alias mm=")
 		zzIdx := strings.Index(output, "alias zz=")
+
 		if aaIdx == -1 || mmIdx == -1 || zzIdx == -1 {
 			t.Fatalf("missing custom aliases in output:\n%s", output)
 		}
+
 		if !(aaIdx < mmIdx && mmIdx < zzIdx) {
 			t.Errorf("custom aliases not in sorted order:\n%s", output)
 		}
@@ -105,6 +108,7 @@ func TestActivate_FRANK_ALIASES(t *testing.T) {
 	// _FRANK_ALIASES must appear before alias lines
 	aliasVarIdx := strings.Index(output, `_FRANK_ALIASES="`)
 	firstAlias := strings.Index(output, "alias ")
+
 	if aliasVarIdx >= firstAlias {
 		t.Errorf("_FRANK_ALIASES must appear before alias definitions")
 	}
@@ -121,6 +125,7 @@ func TestActivate_SingleQuoteEscape(t *testing.T) {
 	if !strings.Contains(output, `'\''`) {
 		t.Errorf("expected single quote escaping ('\\''') in output:\n%s", output)
 	}
+
 	if !strings.Contains(output, "alias tricky=") {
 		t.Errorf("expected tricky alias in output:\n%s", output)
 	}
@@ -132,6 +137,7 @@ func TestDeactivate(t *testing.T) {
 	if !strings.Contains(output, "for _a in $_FRANK_ALIASES") {
 		t.Errorf("expected _FRANK_ALIASES loop in deactivate output:\n%s", output)
 	}
+
 	if !strings.Contains(output, "unset _FRANK_ALIASES") {
 		t.Errorf("expected unset _FRANK_ALIASES in deactivate output:\n%s", output)
 	}
@@ -168,9 +174,11 @@ func TestShellSetup_Zsh(t *testing.T) {
 	// The completion call must appear inside _frank_setup, not at top-level eval time.
 	setupIdx := strings.Index(output, "_frank_setup")
 	completionIdx := strings.Index(output, `frank config shell completion zsh`)
+
 	if completionIdx != -1 && setupIdx != -1 && completionIdx < setupIdx {
 		t.Errorf("zsh hook: completion call must be inside _frank_setup, not before it (top-level eval is the old bug)")
 	}
+
 	if setupIdx == -1 {
 		t.Errorf("zsh hook: _frank_setup not found, cannot verify completion placement")
 	}
@@ -209,11 +217,13 @@ func TestShellSetup_Bash(t *testing.T) {
 func TestShellSetup_DefaultDetect(t *testing.T) {
 	t.Run("detects zsh from SHELL env", func(t *testing.T) {
 		t.Setenv("SHELL", "/bin/zsh")
+
 		output := ShellSetup("")
 
 		if !strings.Contains(output, "_frank_precmd_init") {
 			t.Errorf("default detect with SHELL=/bin/zsh: expected zsh hook (containing _frank_precmd_init), got:\n%s", output)
 		}
+
 		if strings.Contains(output, "PROMPT_COMMAND") {
 			t.Errorf("default detect with SHELL=/bin/zsh: expected zsh hook, but got bash-specific PROMPT_COMMAND, got:\n%s", output)
 		}
@@ -221,11 +231,13 @@ func TestShellSetup_DefaultDetect(t *testing.T) {
 
 	t.Run("detects bash from SHELL env", func(t *testing.T) {
 		t.Setenv("SHELL", "/bin/bash")
+
 		output := ShellSetup("")
 
 		if !strings.Contains(output, "PROMPT_COMMAND") {
 			t.Errorf("default detect with SHELL=/bin/bash: expected bash hook (containing PROMPT_COMMAND), got:\n%s", output)
 		}
+
 		if strings.Contains(output, "_frank_precmd_init") {
 			t.Errorf("default detect with SHELL=/bin/bash: expected bash hook, but got zsh-specific _frank_precmd_init, got:\n%s", output)
 		}

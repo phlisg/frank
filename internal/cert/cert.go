@@ -29,6 +29,7 @@ func CertsExist(frankDir string) bool {
 	keyFile := filepath.Join(frankDir, "certs", "localhost-key.pem")
 	_, err1 := os.Stat(certFile)
 	_, err2 := os.Stat(keyFile)
+
 	return err1 == nil && err2 == nil
 }
 
@@ -111,9 +112,11 @@ func caInstalled(runner commandRunner, mkcertPath string, fs fileSystem) bool {
 	if err != nil {
 		return false
 	}
+
 	caRoot := strings.TrimSpace(string(out))
 	if caRoot == "" {
 		return false
 	}
+
 	return fs.Exists(filepath.Join(caRoot, "rootCA.pem"))
 }

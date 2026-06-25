@@ -12,6 +12,7 @@ func TestPatchPHPUnitXML_FileNotExist(t *testing.T) {
 	if err := PatchPHPUnitXML(dir, "mysql"); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
+
 	if _, err := os.Stat(filepath.Join(dir, "phpunit.xml")); !os.IsNotExist(err) {
 		t.Fatal("phpunit.xml should not be created")
 	}
@@ -30,6 +31,7 @@ func TestPatchPHPUnitXML_SqliteSkip(t *testing.T) {
 	if err := PatchPHPUnitXML(dir, "sqlite"); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
+
 	got, _ := os.ReadFile(path)
 	if string(got) != content {
 		t.Fatal("file should not be modified for sqlite")
@@ -49,6 +51,7 @@ func TestPatchPHPUnitXML_EmptyStringSkip(t *testing.T) {
 	if err := PatchPHPUnitXML(dir, ""); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
+
 	got, _ := os.ReadFile(path)
 	if string(got) != content {
 		t.Fatal("file should not be modified for empty string")
@@ -276,6 +279,7 @@ func TestRestorePHPUnitXML_FileNotExist(t *testing.T) {
 
 func requireContains(t *testing.T, haystack, needle string) {
 	t.Helper()
+
 	if !strings.Contains(haystack, needle) {
 		t.Errorf("expected to find %q in:\n%s", needle, haystack)
 	}

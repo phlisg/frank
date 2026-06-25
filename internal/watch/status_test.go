@@ -12,6 +12,7 @@ func TestReadPidfile_Missing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing pidfile should not error, got %v", err)
 	}
+
 	if pid != 0 {
 		t.Fatalf("missing pidfile should return 0, got %d", pid)
 	}
@@ -19,10 +20,12 @@ func TestReadPidfile_Missing(t *testing.T) {
 
 func TestReadPidfile_Malformed(t *testing.T) {
 	dir := t.TempDir()
+
 	path := filepath.Join(dir, "watch.pid")
 	if err := os.WriteFile(path, []byte("not-a-number\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := ReadPidfile(path); err == nil {
 		t.Fatalf("malformed pidfile should error")
 	}
@@ -33,10 +36,12 @@ func TestWriteAndReadPidfile_RoundTrip(t *testing.T) {
 	if err := WritePidfile(path, 4242); err != nil {
 		t.Fatalf("WritePidfile: %v", err)
 	}
+
 	pid, err := ReadPidfile(path)
 	if err != nil {
 		t.Fatalf("ReadPidfile: %v", err)
 	}
+
 	if pid != 4242 {
 		t.Fatalf("round-trip pid mismatch: got %d want 4242", pid)
 	}
@@ -56,6 +61,7 @@ func newCheckerWithFakes(t *testing.T, laravelRunning bool, pidAlive bool) (*Sta
 	c.killFn = func(pid int) error {
 		f.killedPID = pid
 		f.killCount++
+
 		return nil
 	}
 	prevRemove := c.removeFn
@@ -63,6 +69,7 @@ func newCheckerWithFakes(t *testing.T, laravelRunning bool, pidAlive bool) (*Sta
 		f.removedPaths = append(f.removedPaths, p)
 		return prevRemove(p)
 	}
+
 	return c, f
 }
 
@@ -75,6 +82,7 @@ type fakes struct {
 
 func writePid(t *testing.T, path string, pid int) {
 	t.Helper()
+
 	if err := WritePidfile(path, pid); err != nil {
 		t.Fatalf("WritePidfile: %v", err)
 	}
@@ -89,9 +97,11 @@ func TestCheck_StoppedWhenPidfileMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
+
 	if got.State != StatusStopped {
 		t.Errorf("state = %v, want stopped", got.State)
 	}
+
 	if f.killCount != 0 {
 		t.Errorf("no kill expected, got %d", f.killCount)
 	}
@@ -107,12 +117,15 @@ func TestCheck_StoppedCleansStalePidfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
+
 	if got.State != StatusStopped {
 		t.Errorf("state = %v, want stopped", got.State)
 	}
+
 	if _, err := os.Stat(c.PidfilePath); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("stale pidfile should be removed, stat err = %v", err)
 	}
+
 	if f.killCount != 0 {
 		t.Errorf("dead pid should not be signalled, got kill count %d", f.killCount)
 	}
@@ -128,18 +141,23 @@ func TestCheck_RunningWhenPidAliveAndLaravelUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
+
 	if got.State != StatusRunning {
 		t.Errorf("state = %v, want running", got.State)
 	}
+
 	if got.PID != 12345 {
 		t.Errorf("PID = %d, want 12345", got.PID)
 	}
+
 	if got.StartedAt.IsZero() {
 		t.Errorf("StartedAt should be set from pidfile mtime")
 	}
+
 	if _, err := os.Stat(c.PidfilePath); err != nil {
 		t.Errorf("running state must preserve pidfile, stat err = %v", err)
 	}
+
 	if f.killCount != 0 {
 		t.Errorf("running state must not signal, got kill count %d", f.killCount)
 	}
@@ -155,15 +173,19 @@ func TestCheck_OrphanKillsAndUnlinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
+
 	if got.State != StatusOrphaned {
 		t.Errorf("state = %v, want orphaned", got.State)
 	}
+
 	if got.PID != 54321 {
 		t.Errorf("PID = %d, want 54321", got.PID)
 	}
+
 	if f.killCount != 1 || f.killedPID != 54321 {
 		t.Errorf("expected one kill of 54321, got count=%d pid=%d", f.killCount, f.killedPID)
 	}
+
 	if _, err := os.Stat(c.PidfilePath); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("orphan path must unlink pidfile, stat err = %v", err)
 	}
@@ -177,6 +199,7 @@ func TestCheck_MalformedPidfileReturnsErrorAndCleans(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(c.PidfilePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(c.PidfilePath, []byte("garbage"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -185,9 +208,11 @@ func TestCheck_MalformedPidfileReturnsErrorAndCleans(t *testing.T) {
 	if err == nil {
 		t.Fatalf("malformed pidfile should surface parse error")
 	}
+
 	if got.State != StatusStopped {
 		t.Errorf("state = %v, want stopped", got.State)
 	}
+
 	if _, err := os.Stat(c.PidfilePath); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("malformed pidfile must unlink, stat err = %v", err)
 	}
@@ -197,6 +222,7 @@ func TestCheck_MalformedPidfileReturnsErrorAndCleans(t *testing.T) {
 func TestPidfilePath_AlwaysDotFrank(t *testing.T) {
 	got := PidfilePath("/some/project")
 	want := filepath.Join("/some/project", ".frank", "watch.pid")
+
 	if got != want {
 		t.Errorf("PidfilePath = %q, want %q", got, want)
 	}

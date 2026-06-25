@@ -101,9 +101,11 @@ func ComputeLayout(w, h int, rows []RowSpec, minPaneWidth int) Layout {
 
 	visibleRows := len(rows)
 	perRow := 0
+
 	if visibleRows > 0 {
 		perRow = budget / visibleRows
 	}
+
 	if perRow < minRowHeight {
 		layout.Vertical = true
 		perRow = minRowHeight
@@ -148,6 +150,7 @@ func computeRow(w, perRow int, spec RowSpec, minPaneWidth int) RowLayout {
 		if panesPerPage < 1 {
 			panesPerPage = 1
 		}
+
 		if panesPerPage > paneCount {
 			panesPerPage = paneCount
 		}
@@ -168,6 +171,7 @@ func computeRow(w, perRow int, spec RowSpec, minPaneWidth int) RowLayout {
 		for i := range row.Panes {
 			row.Panes[i] = PaneLayout{Width: pageWidth, Height: perRow}
 		}
+
 		return row
 	}
 
@@ -180,5 +184,6 @@ func computeRow(w, perRow int, spec RowSpec, minPaneWidth int) RowLayout {
 	for i := range row.Panes {
 		row.Panes[i] = PaneLayout{Width: colWidth, Height: perRow}
 	}
+
 	return row
 }

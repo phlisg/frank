@@ -152,6 +152,7 @@ func New(cfg Config) (*Watcher, error) {
 	if runner == nil {
 		runner = newDockerRunner(cfg.ProjectRoot, cfg.DockerComposeFile)
 	}
+
 	return &Watcher{
 		cfg:    cfg,
 		events: make(chan fsnotify.Event, 128),
@@ -181,6 +182,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	w.fsw = fsw
 	w.gitignore = compileIgnore(w.cfg.ProjectRoot)
 
@@ -189,6 +191,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 		// watches succeeded. Detailed logging lives in armWatches.
 		_ = werr
 	}
+
 	w.armedAt = time.Now()
 
 	debouncerDone := make(chan struct{})
@@ -196,6 +199,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 		defer close(debouncerDone)
 		w.runDebouncer(ctx)
 	}()
+
 	defer func() { <-debouncerDone }()
 
 	for {
@@ -203,6 +207,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			_ = w.fsw.Close()
 			w.stopOnce.Do(func() { close(w.done) })
+
 			return ctx.Err()
 		case <-w.done:
 			_ = w.fsw.Close()
@@ -211,7 +216,9 @@ func (w *Watcher) Start(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
+
 			w.handleDirEvent(ev)
+
 			if _, fire := w.classify(ev); !fire {
 				continue
 			}
@@ -246,5 +253,6 @@ func (w *Watcher) Stop() error {
 	w.stopOnce.Do(func() {
 		close(w.done)
 	})
+
 	return nil
 }

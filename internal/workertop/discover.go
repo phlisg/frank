@@ -80,6 +80,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 	if cfg == nil {
 		return nil, fmt.Errorf("discoverWorkers: nil config")
 	}
+
 	if d == nil {
 		return nil, fmt.Errorf("discoverWorkers: nil inspector")
 	}
@@ -94,6 +95,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 		if err := resolveState(d, containerName(projectName, spec.Name), &spec); err != nil {
 			return nil, err
 		}
+
 		specs = append(specs, spec)
 	}
 
@@ -107,6 +109,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 			if err := resolveState(d, containerName(projectName, spec.Name), &spec); err != nil {
 				return nil, err
 			}
+
 			specs = append(specs, spec)
 		}
 	}
@@ -115,6 +118,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 	if err != nil {
 		return nil, fmt.Errorf("discoverWorkers: list ad-hoc workers: %w", err)
 	}
+
 	for _, name := range adhoc {
 		spec := PaneSpec{
 			Name: name,
@@ -123,6 +127,7 @@ func discoverWorkers(cfg *config.Config, projectName string, d containerInspecto
 		if err := resolveState(d, name, &spec); err != nil {
 			return nil, err
 		}
+
 		specs = append(specs, spec)
 	}
 
@@ -142,6 +147,7 @@ func resolveState(d containerInspector, name string, spec *PaneSpec) error {
 	if err != nil {
 		return fmt.Errorf("inspect %s: %w", name, err)
 	}
+
 	spec.ContainerID = id
 	switch status {
 	case "":
@@ -156,5 +162,6 @@ func resolveState(d containerInspector, name string, spec *PaneSpec) error {
 		spec.State = StateExited
 		spec.ExitCode = exitCode
 	}
+
 	return nil
 }

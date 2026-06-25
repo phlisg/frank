@@ -32,6 +32,11 @@ var knownNodeKeys = map[string]bool{
 	"packageManager": true,
 }
 
+var knownDevKeys = map[string]bool{
+	"enabled": true,
+	"command": true,
+}
+
 var validPHPVersions = map[string]bool{
 	"8.2": true,
 	"8.3": true,
@@ -116,6 +121,7 @@ type Config struct {
 	Workers  Workers                  `yaml:"workers"`
 	Server   Server                   `yaml:"server,omitempty"`
 	Node     Node                     `yaml:"node,omitempty"`
+	Dev      Dev                      `yaml:"dev,omitempty"`
 	Tools    []string                 `yaml:"tools,omitempty"`
 	Aliases  map[string]Alias         `yaml:"aliases,omitempty"`
 }
@@ -135,9 +141,11 @@ func (s Server) EffectivePort() int {
 	if s.Port != 0 {
 		return s.Port
 	}
+
 	if s.IsHTTPS() {
 		return 443
 	}
+
 	return 80
 }
 
@@ -151,12 +159,47 @@ func (a *Alias) UnmarshalYAML(value *yaml.Node) error {
 		a.Cmd = value.Value
 		return nil
 	}
+
 	type raw Alias
+
 	return value.Decode((*raw)(a))
 }
 
 type Node struct {
 	PackageManager string `yaml:"packageManager,omitempty"`
+}
+
+// Dev configures the long-lived frontend dev server (Vite) run as a compose
+// sidecar (laravel.vite). Enabled is a nil-pointer-defaults-true field, same
+// pattern as Server.HTTPS — left nil so the round-tripped frank.yaml stays clean.
+type Dev struct {
+	Enabled *bool  `yaml:"enabled"`
+	Command string `yaml:"command,omitempty"`
+}
+
+// IsEnabled reports whether the dev server is enabled (defaults true when unset).
+func (d Dev) IsEnabled() bool { return d.Enabled == nil || *d.Enabled }
+
+// EffectiveCommand returns the shell command run inside the laravel.vite
+// container. An explicit Command is trusted verbatim; otherwise it derives from
+// the package manager. The install is guarded on node_modules so it runs only on
+// first boot (mirrors the vendor guard in templates/workers/init.fragment.tmpl) —
+// without the guard, restart: unless-stopped would re-resolve the lockfile on
+// every container cycle. Frank installs node deps nowhere else, so this is the
+// sole installer, not a backstop.
+func (d Dev) EffectiveCommand(pm string) string {
+	if d.Command != "" {
+		return d.Command
+	}
+
+	switch pm {
+	case "pnpm":
+		return "[ -d node_modules ] || pnpm install; pnpm dev"
+	case "bun":
+		return "[ -d node_modules ] || bun install; bun run dev"
+	default: // npm
+		return "[ -d node_modules ] || npm install; npm run dev"
+	}
 }
 
 type Workers struct {
@@ -195,17 +238,21 @@ func IsWorktree(dir string) bool {
 	gitDir := exec.Command("git", "rev-parse", "--git-dir")
 	gitDir.Dir = dir
 	gitDir.Env = env
+
 	gdOut, err := gitDir.Output()
 	if err != nil {
 		return false
 	}
+
 	commonDir := exec.Command("git", "rev-parse", "--git-common-dir")
 	commonDir.Dir = dir
 	commonDir.Env = env
+
 	cdOut, err := commonDir.Output()
 	if err != nil {
 		return false
 	}
+
 	gd := strings.TrimSpace(string(gdOut))
 	cd := strings.TrimSpace(string(cdOut))
 	// Resolve to absolute — git may return relative for one and absolute for the other.
@@ -213,12 +260,15 @@ func IsWorktree(dir string) bool {
 	if base == "" {
 		base, _ = os.Getwd()
 	}
+
 	if !filepath.IsAbs(gd) {
 		gd = filepath.Join(base, gd)
 	}
+
 	if !filepath.IsAbs(cd) {
 		cd = filepath.Join(base, cd)
 	}
+
 	return filepath.Clean(gd) != filepath.Clean(cd)
 }
 
@@ -227,12 +277,15 @@ func IsWorktree(dir string) bool {
 // with git commands that need to inspect the real worktree layout.
 func CleanGitEnv() []string {
 	var env []string
+
 	for _, e := range os.Environ() {
 		if strings.HasPrefix(e, "GIT_DIR=") || strings.HasPrefix(e, "GIT_WORK_TREE=") || strings.HasPrefix(e, "GIT_INDEX_FILE=") {
 			continue
 		}
+
 		env = append(env, e)
 	}
+
 	return env
 }
 
@@ -242,6 +295,7 @@ func ProjectName(dir string) string {
 	if err != nil {
 		return filepath.Base(dir)
 	}
+
 	return filepath.Base(abs)
 }
 
@@ -252,23 +306,28 @@ func MainProjectName(dir string) string {
 	if !IsWorktree(dir) {
 		return ProjectName(dir)
 	}
+
 	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
 	cmd.Dir = dir
 	cmd.Env = CleanGitEnv()
+
 	out, err := cmd.Output()
 	if err != nil {
 		return ProjectName(dir)
 	}
+
 	cd := strings.TrimSpace(string(out))
 	if !filepath.IsAbs(cd) {
 		cd = filepath.Join(dir, cd)
 	}
+
 	return filepath.Base(filepath.Dir(filepath.Clean(cd)))
 }
 
 // Load reads frank.yaml from dir, applies defaults, and validates.
 func Load(dir string) (*Config, error) {
 	path := filepath.Join(dir, ConfigFileName)
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read %s: %w", ConfigFileName, err)
@@ -287,6 +346,7 @@ func Load(dir string) (*Config, error) {
 	warnUnknownServerKeys(&root)
 	warnUnknownWorkerKeys(&root)
 	warnUnknownNodeKeys(&root)
+	warnUnknownDevKeys(&root)
 
 	// Capture explicit-empty-queues before defaulting overwrites.
 	explicitEmptyQueues := make([]bool, len(cfg.Workers.Queue))
@@ -307,6 +367,7 @@ func Load(dir string) (*Config, error) {
 func New() *Config {
 	cfg := &Config{}
 	applyDefaults(cfg)
+
 	return cfg
 }
 
@@ -314,15 +375,19 @@ func applyDefaults(cfg *Config) {
 	if cfg.PHP.Version == "" {
 		cfg.PHP.Version = DefaultPHPVersion
 	}
+
 	if cfg.PHP.Runtime == "" {
 		cfg.PHP.Runtime = DefaultPHPRuntime
 	}
+
 	if cfg.Laravel.Version == "" {
 		cfg.Laravel.Version = DefaultLaravelVersion
 	}
+
 	if len(cfg.Services) == 0 {
 		cfg.Services = append([]string{}, defaultServices...)
 	}
+
 	if cfg.Node.PackageManager == "" {
 		cfg.Node.PackageManager = DefaultPackageManager
 	}
@@ -336,14 +401,17 @@ func applyDefaults(cfg *Config) {
 		cfg.Workers.Schedule = true
 		cfg.Workers.Queue = []QueuePool{{Count: 1}}
 	}
+
 	for i := range cfg.Workers.Queue {
 		p := &cfg.Workers.Queue[i]
 		if p.Queues == nil {
 			p.Queues = []string{"default"}
 		}
+
 		if p.Name == "" && len(p.Queues) > 0 {
 			p.Name = p.Queues[0]
 		}
+
 		if p.Count == 0 {
 			p.Count = 1
 		}
@@ -354,12 +422,15 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 	if !validPHPVersions[cfg.PHP.Version] {
 		return fmt.Errorf("unsupported PHP version %q — valid options: 8.2, 8.3, 8.4, 8.5", cfg.PHP.Version)
 	}
+
 	if !validLaravelVersions[cfg.Laravel.Version] {
 		return fmt.Errorf("unsupported Laravel version %q — valid options: 12.*, 13.*, latest", cfg.Laravel.Version)
 	}
+
 	if !validRuntimes[cfg.PHP.Runtime] {
 		return fmt.Errorf("unsupported runtime %q — valid options: frankenphp, fpm", cfg.PHP.Runtime)
 	}
+
 	if !validPackageManagers[cfg.Node.PackageManager] {
 		return fmt.Errorf("unsupported package manager %q — valid options: npm, pnpm, bun", cfg.Node.PackageManager)
 	}
@@ -369,14 +440,17 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 	}
 
 	var dbCount int
+
 	for _, svc := range cfg.Services {
 		if !validServices[svc] {
 			return fmt.Errorf("unsupported service %q — valid options: pgsql, mysql, mariadb, sqlite, redis, memcached, meilisearch, mailpit", svc)
 		}
+
 		if databaseServices[svc] {
 			dbCount++
 		}
 	}
+
 	if dbCount > 1 {
 		return fmt.Errorf("only one database service is allowed (pgsql, mysql, mariadb, sqlite) — found %d", dbCount)
 	}
@@ -394,27 +468,35 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 
 func validateWorkers(w *Workers, explicitEmptyQueues []bool) error {
 	names := make(map[string]int, len(w.Queue))
+
 	for i, p := range w.Queue {
 		if i < len(explicitEmptyQueues) && explicitEmptyQueues[i] {
 			return fmt.Errorf("workers.queue[%d]: queues must not be empty", i)
 		}
+
 		if p.Count < 1 {
 			return fmt.Errorf("workers.queue[%d] (%s): count must be ≥ 1", i, p.Name)
 		}
+
 		if !workerPoolNameRe.MatchString(p.Name) {
 			return fmt.Errorf("workers.queue[%d]: invalid pool name %q — must match [a-z0-9_-]+", i, p.Name)
 		}
+
 		if p.Tries < 0 || p.Timeout < 0 || p.Memory < 0 || p.Sleep < 0 || p.Backoff < 0 {
 			return fmt.Errorf("workers.queue[%d] (%s): passthrough values must be ≥ 0", i, p.Name)
 		}
+
 		if slices.Contains(p.Queues, "") {
 			return fmt.Errorf("workers.queue[%d] (%s): queue name must not be empty", i, p.Name)
 		}
+
 		if prev, ok := names[p.Name]; ok {
 			return fmt.Errorf("workers.queue[%d] and [%d]: duplicate pool name %q", prev, i, p.Name)
 		}
+
 		names[p.Name] = i
 	}
+
 	return nil
 }
 
@@ -423,14 +505,17 @@ func warnUnknownServerKeys(root *yaml.Node) {
 	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
 		return
 	}
+
 	top := root.Content[0]
 	if top.Kind != yaml.MappingNode {
 		return
 	}
+
 	server := mapValue(top, "server")
 	if server == nil || server.Kind != yaml.MappingNode {
 		return
 	}
+
 	for i := 0; i+1 < len(server.Content); i += 2 {
 		key := server.Content[i].Value
 		if !knownServerKeys[key] {
@@ -445,28 +530,34 @@ func warnUnknownWorkerKeys(root *yaml.Node) {
 	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
 		return
 	}
+
 	top := root.Content[0]
 	if top.Kind != yaml.MappingNode {
 		return
 	}
+
 	workers := mapValue(top, "workers")
 	if workers == nil || workers.Kind != yaml.MappingNode {
 		return
 	}
+
 	for i := 0; i+1 < len(workers.Content); i += 2 {
 		key := workers.Content[i].Value
 		if !knownWorkersKeys[key] {
 			fmt.Fprintf(os.Stderr, "warning: unknown key %q under workers — ignored\n", key)
 		}
 	}
+
 	queue := mapValue(workers, "queue")
 	if queue == nil || queue.Kind != yaml.SequenceNode {
 		return
 	}
+
 	for idx, item := range queue.Content {
 		if item.Kind != yaml.MappingNode {
 			continue
 		}
+
 		for i := 0; i+1 < len(item.Content); i += 2 {
 			key := item.Content[i].Value
 			if !knownQueueItemKeys[key] {
@@ -482,14 +573,17 @@ func warnUnknownNodeKeys(root *yaml.Node) {
 	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
 		return
 	}
+
 	top := root.Content[0]
 	if top.Kind != yaml.MappingNode {
 		return
 	}
+
 	node := mapValue(top, "node")
 	if node == nil || node.Kind != yaml.MappingNode {
 		return
 	}
+
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		key := node.Content[i].Value
 		if !knownNodeKeys[key] {
@@ -498,27 +592,59 @@ func warnUnknownNodeKeys(root *yaml.Node) {
 	}
 }
 
+// warnUnknownDevKeys emits a warning for unknown keys under the dev block,
+// for forward-compat with future fields.
+func warnUnknownDevKeys(root *yaml.Node) {
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return
+	}
+
+	top := root.Content[0]
+	if top.Kind != yaml.MappingNode {
+		return
+	}
+
+	dev := mapValue(top, "dev")
+	if dev == nil || dev.Kind != yaml.MappingNode {
+		return
+	}
+
+	for i := 0; i+1 < len(dev.Content); i += 2 {
+		key := dev.Content[i].Value
+		if !knownDevKeys[key] {
+			fmt.Fprintf(os.Stderr, "warning: unknown key %q under dev — ignored\n", key)
+		}
+	}
+}
+
 func validateAliases(aliases map[string]Alias) error {
 	seen := make(map[string]string, len(aliases))
+
 	for name, a := range aliases {
 		if !aliasNameRe.MatchString(name) {
 			return fmt.Errorf("aliases.%s: invalid name — must match [a-zA-Z_][a-zA-Z0-9_-]*", name)
 		}
+
 		if a.Cmd == "" {
 			return fmt.Errorf("aliases.%s: cmd must not be empty", name)
 		}
+
 		lower := strings.ToLower(name)
 		if builtinAliasNames[lower] {
 			return fmt.Errorf("aliases.%s: collides with built-in alias %q", name, lower)
 		}
+
 		if prev, ok := seen[lower]; ok {
 			return fmt.Errorf("aliases.%s: case-insensitive collision with %q", name, prev)
 		}
+
 		seen[lower] = name
+
 		if shellBuiltins[lower] {
 			fmt.Fprintf(os.Stderr, "warning: alias %q shadows shell builtin\n", name)
 		}
 	}
+
 	return nil
 }
 
@@ -526,11 +652,13 @@ func mapValue(m *yaml.Node, key string) *yaml.Node {
 	if m.Kind != yaml.MappingNode {
 		return nil
 	}
+
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		if m.Content[i].Value == key {
 			return m.Content[i+1]
 		}
 	}
+
 	return nil
 }
 
@@ -555,7 +683,9 @@ func AllServices() []string {
 	for name := range validServices {
 		names = append(names, name)
 	}
+
 	sort.Strings(names)
+
 	return names
 }
 
@@ -566,6 +696,7 @@ func (cfg *Config) Database() string {
 			return svc
 		}
 	}
+
 	return ""
 }
 
@@ -575,5 +706,6 @@ func (cfg *Config) Database() string {
 func ViteWorktreePort(projectName string) int {
 	h := fnv.New32a()
 	h.Write([]byte(projectName))
+
 	return 5174 + int(h.Sum32()%26)
 }

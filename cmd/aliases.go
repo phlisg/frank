@@ -82,6 +82,7 @@ var aliasesCmd = &cobra.Command{
 // shortCmd trims the verbose docker compose prefix for readability.
 func shortCmd(cmd string) string {
 	const dcPrefix = "docker compose --project-directory . -f .frank/compose.yaml "
+
 	const execPrefix = dcPrefix + "exec --user sail laravel.test "
 	switch {
 	case len(cmd) > len(execPrefix) && cmd[:len(execPrefix)] == execPrefix:

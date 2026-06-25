@@ -23,6 +23,7 @@ func PatchPHPUnitXML(dir string, dbConnection string) error {
 	if dbConnection == "" || dbConnection == "sqlite" {
 		return nil
 	}
+
 	return patchPHPUnit(dir, dbConnection, "testing")
 }
 
@@ -38,11 +39,13 @@ func RestorePHPUnitXML(dir string) error {
 // DB_CONNECTION and DB_DATABASE, inserting missing lines before </php>.
 func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	path := filepath.Join(dir, "phpunit.xml")
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
+
 		return fmt.Errorf("read phpunit.xml: %w", err)
 	}
 
@@ -58,6 +61,7 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	for i, line := range lines {
 		if m := phpunitVarRe.FindStringSubmatch(line); m != nil {
 			tag := extractTag(line)
+
 			switch {
 			case m[2] == "DB_CONNECTION" && tag == "env":
 				lines[i] = m[1] + m[2] + m[3] + dbConnection + ensureForce(m[5])
@@ -73,6 +77,7 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 				foundServerDB = true
 			}
 		}
+
 		if strings.TrimSpace(line) == "</php>" {
 			phpCloseIdx = i
 		}
@@ -92,12 +97,15 @@ func patchPHPUnit(dir string, dbConnection string, dbDatabase string) error {
 	if !foundEnvConn {
 		inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_CONNECTION" value="%s" force="true"/>`, indent, dbConnection))
 	}
+
 	if !foundEnvDB {
 		inserts = append(inserts, fmt.Sprintf(`%s<env name="DB_DATABASE" value="%s" force="true"/>`, indent, dbDatabase))
 	}
+
 	if !foundServerConn {
 		inserts = append(inserts, fmt.Sprintf(`%s<server name="DB_CONNECTION" value="%s"/>`, indent, dbConnection))
 	}
+
 	if !foundServerDB {
 		inserts = append(inserts, fmt.Sprintf(`%s<server name="DB_DATABASE" value="%s"/>`, indent, dbDatabase))
 	}
@@ -118,6 +126,7 @@ func extractTag(line string) string {
 	if strings.HasPrefix(trimmed, "<server") {
 		return "server"
 	}
+
 	return "env"
 }
 
@@ -127,5 +136,6 @@ func ensureForce(suffix string) string {
 	if strings.Contains(suffix, `force="true"`) {
 		return suffix
 	}
+
 	return strings.Replace(suffix, `"/>`, `" force="true"/>`, 1)
 }

@@ -63,8 +63,40 @@ After setting, Frank automatically regenerates `.frank/` files and prompts to re
 | `php.runtime` | `frankenphp`, `fpm` | `frankenphp` |
 | `laravel.version` | `12.*`, `13.*`, `latest` | `latest` |
 | `node.packageManager` | `npm`, `pnpm`, `bun` | `npm` |
+| `dev.enabled` | `true`, `false` | `true` |
+| `dev.command` | any shell command | derived from `node.packageManager` |
 
 Unknown keys or invalid values produce an error listing valid options. Shell completion is available for both keys and values.
+
+### Dev server (`dev`)
+
+Frank runs the frontend dev server (Vite) as a managed compose sidecar
+(`laravel.vite`), started by `frank up` and stopped by `frank down`. Attach to
+its output with `frank dev` (Ctrl-C detaches; the server keeps running).
+
+```yaml
+dev:
+  enabled: true          # false omits the laravel.vite service entirely
+  command: ""            # empty → derived from node.packageManager
+```
+
+When `command` is empty, Frank derives it from the package manager — e.g. for
+`pnpm` it runs `pnpm install` (only when `node_modules` is absent) then
+`pnpm dev`. Set `command` to override verbatim (it is run via `sh -c` inside the
+container) — useful for extra flags, a different script, or skipping the install:
+
+```yaml
+dev:
+  command: "npm run dev -- --force"
+```
+
+Keep Vite listening on **port 5173 inside the container** — that's the only port
+compose publishes (`<host>:5173`). Telling Vite to use a different port in
+`command` leaves it unmapped and unreachable from the host. Change the *host*
+port via worktree mode, not here.
+
+With `dev.enabled: false`, no dev-server container is created and the Vite port
+is left unmapped.
 
 For services, workers, tools, and aliases, use the dedicated commands instead:
 

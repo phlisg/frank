@@ -40,21 +40,27 @@ func (g *Generator) buildEnvLines(cfg *config.Config, projectName string, isExam
 	if err != nil {
 		return nil, err
 	}
+
 	for _, svc := range cfg.Services {
 		svcCfg := cfg.Config[svc]
+
 		rendered, err := g.engine.RenderServiceEnv(svc, svcCfg, projectName, false)
 		if err != nil {
 			return nil, fmt.Errorf("service %q env: %w", svc, err)
 		}
+
 		block, err := parseEnvBlock(rendered)
 		if err != nil {
 			return nil, fmt.Errorf("parse service %q env block: %w", svc, err)
 		}
+
 		lines = mergeEnvBlock(lines, svc, block)
 	}
+
 	if isExample {
 		lines = redactSensitive(lines)
 	}
+
 	return lines, nil
 }
 
@@ -64,6 +70,7 @@ func (g *Generator) GenerateEnv(cfg *config.Config, projectName string) (string,
 	if err != nil {
 		return "", err
 	}
+
 	return marshalEnv(lines), nil
 }
 
@@ -73,6 +80,7 @@ func (g *Generator) GenerateEnvExample(cfg *config.Config, projectName string) (
 	if err != nil {
 		return "", err
 	}
+
 	return marshalEnv(lines), nil
 }
 
@@ -92,14 +100,17 @@ func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error 
 	if readErr == nil {
 		// Existing .env — patch only frank-managed keys.
 		envLines = parseFullEnvFile(string(existingData))
+
 		frankLines, err := g.buildEnvLines(cfg, projectName, false)
 		if err != nil {
 			return err
 		}
+
 		envLines = patchManagedKeys(envLines, frankLines)
 	} else {
 		// No .env — generate from scratch.
 		var err error
+
 		envLines, err = g.buildEnvLines(cfg, projectName, false)
 		if err != nil {
 			return err
@@ -147,15 +158,18 @@ var managedKeys = map[string]bool{
 func patchManagedKeys(existing, frankLines []envLine) []envLine {
 	// Build set of frank-managed keys: explicitly managed + all service keys.
 	frankKeys := make(map[string]string)
+
 	for _, line := range frankLines {
 		if line.comment || line.disabled {
 			continue
 		}
+
 		frankKeys[line.key] = line.value
 	}
 
 	// Build index of existing keys for fast lookup.
 	existingIndex := make(map[string]int)
+
 	for i, line := range existing {
 		if !line.comment {
 			existingIndex[line.key] = i
@@ -171,13 +185,16 @@ func patchManagedKeys(existing, frankLines []envLine) []envLine {
 	copy(result, existing)
 
 	var appendLines []envLine
+
 	for _, fl := range frankLines {
 		if fl.comment || fl.disabled {
 			continue
 		}
+
 		if !managedKeys[fl.key] && !isServiceKey(fl.key) {
 			continue
 		}
+
 		if idx, ok := existingIndex[fl.key]; ok {
 			result[idx].value = fl.value
 			result[idx].disabled = false
@@ -207,6 +224,7 @@ func isServiceKey(key string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -214,6 +232,7 @@ func isServiceKey(key string) bool {
 // prepending the Frank header and substituting APP_NAME with the project name.
 func (g *Generator) loadLaravelBaseEnv(cfg *config.Config, projectName string) ([]envLine, error) {
 	templateVersion := "13.x" // default: latest
+
 	switch cfg.Laravel.Version {
 	case "12.x":
 		templateVersion = "12.x"
@@ -237,11 +256,14 @@ func (g *Generator) loadLaravelBaseEnv(cfg *config.Config, projectName string) (
 	if cfg.Server.IsHTTPS() {
 		scheme = "https"
 	}
+
 	portSuffix := ""
 	if cfg.Server.Port != 0 {
 		portSuffix = fmt.Sprintf(":%d", cfg.Server.Port)
 	}
+
 	appURL := fmt.Sprintf("%s://localhost%s", scheme, portSuffix)
+
 	for i, line := range lines {
 		if !line.comment && !line.disabled && line.key == "APP_URL" {
 			lines[i].value = appURL
@@ -258,6 +280,7 @@ func (g *Generator) loadLaravelBaseEnv(cfg *config.Config, projectName string) (
 func mergeEnvBlock(base []envLine, svc string, block []envLine) []envLine {
 	// Index both active and disabled lines (anything with comment=false).
 	keyIndex := map[string]int{}
+
 	for i, line := range base {
 		if !line.comment {
 			keyIndex[line.key] = i
@@ -268,6 +291,7 @@ func mergeEnvBlock(base []envLine, svc string, block []envLine) []envLine {
 	copy(result, base)
 
 	var newLines []envLine
+
 	for _, bline := range block {
 		if idx, exists := keyIndex[bline.key]; exists {
 			result[idx].value = bline.value
@@ -290,14 +314,17 @@ func isEnvKey(s string) bool {
 	if s == "" {
 		return false
 	}
+
 	for i, c := range s {
 		if i == 0 && !(c >= 'A' && c <= 'Z') {
 			return false
 		}
+
 		if i > 0 && !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -308,51 +335,63 @@ func isEnvKey(s string) bool {
 // serialisation is canonical (#KEY=value, no space).
 func parseFullEnvFile(content string) []envLine {
 	var lines []envLine
+
 	for _, raw := range strings.Split(content, "\n") {
 		if raw == "" {
 			lines = append(lines, blank())
 			continue
 		}
+
 		if strings.HasPrefix(raw, "#") {
 			rest := raw[1:]
 			if len(rest) > 0 && rest[0] == ' ' {
 				rest = rest[1:]
 			}
+
 			if eqIdx := strings.IndexByte(rest, '='); eqIdx > 0 && isEnvKey(rest[:eqIdx]) {
 				lines = append(lines, disabled(rest[:eqIdx], rest[eqIdx+1:]))
 				continue
 			}
+
 			lines = append(lines, comment(raw))
+
 			continue
 		}
+
 		eqIdx := strings.IndexByte(raw, '=')
 		if eqIdx < 0 {
 			lines = append(lines, comment(raw))
 			continue
 		}
+
 		lines = append(lines, kv(raw[:eqIdx], raw[eqIdx+1:]))
 	}
 	// trim trailing blank lines
 	for len(lines) > 0 && lines[len(lines)-1].comment && lines[len(lines)-1].value == "" {
 		lines = lines[:len(lines)-1]
 	}
+
 	return lines
 }
 
 // parseEnvBlock converts a rendered env template string into envLine values.
 func parseEnvBlock(rendered string) ([]envLine, error) {
 	var out []envLine
+
 	for _, raw := range strings.Split(strings.TrimSpace(rendered), "\n") {
 		raw = strings.TrimSpace(raw)
 		if raw == "" || strings.HasPrefix(raw, "#") {
 			continue
 		}
+
 		idx := strings.IndexByte(raw, '=')
 		if idx < 0 {
 			return nil, fmt.Errorf("unexpected env line %q", raw)
 		}
+
 		out = append(out, kv(raw[:idx], raw[idx+1:]))
 	}
+
 	return out, nil
 }
 
@@ -368,17 +407,20 @@ var sensitiveKeys = map[string]bool{
 func redactSensitive(lines []envLine) []envLine {
 	out := make([]envLine, len(lines))
 	copy(out, lines)
+
 	for i, line := range out {
 		if !line.comment && sensitiveKeys[line.key] {
 			out[i].value = ""
 		}
 	}
+
 	return out
 }
 
 // marshalEnv serialises envLine values to a .env file string.
 func marshalEnv(lines []envLine) string {
 	var sb strings.Builder
+
 	for _, line := range lines {
 		if line.comment {
 			if line.value == "" {
@@ -400,5 +442,6 @@ func marshalEnv(lines []envLine) string {
 			sb.WriteByte('\n')
 		}
 	}
+
 	return sb.String()
 }

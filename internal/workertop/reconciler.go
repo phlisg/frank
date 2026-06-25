@@ -55,11 +55,13 @@ type Reconciler struct {
 // were already on screen. Pass nil when there is no pre-existing set.
 func NewReconciler(lister adhocLister, interval time.Duration, initial []PaneSpec) *Reconciler {
 	current := make(map[string]struct{})
+
 	for _, s := range initial {
 		if s.Kind == KindAdhoc {
 			current[s.Name] = struct{}{}
 		}
 	}
+
 	return &Reconciler{
 		lister:   lister,
 		interval: interval,
@@ -92,6 +94,7 @@ func (r *Reconciler) Run(ctx context.Context) {
 			if err != nil {
 				continue
 			}
+
 			added, removed := diffAdhoc(r.current, latest)
 			for _, c := range added {
 				select {
@@ -107,8 +110,10 @@ func (r *Reconciler) Run(ctx context.Context) {
 					},
 				}:
 				}
+
 				r.current[c.Name] = struct{}{}
 			}
+
 			for _, name := range removed {
 				select {
 				case <-ctx.Done():
@@ -135,14 +140,17 @@ func diffAdhoc(current map[string]struct{}, latest []AdhocContainer) (added []Ad
 	latestSet := make(map[string]struct{}, len(latest))
 	for _, c := range latest {
 		latestSet[c.Name] = struct{}{}
+
 		if _, ok := current[c.Name]; !ok {
 			added = append(added, c)
 		}
 	}
+
 	for name := range current {
 		if _, ok := latestSet[name]; !ok {
 			removed = append(removed, name)
 		}
 	}
+
 	return added, removed
 }

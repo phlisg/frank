@@ -57,6 +57,7 @@ func (g *Generator) Generate(cfg *config.Config, projectName, mainProjectName st
 	if err != nil {
 		return "", fmt.Errorf("runtime fragment: %w", err)
 	}
+
 	if err := mergeFragment(services, runtimeFrag); err != nil {
 		return "", fmt.Errorf("merge runtime fragment: %w", err)
 	}
@@ -76,14 +77,18 @@ func (g *Generator) Generate(cfg *config.Config, projectName, mainProjectName st
 		if svc == "sqlite" {
 			continue // sqlite has no compose fragment
 		}
+
 		svcCfg := cfg.Config[svc]
+
 		frag, err := g.engine.RenderServiceCompose(svc, svcCfg, projectName, ephemeralPorts)
 		if err != nil {
 			return "", fmt.Errorf("service %q fragment: %w", svc, err)
 		}
+
 		if err := mergeFragment(services, frag); err != nil {
 			return "", fmt.Errorf("merge service %q fragment: %w", svc, err)
 		}
+
 		if vol, ok := volumeServices[svc]; ok {
 			volumes[vol] = map[string]interface{}{"driver": "local"}
 		}
@@ -102,6 +107,10 @@ func (g *Generator) Generate(cfg *config.Config, projectName, mainProjectName st
 	if err := g.emitWorkers(services, cfg, projectName); err != nil {
 		return "", err
 	}
+
+	// 4b. Emit the dev server sidecar (laravel.vite) when enabled. It publishes
+	//     the Vite port that laravel.test used to own (port move).
+	emitVite(services, cfg, projectName, vitePort)
 
 	// 5. Validate host port uniqueness.
 	if err := validatePorts(services); err != nil {
@@ -135,10 +144,12 @@ func (g *Generator) Write(cfg *config.Config, projectName, mainProjectName, dir 
 	if err != nil {
 		return err
 	}
+
 	frankDir := filepath.Join(dir, ".frank")
 	if err := os.MkdirAll(frankDir, 0755); err != nil {
 		return fmt.Errorf("create .frank directory: %w", err)
 	}
+
 	return os.WriteFile(filepath.Join(frankDir, "compose.yaml"), []byte(content), 0644)
 }
 
@@ -148,16 +159,20 @@ func (g *Generator) Write(cfg *config.Config, projectName, mainProjectName, dir 
 // service_started). sqlite has no compose service and is skipped.
 func serviceDepends(cfg *config.Config) map[string]interface{} {
 	deps := map[string]interface{}{}
+
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
 			continue
 		}
+
 		condition := "service_started"
 		if healthcheckedServices[svc] {
 			condition = "service_healthy"
 		}
+
 		deps[svc] = map[string]interface{}{"condition": condition}
 	}
+
 	return deps
 }
 
@@ -195,15 +210,19 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 	if err != nil {
 		return fmt.Errorf("init fragment: %w", err)
 	}
+
 	if err := mergeFragment(services, initFrag); err != nil {
 		return fmt.Errorf("merge init fragment: %w", err)
 	}
+
 	injectBuild(services, "migrate", laravelBuild)
+
 	if migrateDeps := serviceDepends(cfg); len(migrateDeps) > 0 {
 		if svc, ok := services["migrate"].(map[string]interface{}); ok {
 			svc["depends_on"] = migrateDeps
 		}
 	}
+
 	if w.Schedule {
 		frag, err := g.engine.RenderWorker("schedule", template.WorkerData{
 			ProjectName: projectName,
@@ -211,14 +230,17 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 		if err != nil {
 			return fmt.Errorf("schedule worker fragment: %w", err)
 		}
+
 		if err := mergeFragment(services, frag); err != nil {
 			return fmt.Errorf("merge schedule worker fragment: %w", err)
 		}
+
 		injectBuild(services, "schedule", laravelBuild)
 	}
 
 	for _, pool := range w.Queue {
 		queuesCSV := strings.Join(pool.Queues, ",")
+
 		for i := 1; i <= pool.Count; i++ {
 			name := fmt.Sprintf("queue.%s.%d", pool.Name, i)
 			frag, err := g.engine.RenderWorker("queue", template.WorkerData{
@@ -232,17 +254,57 @@ func (g *Generator) emitWorkers(services map[string]interface{}, cfg *config.Con
 				Sleep:       pool.Sleep,
 				Backoff:     pool.Backoff,
 			})
+
 			if err != nil {
 				return fmt.Errorf("queue worker fragment %q: %w", name, err)
 			}
+
 			if err := mergeFragment(services, frag); err != nil {
 				return fmt.Errorf("merge queue worker fragment %q: %w", name, err)
 			}
+
 			injectBuild(services, name, laravelBuild)
 		}
 	}
 
 	return nil
+}
+
+// emitVite adds the laravel.vite dev-server sidecar to services when dev is
+// enabled. It reuses the laravel.test image (build-block tag-dedup, same
+// mechanism as workers) and publishes the Vite port on the host. The service
+// runs the package-manager dev command via sh -c; the guarded install inside
+// that command is the sole node-deps installer (Frank installs them nowhere
+// else). Kept inline in Go rather than templated because it's one service with
+// a Go-computed command — same post-merge-injection philosophy as worker build
+// blocks and depends_on.
+func emitVite(services map[string]interface{}, cfg *config.Config, projectName string, vitePort int) {
+	if !cfg.Dev.IsEnabled() {
+		return
+	}
+
+	cmd := cfg.Dev.EffectiveCommand(cfg.Node.PackageManager)
+	services["laravel.vite"] = map[string]interface{}{
+		"image":          fmt.Sprintf("frank-%s-laravel.test", projectName),
+		"container_name": "laravel.vite",
+		"tty":            true,
+		"command":        []interface{}{"sh", "-c", cmd},
+		"volumes":        []interface{}{".:/var/www/html"},
+		"working_dir":    "/var/www/html",
+		// COREPACK_ENABLE_DOWNLOAD_PROMPT=0: pnpm pinned via package.json's
+		// packageManager field is fetched by corepack, which otherwise prompts
+		// "about to download … continue?" and wedges — the container has no stdin.
+		"environment": []interface{}{"WWWUSER=${UID:-1000}", "COREPACK_ENABLE_DOWNLOAD_PROMPT=0"},
+		"env_file":       []interface{}{".env"},
+		"healthcheck":    map[string]interface{}{"disable": true},
+		"restart":        "unless-stopped",
+		"networks":       []interface{}{"frank"},
+		"ports":          []interface{}{fmt.Sprintf("%d:5173", vitePort)},
+		"depends_on": map[string]interface{}{
+			"laravel.test": map[string]interface{}{"condition": "service_started"},
+		},
+	}
+	injectBuild(services, "laravel.vite", laravelTestBuild(services))
 }
 
 // laravelTestBuild returns the build: block declared on the laravel.test
@@ -254,6 +316,7 @@ func laravelTestBuild(services map[string]interface{}) interface{} {
 	if !ok {
 		return nil
 	}
+
 	return lt["build"]
 }
 
@@ -263,10 +326,12 @@ func injectBuild(services map[string]interface{}, name string, laravelBuild inte
 	if laravelBuild == nil {
 		return
 	}
+
 	svc, ok := services[name].(map[string]interface{})
 	if !ok {
 		return
 	}
+
 	svc["build"] = laravelBuild
 }
 
@@ -277,39 +342,48 @@ func mergeFragment(services map[string]interface{}, fragment string) error {
 	if err := yaml.Unmarshal([]byte(fragment), &parsed); err != nil {
 		return fmt.Errorf("parse fragment YAML: %w", err)
 	}
+
 	for name, def := range parsed {
 		services[name] = def
 	}
+
 	return nil
 }
 
 // validatePorts checks that no two services bind the same host port + protocol.
 func validatePorts(services map[string]interface{}) error {
 	seen := map[string]string{} // "port/proto" → service name
+
 	for svcName, svcDef := range services {
 		svcMap, ok := svcDef.(map[string]interface{})
 		if !ok {
 			continue
 		}
+
 		ports, ok := svcMap["ports"].([]interface{})
 		if !ok {
 			continue
 		}
+
 		for _, portEntry := range ports {
 			portStr, ok := portEntry.(string)
 			if !ok {
 				continue
 			}
+
 			key := hostPortKey(portStr)
 			if key == "" {
 				continue
 			}
+
 			if prev, conflict := seen[key]; conflict {
 				return fmt.Errorf("port conflict on %s: services %q and %q both bind the same host port", key, prev, svcName)
 			}
+
 			seen[key] = svcName
 		}
 	}
+
 	return nil
 }
 
@@ -321,9 +395,12 @@ func hostPortKey(mapping string) string {
 		proto = mapping[idx+1:]
 		mapping = mapping[:idx]
 	}
+
 	if !strings.Contains(mapping, ":") {
 		return ""
 	}
+
 	host := strings.SplitN(mapping, ":", 2)[0]
+
 	return host + "/" + proto
 }

@@ -47,6 +47,7 @@ func CheckDependencies() error {
 	if err != nil {
 		return errors.New("docker compose plugin not found — please install Docker Compose: https://docs.docker.com/compose/install/")
 	}
+
 	if !strings.Contains(string(out), "Docker Compose") {
 		return errors.New("unexpected output from 'docker compose version' — please ensure Docker Compose v2 is installed")
 	}
@@ -66,6 +67,7 @@ func (c *Client) Run(args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+
 	return runCmd(cmd)
 }
 
@@ -76,6 +78,7 @@ func (c *Client) RunStream(w io.Writer, args ...string) error {
 	cmd := c.composeCmd(args...)
 	cmd.Stdout = w
 	cmd.Stderr = w
+
 	return runCmd(cmd)
 }
 
@@ -83,10 +86,12 @@ func (c *Client) RunStream(w io.Writer, args ...string) error {
 // returning it as a string. Used for state detection (e.g. ps).
 func (c *Client) RunQuiet(args ...string) (string, error) {
 	cmd := c.composeCmd(args...)
+
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	err := runCmd(cmd)
+
 	return buf.String(), err
 }
 
@@ -136,17 +141,23 @@ func (c *Client) RunAdhoc(name string, labels map[string]string, cmdArgs []strin
 	for k := range labels {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
+
 	for _, k := range keys {
 		args = append(args, "--label", k+"="+labels[k])
 	}
+
 	args = append(args, "laravel.test")
 	args = append(args, cmdArgs...)
+
 	if err := c.Run(args...); err != nil {
 		return err
 	}
+
 	cmd := exec.Command("docker", "update", "--restart=unless-stopped", name)
 	cmd.Dir = c.dir
+
 	return runCmd(cmd)
 }
 
@@ -156,11 +167,13 @@ func (c *Client) StopContainers(names []string) error {
 	if len(names) == 0 {
 		return nil
 	}
+
 	args := append([]string{"rm", "-f"}, names...)
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return runCmd(cmd)
 }
 
@@ -178,17 +191,22 @@ func (c *Client) ListContainers(projectName string, workerFilter string, format 
 	} else {
 		args = append(args, "--filter", "label=frank.worker="+workerFilter)
 	}
+
 	if format != "" {
 		args = append(args, "--format", format)
 	}
+
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
+
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = os.Stderr
+
 	if err := runCmd(cmd); err != nil {
 		return "", err
 	}
+
 	return buf.String(), nil
 }
 
@@ -204,16 +222,20 @@ func (c *Client) AdhocWorkerNames(projectName string) ([]string, error) {
 	}
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
+
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = os.Stderr
+
 	if err := runCmd(cmd); err != nil {
 		return nil, err
 	}
+
 	out := strings.TrimSpace(buf.String())
 	if out == "" {
 		return nil, nil
 	}
+
 	return strings.Split(out, "\n"), nil
 }
 
@@ -239,28 +261,36 @@ func (c *Client) ListAdhocWorkersWithIDs(projectName string) ([]AdhocWorker, err
 	}
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
+
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = os.Stderr
+
 	if err := runCmd(cmd); err != nil {
 		return nil, err
 	}
+
 	out := strings.TrimSpace(buf.String())
 	if out == "" {
 		return nil, nil
 	}
+
 	var workers []AdhocWorker
+
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
+
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
 			continue
 		}
+
 		workers = append(workers, AdhocWorker{ID: fields[0], Name: fields[1]})
 	}
+
 	return workers, nil
 }
 
@@ -277,9 +307,11 @@ func (c *Client) InspectContainer(name string) (string, int, string, error) {
 		name,
 	)
 	cmd.Dir = c.dir
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+
 	if err := cmd.Run(); err != nil {
 		// `docker inspect` on a missing container exits non-zero with
 		// "No such object" on stderr. Treat that as a missing container,
@@ -287,18 +319,24 @@ func (c *Client) InspectContainer(name string) (string, int, string, error) {
 		if strings.Contains(strings.ToLower(stderr.String()), "no such object") {
 			return "", 0, "", nil
 		}
+
 		return "", 0, "", fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
 	}
+
 	fields := strings.Fields(strings.TrimSpace(stdout.String()))
 	if len(fields) < 3 {
 		return "", 0, "", fmt.Errorf("docker inspect %s: unexpected output %q", name, stdout.String())
 	}
+
 	status := fields[0]
+
 	var exitCode int
 	if _, err := fmt.Sscanf(fields[1], "%d", &exitCode); err != nil {
 		return "", 0, "", fmt.Errorf("docker inspect %s: parse exit code %q: %w", name, fields[1], err)
 	}
+
 	id := fields[2]
+
 	return status, exitCode, id, nil
 }
 
@@ -309,7 +347,9 @@ func (c *Client) LogsForWorkers(services []string, follow bool) error {
 	if follow {
 		args = append(args, "-f")
 	}
+
 	args = append(args, services...)
+
 	return c.Run(args...)
 }
 
@@ -321,6 +361,7 @@ func (c *Client) ComposePSServiceExists(name string) bool {
 	if err != nil {
 		return false
 	}
+
 	return strings.TrimSpace(out) != ""
 }
 
@@ -332,12 +373,14 @@ func (c *Client) LogsRaw(name string, follow bool) error {
 	if follow {
 		args = append(args, "-f")
 	}
+
 	args = append(args, name)
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+
 	return runCmd(cmd)
 }
 
@@ -350,6 +393,7 @@ func (c *Client) LogsRawPrefixed(name string, follow bool) error {
 	if follow {
 		args = append(args, "-f")
 	}
+
 	args = append(args, name)
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = c.dir
@@ -358,20 +402,26 @@ func (c *Client) LogsRawPrefixed(name string, follow bool) error {
 	if err != nil {
 		return err
 	}
+
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
 	var wg sync.WaitGroup
+
 	wg.Add(2)
+
 	go func() { defer wg.Done(); copyWithPrefix(os.Stdout, stdout, name) }()
 	go func() { defer wg.Done(); copyWithPrefix(os.Stderr, stderr, name) }()
+
 	waitErr := cmd.Wait()
 	wg.Wait()
+
 	return waitErr
 }
 
@@ -380,6 +430,7 @@ func (c *Client) LogsRawPrefixed(name string, follow bool) error {
 func copyWithPrefix(dst io.Writer, src io.Reader, name string) {
 	sc := bufio.NewScanner(src)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+
 	for sc.Scan() {
 		fmt.Fprintf(dst, "%s  | %s\n", name, sc.Text())
 	}
@@ -392,6 +443,7 @@ func (c *Client) ContainerStatus() (ContainerState, int, int) {
 	if err != nil {
 		return StateStopped, 0, 0
 	}
+
 	return parseContainerStatus(out)
 }
 
@@ -404,8 +456,10 @@ func (c *Client) WaitForContainer(service string, timeout time.Duration) error {
 		if _, err := c.ExecQuiet(service, "true"); err == nil {
 			return nil
 		}
+
 		time.Sleep(2 * time.Second)
 	}
+
 	return fmt.Errorf("container %q did not become ready within %s", service, timeout)
 }
 
@@ -417,11 +471,14 @@ func parseContainerStatus(out string) (ContainerState, int, int) {
 	}
 
 	var running, total int
+
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
+
 		total++
+
 		if strings.Contains(line, `"State":"running"`) || strings.Contains(line, `"Status":"running"`) {
 			running++
 		}
@@ -430,9 +487,11 @@ func parseContainerStatus(out string) (ContainerState, int, int) {
 	if running == 0 {
 		return StateStopped, 0, 0
 	}
+
 	if running == total {
 		return StateRunning, running, total
 	}
+
 	return StatePartial, running, total
 }
 
@@ -442,6 +501,7 @@ func (c *Client) composeCmd(args ...string) *exec.Cmd {
 	cmdArgs := append(prefix, args...)
 	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = c.dir
+
 	return cmd
 }
 
@@ -452,7 +512,9 @@ func runCmd(cmd *exec.Cmd) error {
 		if errors.As(err, &exitErr) {
 			return fmt.Errorf("command exited with code %d", exitErr.ExitCode())
 		}
+
 		return err
 	}
+
 	return nil
 }

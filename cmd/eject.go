@@ -40,6 +40,7 @@ func runEject(cmd *cobra.Command, args []string) error {
 	}
 
 	client := docker.New(dir)
+
 	state, _, _ := client.ContainerStatus()
 	if state != docker.StateRunning {
 		return fmt.Errorf("containers are not running — run frank up first")
@@ -47,12 +48,15 @@ func runEject(cmd *cobra.Command, args []string) error {
 
 	// Build --with list: map Frank services to Sail equivalents, dropping sqlite.
 	var sailServices []string
+
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
 			continue
 		}
+
 		sailServices = append(sailServices, svc)
 	}
+
 	withList := strings.Join(sailServices, ",")
 
 	reqRegion := output.Region("Installing Sail")
@@ -60,6 +64,7 @@ func runEject(cmd *cobra.Command, args []string) error {
 		reqRegion.Stop(err)
 		return fmt.Errorf("composer require laravel/sail failed: %w", err)
 	}
+
 	reqRegion.Stop(nil)
 
 	installRegion := output.Region("Configuring Sail")
@@ -70,6 +75,7 @@ func runEject(cmd *cobra.Command, args []string) error {
 		installRegion.Stop(err)
 		return fmt.Errorf("sail:install failed: %w", err)
 	}
+
 	installRegion.Stop(nil)
 
 	// Restore phpunit.xml to Laravel defaults (sqlite/:memory:).
@@ -89,6 +95,7 @@ func runEject(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("  eject complete — run ./vendor/bin/sail up to start containers")
+
 	return nil
 }
 
@@ -126,5 +133,6 @@ func flattenDockerfile(dir string, cfg *config.Config) error {
 	if err := writeFile(filepath.Join(dir, ".frank", "Dockerfile"), body); err != nil {
 		return err
 	}
+
 	return nil
 }

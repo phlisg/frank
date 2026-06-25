@@ -24,15 +24,18 @@ func compileIgnore(projectRoot string) *ignore.GitIgnore {
 	baseline := append([]string(nil), baselineIgnorePatterns...)
 
 	giPath := filepath.Join(projectRoot, ".gitignore")
+
 	data, err := os.ReadFile(giPath)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			fmt.Fprintf(os.Stderr, "frank watch: WARN failed to read %s (%v); falling back to baseline ignore patterns only\n", giPath, err)
 		}
+
 		return ignore.CompileIgnoreLines(baseline...)
 	}
 
 	lines := strings.Split(string(data), "\n")
+
 	return ignore.CompileIgnoreLines(append(baseline, lines...)...)
 }
 
@@ -51,18 +54,22 @@ func (m *ignoreMatcher) Matches(relPath string, isDir bool) bool {
 	if m == nil || m.gi == nil {
 		return false
 	}
+
 	p := filepath.ToSlash(relPath)
 	if p == "" || p == "." {
 		return false
 	}
+
 	if m.gi.MatchesPath(p) {
 		return true
 	}
+
 	if isDir && !strings.HasSuffix(p, "/") {
 		if m.gi.MatchesPath(p + "/") {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -81,23 +88,28 @@ func (w *Watcher) armWatches() (int, error) {
 
 	matcher := &ignoreMatcher{gi: w.gitignore}
 	added := make(map[string]struct{})
+
 	var firstErr error
 
 	add := func(dir string) {
 		if _, ok := added[dir]; ok {
 			return
 		}
+
 		if err := w.fsw.Add(dir); err != nil {
 			if firstErr == nil {
 				firstErr = fmt.Errorf("add watch %q: %w", dir, err)
 			}
+
 			return
 		}
+
 		added[dir] = struct{}{}
 	}
 
 	for _, root := range defaultWatchRoots {
 		absRoot := filepath.Join(w.cfg.ProjectRoot, root)
+
 		info, err := os.Stat(absRoot)
 		if err != nil || !info.IsDir() {
 			// Missing root is not an error — Laravel projects vary; e.g.
@@ -112,11 +124,14 @@ func (w *Watcher) armWatches() (int, error) {
 				if firstErr == nil {
 					firstErr = err
 				}
+
 				if d != nil && d.IsDir() {
 					return fs.SkipDir
 				}
+
 				return nil
 			}
+
 			if !d.IsDir() {
 				return nil
 			}
@@ -129,7 +144,9 @@ func (w *Watcher) armWatches() (int, error) {
 			if matcher.Matches(rel, true) {
 				return fs.SkipDir
 			}
+
 			add(path)
+
 			return nil
 		})
 		if werr != nil && firstErr == nil {
@@ -142,14 +159,17 @@ func (w *Watcher) armWatches() (int, error) {
 	// parent dir is ignored (defensive — unlikely for root-level files).
 	for _, file := range defaultWatchFiles {
 		parent := filepath.Dir(filepath.Join(w.cfg.ProjectRoot, file))
+
 		info, err := os.Stat(parent)
 		if err != nil || !info.IsDir() {
 			continue
 		}
+
 		rel, relErr := filepath.Rel(w.cfg.ProjectRoot, parent)
 		if relErr == nil && matcher.Matches(rel, true) {
 			continue
 		}
+
 		add(parent)
 	}
 
@@ -174,14 +194,17 @@ func (w *Watcher) handleDirEvent(ev fsnotify.Event) {
 		if err != nil || !info.IsDir() {
 			return
 		}
+
 		rel, err := filepath.Rel(w.cfg.ProjectRoot, ev.Name)
 		if err != nil {
 			return
 		}
+
 		matcher := &ignoreMatcher{gi: w.gitignore}
 		if matcher.Matches(rel, true) {
 			return
 		}
+
 		_ = w.fsw.Add(ev.Name)
 
 	case ev.Op&fsnotify.Remove != 0:

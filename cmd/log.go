@@ -62,12 +62,14 @@ func runLog(cmd *cobra.Command, args []string) error {
 	if !logNoFollow {
 		tailArgs = append(tailArgs, "-f")
 	}
+
 	tailArgs = append(tailArgs, "storage/logs/laravel.log")
 
 	err := client.Exec("laravel.test", tailArgs...)
 	if err != nil && isInterrupt(err) {
 		return nil
 	}
+
 	return err
 }
 
@@ -80,6 +82,7 @@ func runLogReset(cmd *cobra.Command, args []string) error {
 	}
 
 	output.Group("Reset laravel.log", "")
+
 	return nil
 }
 

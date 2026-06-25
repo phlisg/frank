@@ -26,18 +26,22 @@ func (m *mockDocker) ExecQuiet(service string, command ...string) (string, error
 func makeRequest(args map[string]any) mcplib.CallToolRequest {
 	req := mcplib.CallToolRequest{}
 	req.Params.Arguments = args
+
 	return req
 }
 
 func contentText(t *testing.T, result *mcplib.CallToolResult) string {
 	t.Helper()
+
 	if len(result.Content) == 0 {
 		t.Fatal("expected at least one content block")
 	}
+
 	tc, ok := result.Content[0].(mcplib.TextContent)
 	if !ok {
 		t.Fatalf("expected TextContent, got %T", result.Content[0])
 	}
+
 	return tc.Text
 }
 
@@ -57,6 +61,7 @@ func TestHandleStatus_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -72,6 +77,7 @@ func TestHandleStatus_Success(t *testing.T) {
 	if !ok {
 		t.Fatal("expected services array")
 	}
+
 	if len(svcList) != 2 {
 		t.Fatalf("expected 2 services, got %d", len(svcList))
 	}
@@ -89,12 +95,15 @@ func TestHandleStatus_Success(t *testing.T) {
 	if services[0]["Name"] != "laravel.test" {
 		t.Errorf("expected Name=laravel.test, got %v", services[0]["Name"])
 	}
+
 	if services[0]["State"] != "running" {
 		t.Errorf("expected State=running, got %v", services[0]["State"])
 	}
+
 	if services[0]["Health"] != "" {
 		t.Errorf("expected Health='', got %v", services[0]["Health"])
 	}
+
 	publishers, ok := services[0]["Publishers"].([]any)
 	if !ok || len(publishers) == 0 {
 		t.Error("expected non-empty Publishers for laravel.test")
@@ -103,6 +112,7 @@ func TestHandleStatus_Success(t *testing.T) {
 	if services[1]["Name"] != "pgsql" {
 		t.Errorf("expected Name=pgsql, got %v", services[1]["Name"])
 	}
+
 	if services[1]["Health"] != "healthy" {
 		t.Errorf("expected Health=healthy, got %v", services[1]["Health"])
 	}
@@ -121,6 +131,7 @@ func TestHandleStatus_DockerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected Go error: %v", err)
 	}
+
 	if !result.IsError {
 		t.Fatal("expected IsError=true")
 	}
@@ -143,6 +154,7 @@ func TestHandleConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -158,9 +170,11 @@ func TestHandleConfig(t *testing.T) {
 	if !ok {
 		t.Fatal("expected PHP key in config")
 	}
+
 	if php["Version"] != "8.4" {
 		t.Errorf("expected PHP.Version=8.4, got %v", php["Version"])
 	}
+
 	if php["Runtime"] != "frankenphp" {
 		t.Errorf("expected PHP.Runtime=frankenphp, got %v", php["Runtime"])
 	}
@@ -169,6 +183,7 @@ func TestHandleConfig(t *testing.T) {
 	if !ok {
 		t.Fatal("expected Services array in config")
 	}
+
 	if len(services) != 2 {
 		t.Errorf("expected 2 services, got %d", len(services))
 	}
@@ -176,6 +191,7 @@ func TestHandleConfig(t *testing.T) {
 
 func TestHandleLogs_AllServices(t *testing.T) {
 	var captured []string
+
 	h := &handlers{
 		client: &mockDocker{
 			runQuietFn: func(args ...string) (string, error) {
@@ -186,10 +202,12 @@ func TestHandleLogs_AllServices(t *testing.T) {
 	}
 
 	req := makeRequest(nil)
+
 	result, err := h.handleLogs(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -198,6 +216,7 @@ func TestHandleLogs_AllServices(t *testing.T) {
 	if len(captured) != 3 {
 		t.Fatalf("expected 3 args, got %d: %v", len(captured), captured)
 	}
+
 	if captured[0] != "logs" || captured[1] != "--tail" || captured[2] != "50" {
 		t.Errorf("expected [logs --tail 50], got %v", captured)
 	}
@@ -210,6 +229,7 @@ func TestHandleLogs_AllServices(t *testing.T) {
 
 func TestHandleLogs_SpecificService(t *testing.T) {
 	var captured []string
+
 	h := &handlers{
 		client: &mockDocker{
 			runQuietFn: func(args ...string) (string, error) {
@@ -223,10 +243,12 @@ func TestHandleLogs_SpecificService(t *testing.T) {
 		"service": "pgsql",
 		"lines":   float64(100),
 	})
+
 	result, err := h.handleLogs(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -234,6 +256,7 @@ func TestHandleLogs_SpecificService(t *testing.T) {
 	if len(captured) != 4 {
 		t.Fatalf("expected 4 args, got %d: %v", len(captured), captured)
 	}
+
 	if captured[0] != "logs" || captured[1] != "--tail" || captured[2] != "100" || captured[3] != "pgsql" {
 		t.Errorf("expected [logs --tail 100 pgsql], got %v", captured)
 	}
@@ -241,7 +264,9 @@ func TestHandleLogs_SpecificService(t *testing.T) {
 
 func TestHandleExec_Default(t *testing.T) {
 	var capturedService string
+
 	var capturedCmd []string
+
 	h := &handlers{
 		client: &mockDocker{
 			execQuietFn: func(service string, command ...string) (string, error) {
@@ -255,10 +280,12 @@ func TestHandleExec_Default(t *testing.T) {
 	req := makeRequest(map[string]any{
 		"command": []any{"php", "artisan", "migrate"},
 	})
+
 	result, err := h.handleExec(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -266,6 +293,7 @@ func TestHandleExec_Default(t *testing.T) {
 	if capturedService != "laravel.test" {
 		t.Errorf("expected service=laravel.test, got %q", capturedService)
 	}
+
 	if len(capturedCmd) != 3 || capturedCmd[0] != "php" || capturedCmd[1] != "artisan" || capturedCmd[2] != "migrate" {
 		t.Errorf("expected [php artisan migrate], got %v", capturedCmd)
 	}
@@ -278,7 +306,9 @@ func TestHandleExec_Default(t *testing.T) {
 
 func TestHandleExec_CustomService(t *testing.T) {
 	var capturedService string
+
 	var capturedCmd []string
+
 	h := &handlers{
 		client: &mockDocker{
 			execQuietFn: func(service string, command ...string) (string, error) {
@@ -293,10 +323,12 @@ func TestHandleExec_CustomService(t *testing.T) {
 		"command": []any{"psql"},
 		"service": "pgsql",
 	})
+
 	result, err := h.handleExec(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if result.IsError {
 		t.Fatal("expected IsError=false")
 	}
@@ -304,6 +336,7 @@ func TestHandleExec_CustomService(t *testing.T) {
 	if capturedService != "pgsql" {
 		t.Errorf("expected service=pgsql, got %q", capturedService)
 	}
+
 	if len(capturedCmd) != 1 || capturedCmd[0] != "psql" {
 		t.Errorf("expected [psql], got %v", capturedCmd)
 	}
@@ -322,10 +355,12 @@ func TestHandleExec_EmptyCommand(t *testing.T) {
 	req := makeRequest(map[string]any{
 		"command": []any{},
 	})
+
 	result, err := h.handleExec(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.IsError {
 		t.Fatal("expected IsError=true for empty command")
 	}
@@ -347,10 +382,12 @@ func TestHandleExec_MissingCommand(t *testing.T) {
 	}
 
 	req := makeRequest(nil)
+
 	result, err := h.handleExec(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.IsError {
 		t.Fatal("expected IsError=true for missing command")
 	}

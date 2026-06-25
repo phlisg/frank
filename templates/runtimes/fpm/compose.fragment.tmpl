@@ -4,8 +4,6 @@ laravel.test:
     dockerfile: .frank/Dockerfile
     args:
       WWWGROUP: ${GID:-1000}
-  ports:
-    - "{{.VitePort}}:5173"
   networks:
     - frank
   volumes:

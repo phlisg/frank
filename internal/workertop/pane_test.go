@@ -59,31 +59,37 @@ func TestSearch_FiltersBufferLines(t *testing.T) {
 	p.appendLine("ERROR timeout on order #789")
 
 	p.SetSearch("order")
+
 	content := p.viewport.View()
 	if !strings.Contains(content, "order #123") {
 		t.Error("search should include matching lines")
 	}
+
 	if strings.Contains(content, "cache hit") {
 		t.Error("search should exclude non-matching lines")
 	}
 
 	p.SetSearch("ERROR")
+
 	content = p.viewport.View()
 	if !strings.Contains(content, "timeout") {
 		t.Error("ERROR search should match error line")
 	}
+
 	if strings.Contains(content, "order #123") {
 		t.Error("ERROR search should exclude INFO lines")
 	}
 
 	// Case insensitive
 	p.SetSearch("error")
+
 	content = p.viewport.View()
 	if !strings.Contains(content, "timeout") {
 		t.Error("search should be case-insensitive")
 	}
 
 	p.ClearSearch()
+
 	content = p.viewport.View()
 	if !strings.Contains(content, "cache hit") {
 		t.Error("clear should restore all lines")
@@ -99,19 +105,23 @@ func TestPause_FreezesScrollAndUnpauseCatchesUp(t *testing.T) {
 	p.appendLine("line 2")
 
 	p.TogglePause()
+
 	if !p.paused {
 		t.Fatal("expected paused=true after toggle")
 	}
 
 	posBefore := p.viewport.YOffset
+
 	for i := 0; i < 20; i++ {
 		p.appendLine("scrolling line")
 	}
+
 	if p.viewport.YOffset != posBefore {
 		t.Errorf("viewport scrolled while paused: was %d, now %d", posBefore, p.viewport.YOffset)
 	}
 
 	p.TogglePause()
+
 	if p.paused {
 		t.Fatal("expected paused=false after second toggle")
 	}

@@ -40,33 +40,42 @@ func (w WorktreeItem) StatusLabel() string {
 	if !w.HasFrank {
 		return "not configured"
 	}
+
 	if len(w.Services) == 0 {
 		return "stopped"
 	}
+
 	running := 0
+
 	for _, s := range w.Services {
 		if s.State == "running" {
 			running++
 		}
 	}
+
 	total := len(w.Services)
+
 	if running == 0 {
 		return "stopped"
 	}
+
 	if running == total {
 		return fmt.Sprintf("running (%d/%d)", running, total)
 	}
+
 	return fmt.Sprintf("partial (%d/%d)", running, total)
 }
 
 // PortSummary returns a compact port listing from running services.
 func (w WorktreeItem) PortSummary() string {
 	var ports []string
+
 	for _, s := range w.Services {
 		if s.Ports != "" && s.State == "running" {
 			ports = append(ports, s.Ports)
 		}
 	}
+
 	return strings.Join(ports, " ")
 }
 
@@ -77,6 +86,7 @@ func (w WorktreeItem) IsRunning() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -88,6 +98,7 @@ func Discover(dir string) ([]WorktreeItem, error) {
 	}
 
 	var items []WorktreeItem
+
 	for _, e := range entries {
 		item := WorktreeItem{
 			Path:   e.path,
@@ -108,6 +119,7 @@ func Discover(dir string) ([]WorktreeItem, error) {
 
 		items = append(items, item)
 	}
+
 	return items, nil
 }
 
@@ -122,10 +134,12 @@ func parseWorktrees(dir string) ([]worktreeEntry, error) {
 	cmd := exec.Command("git", "worktree", "list", "--porcelain")
 	cmd.Dir = dir
 	cmd.Env = config.CleanGitEnv()
+
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git worktree list: %w", err)
 	}
+
 	return parsePorcelain(string(out)), nil
 }
 
@@ -138,47 +152,59 @@ func parsePorcelain(raw string) []worktreeEntry {
 	}
 
 	var entries []worktreeEntry
+
 	for _, block := range blocks[1:] {
 		e := parsePorcelainBlock(block)
 		if e.path != "" {
 			entries = append(entries, e)
 		}
 	}
+
 	return entries
 }
 
 func splitPorcelainBlocks(raw string) []string {
 	var blocks []string
+
 	var current []string
+
 	for _, line := range strings.Split(raw, "\n") {
 		if line == "" {
 			if len(current) > 0 {
 				blocks = append(blocks, strings.Join(current, "\n"))
 				current = nil
 			}
+
 			continue
 		}
+
 		current = append(current, line)
 	}
+
 	if len(current) > 0 {
 		blocks = append(blocks, strings.Join(current, "\n"))
 	}
+
 	return blocks
 }
 
 func parsePorcelainBlock(block string) worktreeEntry {
 	var e worktreeEntry
+
 	for _, line := range strings.Split(block, "\n") {
 		if strings.HasPrefix(line, "worktree ") {
 			e.path = strings.TrimPrefix(line, "worktree ")
 		}
+
 		if strings.HasPrefix(line, "branch refs/heads/") {
 			e.branch = strings.TrimPrefix(line, "branch refs/heads/")
 		}
 	}
+
 	if e.branch == "" && e.path != "" {
 		e.branch = "(detached)"
 	}
+
 	return e
 }
 
@@ -196,22 +222,27 @@ type composePSEntry struct {
 
 func probeServices(worktreePath string) []ServiceInfo {
 	client := docker.New(worktreePath)
+
 	out, err := client.RunQuiet("ps", "--format", "json")
 	if err != nil {
 		return nil
 	}
 
 	var services []ServiceInfo
+
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
+
 		var entry composePSEntry
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			continue
 		}
+
 		var pubs []Publisher
+
 		for _, p := range entry.Publishers {
 			if p.PublishedPort > 0 {
 				pubs = append(pubs, Publisher{
@@ -221,6 +252,7 @@ func probeServices(worktreePath string) []ServiceInfo {
 				})
 			}
 		}
+
 		services = append(services, ServiceInfo{
 			Name:       entry.Service,
 			State:      entry.State,
@@ -228,18 +260,23 @@ func probeServices(worktreePath string) []ServiceInfo {
 			Publishers: pubs,
 		})
 	}
+
 	return services
 }
 
 func formatPorts(entry composePSEntry) string {
 	seen := make(map[int]bool)
+
 	var parts []string
+
 	for _, p := range entry.Publishers {
 		if p.PublishedPort > 0 && !seen[p.PublishedPort] {
 			seen[p.PublishedPort] = true
+
 			parts = append(parts, fmt.Sprintf(":%d", p.PublishedPort))
 		}
 	}
+
 	return strings.Join(parts, " ")
 }
 
@@ -259,5 +296,6 @@ func (w WorktreeItem) WebPort() int {
 			}
 		}
 	}
+
 	return 0
 }

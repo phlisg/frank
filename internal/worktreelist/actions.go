@@ -30,15 +30,18 @@ func openBrowser(item WorktreeItem) error {
 	if cfg.Server.IsHTTPS() {
 		scheme = "https"
 	}
+
 	url := fmt.Sprintf("%s://localhost:%d", scheme, port)
 
 	var opener string
+
 	switch runtime.GOOS {
 	case "darwin":
 		opener = "open"
 	default:
 		opener = "xdg-open"
 	}
+
 	return exec.Command(opener, url).Start()
 }
 
@@ -53,6 +56,7 @@ func RemoveWorktree(path, branch string) error {
 	if branch != "" && branch != "(detached)" {
 		_ = exec.Command("git", "branch", "-D", branch).Run()
 	}
+
 	return nil
 }
 
@@ -67,14 +71,17 @@ func upContainers(path string) error {
 			return err
 		}
 	}
+
 	frank, err := os.Executable()
 	if err != nil {
 		frank = "frank"
 	}
+
 	out, err := exec.Command(frank, "up", "-d", "--dir", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("frank up: %s", out)
 	}
+
 	return nil
 }
 
@@ -83,10 +90,12 @@ func downContainers(path string) error {
 	if err != nil {
 		frank = "frank"
 	}
+
 	out, err := exec.Command(frank, "down", "--dir", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("frank down: %s", out)
 	}
+
 	return nil
 }
 
@@ -100,6 +109,7 @@ func openEditor(path string) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 
@@ -110,6 +120,7 @@ func tailLogs(path string) error {
 func CreateWorktree(repoDir, wtPath, branch string) error {
 	cmd := exec.Command("git", "worktree", "add", wtPath, "-b", branch)
 	cmd.Dir = repoDir
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree add: %s", out)
@@ -122,15 +133,19 @@ func CreateWorktree(repoDir, wtPath, branch string) error {
 
 func copyIfExists(srcDir, dstDir, name string) {
 	src := filepath.Join(srcDir, name)
+
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return
 	}
+
 	info, _ := os.Stat(src)
 	perm := os.FileMode(0644)
+
 	if info != nil {
 		perm = info.Mode().Perm()
 	}
+
 	_ = os.WriteFile(filepath.Join(dstDir, name), data, perm)
 }
 
@@ -139,9 +154,11 @@ func regenerate(path string) error {
 	if err != nil {
 		frank = "frank"
 	}
+
 	out, err := exec.Command(frank, "generate", "--dir", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("frank generate: %s", out)
 	}
+
 	return nil
 }

@@ -38,6 +38,7 @@ func TestTotalQueueCount_SumsPositiveCounts(t *testing.T) {
 		{Count: 3},
 		{Count: 0}, // ignored
 	}
+
 	if got := totalQueueCount(cfg); got != 5 {
 		t.Errorf("totalQueueCount = %d, want 5", got)
 	}
@@ -48,7 +49,9 @@ func TestTotalQueueCount_SumsPositiveCounts(t *testing.T) {
 // pidfile and returns nil.
 func TestRunWatchStop_StaleDeadPidCleansUp(t *testing.T) {
 	root := t.TempDir()
+
 	const deadPid = 2_147_483_600
+
 	if err := watch.WritePidfile(watch.PidfilePath(root), deadPid); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -56,6 +59,7 @@ func TestRunWatchStop_StaleDeadPidCleansUp(t *testing.T) {
 	if _, _, err := runWatchStop(root); err != nil {
 		t.Fatalf("runWatchStop: %v", err)
 	}
+
 	if _, err := os.Stat(watch.PidfilePath(root)); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("pidfile should be removed, stat err = %v", err)
 	}
@@ -74,9 +78,11 @@ func TestRunWatchStop_NoPidfile(t *testing.T) {
 func TestRunWatchStop_MalformedPidfile(t *testing.T) {
 	root := t.TempDir()
 	path := watch.PidfilePath(root)
+
 	if err := os.MkdirAll(rootDotFrank(root), 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(path, []byte("garbage"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +90,7 @@ func TestRunWatchStop_MalformedPidfile(t *testing.T) {
 	if _, _, err := runWatchStop(root); err == nil {
 		t.Fatalf("expected error for malformed pidfile")
 	}
+
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("malformed pidfile should be unlinked, stat err = %v", err)
 	}

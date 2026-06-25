@@ -13,11 +13,13 @@ func splitPassthrough(cmd *cobra.Command, args []string) []string {
 			return args[dash:]
 		}
 	}
+
 	for i, a := range args {
 		if a == "--" {
 			return args[i+1:]
 		}
 	}
+
 	return nil
 }
 
@@ -28,13 +30,17 @@ func splitPassthrough(cmd *cobra.Command, args []string) []string {
 // not run.
 func stripDirFlag(args []string) (dir string, rest []string) {
 	dir = resolveDir()
+
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--dir" && i+1 < len(args) {
 			dir = args[i+1]
 			i++
+
 			continue
 		}
+
 		rest = append(rest, args[i])
 	}
+
 	return dir, rest
 }

@@ -89,10 +89,13 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		if loadErr != nil {
 			return fmt.Errorf("no Docker config found — run frank generate first")
 		}
+
 		output.Group("Generating Docker files", "frank.yaml found but .frank/ missing")
+
 		if err := generate(cfg, dir, rootCmd.Version); err != nil {
 			return fmt.Errorf("auto-generate failed: %w", err)
 		}
+
 		composeArgs = append(composeArgs, "--build")
 	}
 
@@ -103,6 +106,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		if needsBuild {
 			composeArgs = append(composeArgs, "--build")
 		}
+
 		quick = false
 	}
 
@@ -144,8 +148,10 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	// edit during container boot still lands a reload trigger once the
 	// arm-suppression window clears. SIGINT/SIGTERM cancels both.
 	var stopWatcher func() error
+
 	if !detach && wantWatcher {
 		var err error
+
 		stopWatcher, err = startForegroundWatcher(dir, cfg)
 		if err != nil {
 			output.Warning(fmt.Sprintf("watcher not started: %v", err))
@@ -162,6 +168,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	region.Stop(upErr)
+
 	if upErr != nil {
 		return upErr
 	}
@@ -174,14 +181,17 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	if err := client.WaitForContainer("laravel.test", 30*time.Second); err != nil {
 		stopWait(err)
 		output.Warning(fmt.Sprintf("%v — skipping post-start tasks", err))
+
 		return nil
 	}
+
 	stopWait(nil)
 
 	if _, err := os.Stat(filepath.Join(dir, "composer.json")); err == nil {
 		region := output.Region("Installing Composer dependencies")
 		err := client.ExecStream(region, "laravel.test", "composer", "install", "--no-interaction")
 		region.Stop(err)
+
 		if err != nil {
 			output.Warning(fmt.Sprintf("composer install failed: %v", err))
 		}
@@ -191,6 +201,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		region := output.Region("Running migrations")
 		err := client.ExecStream(region, "laravel.test", "php", "artisan", "migrate", "--force")
 		region.Stop(err)
+
 		if err != nil {
 			output.Warning(fmt.Sprintf("artisan migrate failed: %v", err))
 		}
@@ -202,13 +213,21 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 
 	if detach && showNextSteps {
 		var steps []string
+
 		pm := "npm"
 		if cfg != nil && cfg.Node.PackageManager != "" {
 			pm = cfg.Node.PackageManager
 		}
+
 		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
-			steps = append(steps, fmt.Sprintf("%s install && %s run dev", pm, pm))
+			if cfg != nil && cfg.Dev.IsEnabled() {
+				// Dev server runs automatically in the laravel.vite sidecar.
+				steps = append(steps, "frank dev    # attach to the dev server (Vite)")
+			} else {
+				steps = append(steps, fmt.Sprintf("%s install && %s run dev", pm, pm))
+			}
 		}
+
 		output.NextSteps(steps)
 	}
 
@@ -232,7 +251,9 @@ func ensureBaseImage(dir string) error {
 	if err != nil {
 		return nil // let the normal flow surface the config error
 	}
+
 	engine := template.New(TemplateFS)
+
 	return baseimage.EnsureBase(engine, cfg)
 }
 
@@ -248,6 +269,7 @@ func composeSubcmdBuilds(args []string) bool {
 		if a == "--" {
 			continue
 		}
+
 		if strings.HasPrefix(a, "-") {
 			// `-f file` / `--file file` style: skip the value too when the
 			// flag has no "=" and isn't a bundled short flag. We can't know
@@ -260,8 +282,10 @@ func composeSubcmdBuilds(args []string) bool {
 				i+1 < len(args) {
 				i++
 			}
+
 			continue
 		}
+
 		switch a {
 		case "build", "up", "run", "create":
 			return true
@@ -269,19 +293,20 @@ func composeSubcmdBuilds(args []string) bool {
 			return false
 		}
 	}
+
 	return false
 }
 
 // autoRegenerate detects a stale .frank/ and regenerates it. Two tiers:
 //
-//   Tier 1 (should we regenerate at all?): stale if .state is missing/corrupt,
-//   the frank version bumped, this is a "dev" build, or sha256(frank.yaml) no
-//   longer matches the stored configHash. The hash check subsumes the old
-//   explicit php.version/runtime comparison — those fields live in frank.yaml,
-//   so any change to them flips the hash.
+//	Tier 1 (should we regenerate at all?): stale if .state is missing/corrupt,
+//	the frank version bumped, this is a "dev" build, or sha256(frank.yaml) no
+//	longer matches the stored configHash. The hash check subsumes the old
+//	explicit php.version/runtime comparison — those fields live in frank.yaml,
+//	so any change to them flips the hash.
 //
-//   Tier 2 (does the image need a rebuild?): only when regenerating, and BEFORE
-//   generate() overwrites the on-disk Dockerfile — see dockerfileChanged.
+//	Tier 2 (does the image need a rebuild?): only when regenerating, and BEFORE
+//	generate() overwrites the on-disk Dockerfile — see dockerfileChanged.
 //
 // Returns (regenerated, needsBuild, err). On a config-load failure it skips
 // gracefully, returning (false, false, nil) so the normal up flow proceeds.
@@ -312,6 +337,7 @@ func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, e
 		} else if state.FrankVersion != "dev" {
 			vc := "v" + currentVersion
 			vs := "v" + state.FrankVersion
+
 			if semver.IsValid(vc) && semver.IsValid(vs) && semver.Compare(vc, vs) > 0 {
 				stale = true
 				reason = fmt.Sprintf("frank updated %s → %s", state.FrankVersion, currentVersion)
@@ -360,6 +386,7 @@ func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, e
 		stopGen(genErr)
 		return false, false, fmt.Errorf("auto-regenerate failed: %w", genErr)
 	}
+
 	stopGen(nil)
 
 	return true, needsBuild, nil
@@ -394,11 +421,13 @@ func dockerfileChanged(dir string, cfg *config.Config) bool {
 		if err != nil {
 			return true
 		}
+
 		onDisk, err := os.ReadFile(filepath.Join(frankDir, d.file))
 		if err != nil || string(onDisk) != rendered {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -408,11 +437,13 @@ func needsAppKey(dir string) bool {
 	if err != nil {
 		return false
 	}
+
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(line) == "APP_KEY=" {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -423,13 +454,16 @@ func generateAppKey(dir string) error {
 	if _, err := rand.Read(key); err != nil {
 		return err
 	}
+
 	value := "base64:" + base64.StdEncoding.EncodeToString(key)
 
 	path := filepath.Join(dir, ".env")
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
+
 	lines := strings.Split(string(data), "\n")
 	for i, line := range lines {
 		if strings.HasPrefix(line, "APP_KEY=") {
@@ -437,8 +471,11 @@ func generateAppKey(dir string) error {
 			break
 		}
 	}
+
 	updated := strings.Join(lines, "\n")
+
 	output.Detail("generated APP_KEY")
+
 	return os.WriteFile(path, []byte(updated), 0644)
 }
 
@@ -452,16 +489,19 @@ func shouldRunWatcher(cfg *config.Config, client *docker.Client, projectRoot str
 		if cfg.Workers.Schedule {
 			return true
 		}
+
 		if totalQueueCount(cfg) > 0 {
 			return true
 		}
 	}
+
 	if client != nil {
 		project := config.ProjectName(projectRoot)
 		if names, err := client.AdhocWorkerNames(project); err == nil && len(names) > 0 {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -488,6 +528,7 @@ func startForegroundWatcher(projectRoot string, cfg *config.Config) (func() erro
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		select {
 		case <-sigCh:
@@ -504,7 +545,9 @@ func startForegroundWatcher(projectRoot string, cfg *config.Config) (func() erro
 	return func() error {
 		signal.Stop(sigCh)
 		cancel()
+
 		err := <-done
+
 		return err
 	}, nil
 }
@@ -517,11 +560,15 @@ func spawnDetachedWatcher(projectRoot string) error {
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
 	}
+
 	argv := []string{self, "--dir", projectRoot, "watch"}
+
 	pid, err := watch.Daemonize(argv, watch.LogfilePath(projectRoot))
 	if err != nil {
 		return err
 	}
+
 	output.Detail(fmt.Sprintf("frank watch: detached child (pid %d)", pid))
+
 	return nil
 }

@@ -150,9 +150,40 @@ Cert generation: `internal/cert/cert.go` — runs `mkcert localhost 127.0.0.1 ::
 
 Template conditionality: `{{if .HTTPS}}` / `{{if .CustomPort}}` in Caddyfile.tmpl, nginx.conf.tmpl, compose fragments. Custom port suppresses HTTP→HTTPS redirect.
 
-Vite dev server: Vite serves its own TLS using Frank's mkcert certs — **no proxy through Caddy/nginx**. `generate()` writes `.frank/vite-server.js` (HTTPS mode: full TLS config with `host: '0.0.0.0'`, cert paths, origin, cors; HTTP mode: just `host: '0.0.0.0'`). `frank new` auto-patches vite.config via `patchViteConfig()` in `cmd/install.go`. `frank setup`/`frank generate` show a hint if vite.config doesn't import `vite-server`. Port 5173 always mapped on `laravel.test` (both runtimes) — FPM moved it from nginx to laravel.test because Vite runs in the app container, not the proxy.
+Vite dev server: Vite serves its own TLS using Frank's mkcert certs — **no proxy through Caddy/nginx**. `generate()` writes `.frank/vite-server.js` (HTTPS mode: full TLS config with `host: '0.0.0.0'`, cert paths, origin, cors; HTTP mode: just `host: '0.0.0.0'`). `frank new` auto-patches vite.config via `patchViteConfig()` in `cmd/install.go`. `frank setup`/`frank generate` show a hint if vite.config doesn't import `vite-server`. Port 5173 is published by the `laravel.vite` sidecar (see Dev Server below), not `laravel.test` — the dev-server feature moved the mapping off the app container. When `dev.enabled: false`, 5173 is left unmapped.
 
 Key design decision: originally tried TLS-terminating Vite at the proxy layer (Caddy/nginx listening on :5173 with TLS, proxying to Vite). Failed because FrankenPHP's single-container architecture creates a port conflict (Caddy and Vite both want 5173). Direct Vite TLS is simpler and works for both runtimes.
+
+## Dev Server (`frank dev`)
+
+The frontend dev server (Vite) runs as a compose sidecar `laravel.vite`, built from
+the same image as `laravel.test` (build-block tag-dedup, same as workers). Spec:
+`docs/superpowers/specs/2026-06-25-dev-server-runner-design.md`.
+
+Config: `Dev struct { Enabled *bool; Command string }` in `internal/config/config.go`
+(nil=true pattern like `Server.HTTPS`; **not** materialized in `applyDefaults` — kept
+nil so round-tripped `frank.yaml` stays clean). `Dev.IsEnabled()` and
+`Dev.EffectiveCommand(pm)`. `EffectiveCommand` returns `Command` verbatim if set, else
+derives `[ -d node_modules ] || <pm> install; <pm> dev` — the `node_modules` guard makes
+the install a noop on every restart, and this is the **sole** node-deps installer (Frank
+installs them nowhere else). Unknown-key warnings via `warnUnknownDevKeys` + `knownDevKeys`.
+
+Compose: `emitVite()` in `internal/compose/compose.go` builds the service inline in Go
+(single service, Go-computed command — same post-merge-injection philosophy as worker
+build blocks), gated on `cfg.Dev.IsEnabled()`. Reuses worker invariants: tty:true,
+healthcheck disable:true, WWWUSER, no `user:`, no `entrypoint:`, image+build tag-dedup.
+**No** migrate/DB dependency (Vite touches neither). **Port move:** the `{{.VitePort}}:5173`
+mapping was removed from `laravel.test` in both runtime fragments and now publishes on
+`laravel.vite` via `vitePort` (5173 non-worktree, 5174–5199 in worktree mode). When dev is
+disabled, no vite service and 5173 unmapped.
+
+Command: `cmd/dev.go` — thin `docker.New(resolveDir()).Run(...)` passthroughs preserving the
+project-dir invariant. `frank dev` = `compose logs -f --no-log-prefix laravel.vite` (Ctrl-C
+detaches, container keeps running); `restart`/`stop`/`start` map to the compose verbs.
+
+Lifecycle owned by compose: `frank up` starts it, `frank down` stops it — no pidfile/
+daemonize/orphan infra (unlike `internal/watch`). New golden fixture `frankenphp-pgsql-no-dev`
+covers the disabled path; `internal/compose/vite_test.go` asserts the port follows `vitePort`.
 
 ## Sail Interop Notes
 

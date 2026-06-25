@@ -10,9 +10,11 @@ func TestLookup(t *testing.T) {
 		if !ok {
 			t.Fatal("expected pint to be found")
 		}
+
 		if tool.Name != "pint" {
 			t.Fatalf("expected Name=pint, got %q", tool.Name)
 		}
+
 		if tool.Category != "php" {
 			t.Fatalf("expected Category=php, got %q", tool.Category)
 		}
@@ -70,6 +72,7 @@ func TestAllTools(t *testing.T) {
 
 	// Verify it's a copy (mutating shouldn't affect registry)
 	tools[0].Name = "mutated"
+
 	orig, _ := Lookup("pint")
 	if orig.Name != "pint" {
 		t.Fatal("AllTools did not return a copy")
@@ -82,6 +85,7 @@ func TestPHPTools(t *testing.T) {
 		if len(tools) != 2 {
 			t.Fatalf("expected 2 PHP tools, got %d", len(tools))
 		}
+
 		for _, tool := range tools {
 			if tool.Category != "php" {
 				t.Errorf("expected php category, got %q for %s", tool.Category, tool.Name)

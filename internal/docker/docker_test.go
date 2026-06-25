@@ -23,9 +23,11 @@ func TestComposeCmd_Args(t *testing.T) {
 	// Args[0] is the binary path; check the rest.
 	args := cmd.Args[1:] // skip binary name
 	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up", "-d", "--build"}
+
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
+
 	for i, a := range args {
 		if a != want[i] {
 			t.Errorf("args[%d] = %q, want %q", i, a, want[i])
@@ -35,6 +37,7 @@ func TestComposeCmd_Args(t *testing.T) {
 
 func TestComposeCmd_Dir(t *testing.T) {
 	c := New("/my/project")
+
 	cmd := c.composeCmd("ps")
 	if cmd.Dir != "/my/project" {
 		t.Errorf("cmd.Dir = %q, want /my/project", cmd.Dir)
@@ -50,10 +53,12 @@ func TestRunCmd_Success(t *testing.T) {
 
 func TestRunCmd_Failure(t *testing.T) {
 	cmd := exec.Command("false")
+
 	err := runCmd(cmd)
 	if err == nil {
 		t.Error("expected error for 'false'")
 	}
+
 	if !strings.Contains(err.Error(), "code 1") {
 		t.Errorf("expected exit code in error, got: %v", err)
 	}
@@ -64,9 +69,11 @@ func TestUp_NoArgs(t *testing.T) {
 	cmd := c.composeCmd(upArgs()...)
 	args := cmd.Args[1:]
 	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up"}
+
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
+
 	for i, a := range args {
 		if a != want[i] {
 			t.Errorf("args[%d] = %q, want %q", i, a, want[i])
@@ -79,9 +86,11 @@ func TestUp_WithDetach(t *testing.T) {
 	cmd := c.composeCmd(upArgs("-d")...)
 	args := cmd.Args[1:]
 	want := []string{"compose", "--project-directory", ".", "-f", ".frank/compose.yaml", "up", "-d"}
+
 	if len(args) != len(want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
+
 	for i, a := range args {
 		if a != want[i] {
 			t.Errorf("args[%d] = %q, want %q", i, a, want[i])
@@ -139,9 +148,11 @@ func TestContainerStatus_ParseRunning(t *testing.T) {
 			if state != tc.wantState {
 				t.Errorf("state = %v, want %v", state, tc.wantState)
 			}
+
 			if running != tc.wantRunning {
 				t.Errorf("running = %d, want %d", running, tc.wantRunning)
 			}
+
 			if total != tc.wantTotal {
 				t.Errorf("total = %d, want %d", total, tc.wantTotal)
 			}

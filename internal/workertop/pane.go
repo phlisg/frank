@@ -100,6 +100,7 @@ type StateMsg struct {
 // ResizeMsg lands.
 func NewPane(spec PaneSpec) *Pane {
 	vp := viewport.New(0, 0)
+
 	return &Pane{
 		spec:     spec,
 		viewport: vp,
@@ -124,23 +125,28 @@ func (p *Pane) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.PaneID != p.spec.Name {
 			return p, nil
 		}
+
 		p.appendLine(m.Line)
+
 		return p, nil
 
 	case StatsMsg:
 		if p.spec.ContainerID == "" {
 			return p, nil
 		}
+
 		if sample, ok := m[p.spec.ContainerID]; ok {
 			p.stats = sample
 			p.statsAge = time.Now()
 		}
+
 		return p, nil
 
 	case ResizeMsg:
 		if m.PaneID != p.spec.Name {
 			return p, nil
 		}
+
 		p.width = m.Width
 		p.height = m.Height
 		p.truncateTitle = m.TruncateTitle
@@ -148,31 +154,40 @@ func (p *Pane) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// bar. Minimum 1×1 so the viewport never goes negative.
 		innerW := p.width - 2
 		innerH := p.height - 2 - 1
+
 		if innerW < 1 {
 			innerW = 1
 		}
+
 		if innerH < 1 {
 			innerH = 1
 		}
+
 		p.viewport.Width = innerW
 		p.viewport.Height = innerH
+
 		return p, nil
 
 	case FocusMsg:
 		if m.PaneID != p.spec.Name {
 			return p, nil
 		}
+
 		p.focused = m.Focused
+
 		return p, nil
 
 	case StateMsg:
 		if m.PaneID != p.spec.Name {
 			return p, nil
 		}
+
 		p.state = m.State
 		p.exitCode = m.ExitCode
+
 		return p, nil
 	}
+
 	return p, nil
 }
 
@@ -190,12 +205,15 @@ func (p *Pane) View() string {
 	style := p.borderStyle()
 	w := p.width - 2
 	h := p.height - 2
+
 	if w < 1 {
 		w = 1
 	}
+
 	if h < 1 {
 		h = 1
 	}
+
 	return style.Width(w).Height(h).Render(body)
 }
 
@@ -216,6 +234,7 @@ func isRestartNoise(line string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -231,16 +250,19 @@ func (p *Pane) appendLine(line string) {
 	} else {
 		p.buffer = append(p.buffer, line)
 	}
+
 	if len(p.buffer) > PaneBufferCap {
 		drop := len(p.buffer) - PaneBufferCap
 		p.buffer = append(p.buffer[:0], p.buffer[drop:]...)
 	}
+
 	if p.searchQuery == "" {
 		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
 	} else {
 		p.rebuildViewport()
 		return
 	}
+
 	if !p.paused {
 		p.viewport.GotoBottom()
 	}
@@ -275,14 +297,18 @@ func (p *Pane) rebuildViewport() {
 		p.viewport.SetContent(strings.Join(p.buffer, "\n"))
 	} else {
 		q := strings.ToLower(p.searchQuery)
+
 		var filtered []string
+
 		for _, line := range p.buffer {
 			if strings.Contains(strings.ToLower(line), q) {
 				filtered = append(filtered, line)
 			}
 		}
+
 		p.viewport.SetContent(strings.Join(filtered, "\n"))
 	}
+
 	p.viewport.GotoBottom()
 }
 
@@ -292,6 +318,7 @@ func (p *Pane) borderStyle() lipgloss.Style {
 	if p.focused {
 		return BorderFocused
 	}
+
 	switch p.state {
 	case StateExited:
 		return BorderExited
@@ -302,6 +329,7 @@ func (p *Pane) borderStyle() lipgloss.Style {
 		if !p.statsAge.IsZero() && time.Since(p.statsAge) > degradedAfter {
 			return BorderDegraded
 		}
+
 		return BorderRunning
 	default:
 		// StateMissing and anything else fall through to the exited
@@ -319,20 +347,24 @@ func (p *Pane) titleBar() string {
 	if p.truncateTitle {
 		name = p.shortName()
 	}
+
 	left := TitleName.Render(name)
 
 	memStr := "—"
+
 	if p.stats.MemBytes > 0 {
 		// Round to nearest MB. docker stats reports in MiB internally;
 		// display rounds to integer for CCTV-clean readability.
 		mb := (p.stats.MemBytes + (1<<20)/2) / (1 << 20)
 		memStr = fmt.Sprintf("%d MB", mb)
 	}
+
 	right := TitleMem.Render(memStr)
 
 	if p.paused {
 		right = right + " " + TitlePaused.Render("[PAUSED]")
 	}
+
 	if p.state == StateExited {
 		right = right + " " + TitleExit.Render(fmt.Sprintf("[exited %d]", p.exitCode))
 	}
@@ -346,6 +378,7 @@ func (p *Pane) titleBar() string {
 
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
+
 	gap := innerW - leftW - rightW
 	if gap < 1 {
 		// Not enough room for both halves; prefer showing the name.
@@ -353,6 +386,7 @@ func (p *Pane) titleBar() string {
 		// collide with the name.
 		return left + " " + right
 	}
+
 	return left + strings.Repeat(" ", gap) + right
 }
 
@@ -372,10 +406,12 @@ func (p *Pane) shortName() string {
 		if len(parts) != 3 || parts[0] != "queue" {
 			return p.spec.Name
 		}
+
 		pool := parts[1]
 		if len(pool) > 3 {
 			pool = pool[:3]
 		}
+
 		return fmt.Sprintf("q.%s.%s", pool, parts[2])
 	default:
 		return p.spec.Name

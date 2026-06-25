@@ -27,12 +27,14 @@ func LogfilePath(projectRoot string) string {
 func (w *Watcher) acquirePidfile() error {
 	path := PidfilePath(w.cfg.ProjectRoot)
 	existing, err := ReadPidfile(path)
+
 	if err != nil {
 		// Malformed content: wipe and proceed.
 		_ = os.Remove(path)
 	} else if existing != 0 && pidAlive(existing) && existing != os.Getpid() {
 		return fmt.Errorf("watch: already running (pid %d); run `frank watch --stop` first", existing)
 	}
+
 	return WritePidfile(path, os.Getpid())
 }
 
@@ -54,9 +56,11 @@ func Daemonize(argv []string, logPath string) (int, error) {
 	if len(argv) == 0 {
 		return 0, errors.New("watch: Daemonize requires a non-empty argv")
 	}
+
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return 0, fmt.Errorf("watch: prepare log dir: %w", err)
 	}
+
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("watch: open log file %s: %w", logPath, err)
@@ -82,5 +86,6 @@ func Daemonize(argv []string, logPath string) (int, error) {
 	// Non-fatal on error: child is already running; worst case the runtime
 	// keeps a process record around briefly.
 	_ = cmd.Process.Release()
+
 	return pid, nil
 }

@@ -27,6 +27,7 @@ func WritePidfile(path string, pid int) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+
 	return os.WriteFile(path, []byte(strconv.Itoa(pid)), 0o644)
 }
 
@@ -39,16 +40,20 @@ func ReadPidfile(path string) (int, error) {
 		if errors.Is(err, fs.ErrNotExist) {
 			return 0, nil
 		}
+
 		return 0, err
 	}
+
 	s := strings.TrimSpace(string(data))
 	if s == "" {
 		return 0, nil
 	}
+
 	pid, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, fmt.Errorf("pidfile %q: invalid pid %q", path, s)
 	}
+
 	return pid, nil
 }
 
@@ -62,14 +67,17 @@ func pidAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
+
 	p, err := os.FindProcess(pid)
 	if err != nil {
 		return false
 	}
+
 	err = p.Signal(syscall.Signal(0))
 	if err == nil {
 		return true
 	}
+
 	return errors.Is(err, syscall.EPERM)
 }
 
@@ -119,6 +127,7 @@ func (s Status) Uptime() time.Duration {
 	if s.StartedAt.IsZero() {
 		return 0
 	}
+
 	return time.Since(s.StartedAt)
 }
 
@@ -183,6 +192,7 @@ func (c *StatusChecker) Check() (Status, error) {
 		// signal errors (already exiting, race with shutdown).
 		_ = c.killFn(pid)
 		_ = c.removeFn(c.PidfilePath)
+
 		return Status{State: StatusOrphaned, PID: pid, StartedAt: startedAt}, nil
 	}
 
@@ -194,5 +204,6 @@ func (c *StatusChecker) pidfileMTime() time.Time {
 	if err != nil {
 		return time.Time{}
 	}
+
 	return info.ModTime()
 }

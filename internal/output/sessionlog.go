@@ -56,10 +56,12 @@ func OpenSessionLog(dir, version string, truncate bool) error {
 	if err != nil {
 		return err
 	}
+
 	sessionLog = f
 
 	ts := time.Now().Format(sessionTimeFmt)
 	fmt.Fprintf(f, "\n=== %s | %s | frank %s ===\n", ts, strings.Join(os.Args, " "), version)
+
 	return nil
 }
 
@@ -67,6 +69,7 @@ func OpenSessionLog(dir, version string, truncate bool) error {
 func CloseSessionLog() {
 	sessionMu.Lock()
 	defer sessionMu.Unlock()
+
 	if sessionLog != nil {
 		_ = sessionLog.Close()
 		sessionLog = nil
@@ -78,6 +81,7 @@ func CloseSessionLog() {
 func logWrite(p []byte) {
 	sessionMu.Lock()
 	defer sessionMu.Unlock()
+
 	if sessionLog != nil {
 		_, _ = sessionLog.Write(collapseCR(ansiRe.ReplaceAll(p, nil)))
 	}
@@ -92,24 +96,32 @@ func collapseCR(b []byte) []byte {
 	if bytes.IndexByte(b, '\r') < 0 {
 		return b
 	}
+
 	var out []byte
+
 	for {
 		i := bytes.IndexByte(b, '\n')
 		seg := b
+
 		if i >= 0 {
 			seg = b[:i]
 		}
+
 		seg = bytes.TrimSuffix(seg, []byte{'\r'}) // CRLF / trailing return
 		if j := bytes.LastIndexByte(seg, '\r'); j >= 0 {
 			seg = seg[j+1:] // keep only the last redraw frame
 		}
+
 		out = append(out, seg...)
+
 		if i < 0 {
 			break
 		}
+
 		out = append(out, '\n')
 		b = b[i+1:]
 	}
+
 	return out
 }
 
@@ -118,6 +130,7 @@ func collapseCR(b []byte) []byte {
 func logLine(format string, args ...any) {
 	sessionMu.Lock()
 	defer sessionMu.Unlock()
+
 	if sessionLog != nil {
 		fmt.Fprintf(sessionLog, format+"\n", args...)
 	}
@@ -126,9 +139,11 @@ func logLine(format string, args ...any) {
 // stepHeader renders a region-start marker: "-- label ----- <timestamp>".
 func stepHeader(label string) string {
 	const width = 52
+
 	prefix := "-- " + label + " "
 	if pad := width - len(prefix); pad > 0 {
 		prefix += strings.Repeat("-", pad)
 	}
+
 	return prefix + " " + time.Now().Format(sessionTimeFmt)
 }

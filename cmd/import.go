@@ -84,6 +84,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	if len(services) == 0 {
 		fmt.Println("Warning: no known services detected — using defaults")
+
 		services = []string{"pgsql", "mailpit"}
 	}
 
@@ -95,13 +96,16 @@ func runImport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	if err := writeFile(filepath.Join(dir, config.ConfigFileName), yamlBytes); err != nil {
 		return err
 	}
+
 	fmt.Printf("  imported  PHP %s, services: %s\n", phpVersion, strings.Join(services, ", "))
 	fmt.Println("  wrote     frank.yaml")
 
 	fmt.Println("\nGenerating Docker files...")
+
 	return generate(cfg, dir, rootCmd.Version)
 }
 
@@ -122,17 +126,21 @@ func parseSailCompose(compose sailComposeFile) (phpVersion string, services []st
 
 	// Deduplicate (mailhog + mailpit could both appear).
 	services = dedup(services)
+
 	return
 }
 
 func dedup(strs []string) []string {
 	seen := map[string]bool{}
 	out := strs[:0]
+
 	for _, str := range strs {
 		if !seen[str] {
 			seen[str] = true
+
 			out = append(out, str)
 		}
 	}
+
 	return out
 }

@@ -4,6 +4,7 @@ import "testing"
 
 func TestNeedsBuild(t *testing.T) {
 	const want = "abc123"
+
 	tests := []struct {
 		name     string
 		present  bool

@@ -15,6 +15,7 @@ func TestConfigShow_OutputContainsDefaults(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(dir, config.ConfigFileName), []byte("version: 1\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -22,9 +23,11 @@ func TestConfigShow_OutputContainsDefaults(t *testing.T) {
 	// Override Dir so resolveDir() returns our temp dir.
 	oldDir := Dir
 	Dir = dir
+
 	defer func() { Dir = oldDir }()
 
 	var buf bytes.Buffer
+
 	configShowCmd.SetOut(&buf)
 	configShowCmd.SetErr(&buf)
 
@@ -36,6 +39,7 @@ func TestConfigShow_OutputContainsDefaults(t *testing.T) {
 	err := configShowCmd.RunE(configShowCmd, nil)
 
 	w.Close()
+
 	os.Stdout = oldStdout
 
 	if err != nil {
@@ -43,6 +47,7 @@ func TestConfigShow_OutputContainsDefaults(t *testing.T) {
 	}
 
 	var out bytes.Buffer
+
 	out.ReadFrom(r)
 	output := out.String()
 

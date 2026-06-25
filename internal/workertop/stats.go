@@ -56,6 +56,7 @@ func NewHub(containerIDs []string, interval time.Duration, exec ExecFn) *Hub {
 	if interval <= 0 {
 		interval = DefaultInterval
 	}
+
 	if exec == nil {
 		exec = DefaultExecFn
 	}
@@ -114,22 +115,26 @@ func (h *Hub) sampleAndEmit(ctx context.Context) {
 		[]string{"stats", "--no-stream", "--format", "{{.ID}} {{.MemPerc}} {{.MemUsage}}"},
 		h.containerIDs...,
 	)
+
 	out, err := h.exec(ctx, "docker", args...)
 	if err != nil {
 		return
 	}
 
 	snapshot := make(map[string]StatsSample, len(h.containerIDs))
+
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
+
 		sample, err := parseStatsLine(line)
 		if err != nil {
 			continue
 		}
+
 		snapshot[sample.ContainerID] = sample
 	}
 
@@ -156,6 +161,7 @@ func parseStatsLine(line string) (StatsSample, error) {
 	}
 
 	pctToken := strings.TrimSuffix(fields[1], "%")
+
 	pct, err := strconv.ParseFloat(pctToken, 64)
 	if err != nil {
 		return StatsSample{}, fmt.Errorf("workertop: parse MemPerc %q: %w", fields[1], err)
@@ -200,19 +206,24 @@ func parseBytes(s string) (int64, error) {
 	if s == "" {
 		return 0, fmt.Errorf("workertop: empty size string")
 	}
+
 	for _, u := range byteUnits {
 		if !strings.HasSuffix(s, u.suffix) {
 			continue
 		}
+
 		numStr := strings.TrimSpace(strings.TrimSuffix(s, u.suffix))
 		if numStr == "" {
 			return 0, fmt.Errorf("workertop: size %q missing numeric part", s)
 		}
+
 		num, err := strconv.ParseFloat(numStr, 64)
 		if err != nil {
 			return 0, fmt.Errorf("workertop: parse size %q: %w", s, err)
 		}
+
 		return int64(num * float64(u.mult)), nil
 	}
+
 	return 0, fmt.Errorf("workertop: unknown size unit in %q", s)
 }

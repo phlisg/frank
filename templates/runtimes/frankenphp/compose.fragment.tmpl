@@ -12,7 +12,6 @@ laravel.test:
 {{- else}}
     - "80"
 {{- end}}
-    - "{{.VitePort}}:5173"
 {{- else}}
 {{- if .HTTPS}}
 {{- if .CustomPort}}
@@ -30,7 +29,6 @@ laravel.test:
     - "80:80"
 {{- end}}
 {{- end}}
-    - "{{.VitePort}}:5173"
 {{- end}}
   networks:
     - frank

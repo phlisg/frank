@@ -55,6 +55,7 @@ func Execute(fsys fs.FS, version string) {
 		default:
 			output.SetLevel(output.Normal)
 		}
+
 		name := cmd.Name()
 		if name == "up" || name == "setup" || name == "frank" {
 			if status, err := selfupdate.Check(rootCmd.Version); err == nil && status.Available {
@@ -92,6 +93,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Run %sfrank new%s or %sfrank setup%s to get started.\n", ansiBold, ansiReset, ansiBold, ansiReset)
 		fmt.Println()
 		printCommands(cmd)
+
 		return nil
 	}
 
@@ -112,17 +114,21 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	// Workers summary
 	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
 		var parts []string
+
 		if cfg.Workers.Schedule {
 			dot := colorDot(state)
 			parts = append(parts, dot+" scheduler")
 		}
+
 		if len(cfg.Workers.Queue) > 0 {
 			queueTotal := 0
 			for _, p := range cfg.Workers.Queue {
 				queueTotal += p.Count
 			}
+
 			parts = append(parts, fmt.Sprintf("%d× queue", queueTotal))
 		}
+
 		printRow("Workers", strings.Join(parts, "  "))
 	}
 
@@ -138,6 +144,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	// Next-step hints
 	fmt.Println()
+
 	switch state {
 	case docker.StateRunning, docker.StatePartial:
 		printHint("frank compose ps", "view running services")
@@ -145,6 +152,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	default:
 		printHint("frank up", "start containers")
 	}
+
 	fmt.Println()
 
 	return nil
@@ -155,6 +163,7 @@ func colorDot(state docker.ContainerState) string {
 	if state == docker.StateRunning {
 		return ansiGreen + ansiBold + "●" + ansiReset
 	}
+
 	return ansiRed + ansiBold + "●" + ansiReset
 }
 
@@ -171,35 +180,44 @@ func printHint(command, desc string) {
 func printCommands(cmd *cobra.Command) {
 	mainNames := []string{"new", "up", "down", "install", "setup"}
 	mainSet := make(map[string]bool, len(mainNames))
+
 	for _, n := range mainNames {
 		mainSet[n] = true
 	}
 
 	subs := make(map[string]*cobra.Command)
+
 	var otherNames []string
+
 	for _, sub := range cmd.Commands() {
 		if sub.Hidden {
 			continue
 		}
+
 		subs[sub.Name()] = sub
+
 		if !mainSet[sub.Name()] {
 			otherNames = append(otherNames, sub.Name())
 		}
 	}
 
 	fmt.Printf("  %sMain Commands:%s\n", ansiDim, ansiReset)
+
 	for _, name := range mainNames {
 		if sub, ok := subs[name]; ok {
 			fmt.Printf("    %-14s%s%s%s\n", name, ansiDim, sub.Short, ansiReset)
 		}
 	}
+
 	fmt.Println()
 
 	fmt.Printf("  %sOther Commands:%s\n", ansiDim, ansiReset)
+
 	for _, name := range otherNames {
 		sub := subs[name]
 		fmt.Printf("    %-14s%s%s%s\n", name, ansiDim, sub.Short, ansiReset)
 	}
+
 	fmt.Println()
 }
 
@@ -211,6 +229,7 @@ func openSessionAppend(dir string) func() {
 	if err := output.OpenSessionLog(dir, rootCmd.Version, false); err != nil {
 		output.Warning(fmt.Sprintf("could not open debug.log: %v", err))
 	}
+
 	return output.CloseSessionLog
 }
 
@@ -219,10 +238,12 @@ func resolveDir() string {
 	if Dir != "" {
 		return Dir
 	}
+
 	dir, err := os.Getwd()
 	if err != nil {
 		return "."
 	}
+
 	return dir
 }
 
@@ -231,5 +252,6 @@ func writeFile(path, content string) error {
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
 	}
+
 	return nil
 }

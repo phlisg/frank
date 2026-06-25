@@ -94,6 +94,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
 		}
+
 		target = filepath.Join(cwd, target)
 	}
 
@@ -101,10 +102,12 @@ func runNew(cmd *cobra.Command, args []string) error {
 		if !info.IsDir() {
 			return fmt.Errorf("%q exists and is not a directory", projectName)
 		}
+
 		entries, err := os.ReadDir(target)
 		if err != nil {
 			return fmt.Errorf("read directory: %w", err)
 		}
+
 		if len(entries) > 0 {
 			return fmt.Errorf("directory %q already exists and is not empty", projectName)
 		}
@@ -134,6 +137,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		} else {
 			initErr = runFrankInit(cmd, cfg, dir, existingCompose)
 		}
+
 		if initErr != nil {
 			output.Warning(fmt.Sprintf("failed: %v — remove the directory and start fresh", initErr))
 			return initErr
@@ -146,6 +150,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		}
 
 		printNewNextSteps(projectName, dir, !flagNoUp, cfg)
+
 		return nil
 	}
 
@@ -162,9 +167,11 @@ func runNew(cmd *cobra.Command, args []string) error {
 	} else {
 		cfg.Laravel.Version = "13.*"
 	}
+
 	if flagRuntime != "" {
 		cfg.PHP.Runtime = flagRuntime
 	}
+
 	if flagPM != "" {
 		switch flagPM {
 		case "npm", "pnpm", "bun":
@@ -197,18 +204,22 @@ func runNew(cmd *cobra.Command, args []string) error {
 	// Workers (non-interactive defaults: schedule on, 1 queue worker)
 	scheduleWorker := flagSchedule
 	queueCount := flagQueueCount
+
 	if !cmd.Flags().Changed("schedule") {
 		scheduleWorker = true
 	}
+
 	if !cmd.Flags().Changed("queue-count") {
 		queueCount = 1
 	}
+
 	applyWorkersFromInit(cfg, scheduleWorker, queueCount)
 
 	// Tools
 	if !flagNoTools {
 		allTools := tool.AllNames()
 		cfg.Tools = make([]string, 0, len(allTools))
+
 		for _, t := range allTools {
 			switch t {
 			case "pint":
@@ -237,18 +248,22 @@ func runNew(cmd *cobra.Command, args []string) error {
 	if sailMode {
 		cfg.PHP.Runtime = "fpm"
 		existingCompose := detectExistingCompose(dir)
+
 		if err := writeConfigAndGenerate(cfg, dir, existingCompose); err != nil {
 			output.Warning(fmt.Sprintf("failed: %v — remove the directory and start fresh", err))
 			return err
 		}
 
 		var sailServices []string
+
 		for _, svc := range cfg.Services {
 			if svc == "sqlite" {
 				continue
 			}
+
 			sailServices = append(sailServices, svc)
 		}
+
 		if err := runSailInstall(dir, sailServices, cfg.PHP.Version); err != nil {
 			output.Warning(fmt.Sprintf("sail install failed: %v — remove the directory and start fresh", err))
 			return fmt.Errorf("sail install: %w", err)
@@ -258,6 +273,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			fmt.Sprintf("cd %s", projectName),
 			"vendor/bin/sail up",
 		})
+
 		return nil
 	}
 
@@ -277,6 +293,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// 9. NextSteps
 	printNewNextSteps(projectName, dir, !flagNoUp, cfg)
+
 	return nil
 }
 
@@ -289,6 +306,7 @@ func runNewUp(dir string, cfg *config.Config) error {
 
 	// npm install inside the container
 	client := docker.New(dir)
+
 	if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
 		pm := "npm"
 		if cfg != nil && cfg.Node.PackageManager != "" {
@@ -304,6 +322,7 @@ func runNewUp(dir string, cfg *config.Config) error {
 		region := output.Region(fmt.Sprintf("Installing %s dependencies", pm))
 		npmErr := client.ExecStream(region, "laravel.test", pm, "install")
 		region.Stop(npmErr)
+
 		if npmErr != nil {
 			output.Warning(fmt.Sprintf("%s install failed: %v", pm, npmErr))
 		}
@@ -317,20 +336,25 @@ func printNewNextSteps(projectName, dir string, containersStarted bool, cfg *con
 	if cfg.Server.IsHTTPS() {
 		printViteHTTPSHint(dir)
 	}
+
 	steps := []string{fmt.Sprintf("cd %s", projectName)}
+
 	if containersStarted {
 		scheme := "http"
 		if cfg.Server.IsHTTPS() {
 			scheme = "https"
 		}
+
 		port := ""
 		if cfg.Server.Port != 0 {
 			port = fmt.Sprintf(":%d", cfg.Server.Port)
 		}
+
 		steps = append(steps, fmt.Sprintf("%s://localhost%s", scheme, port))
 	} else {
 		steps = append(steps, "frank up -d")
 	}
+
 	steps = append(steps, "")
 	steps = append(steps, "Tip: run `frank activate` to load shell aliases (up, down, artisan, etc.)")
 	output.NextSteps(steps)
@@ -346,6 +370,7 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 	if !cmd.Flags().Changed("schedule") {
 		scheduleWorker = true
 	}
+
 	if !cmd.Flags().Changed("queue-count") {
 		queueCount = 1
 	}
@@ -474,8 +499,10 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 
 	if !flagNoTools {
 		allTools := tool.AllNames()
+
 		if flagPHP != "" || sailMode {
 			cfg.Tools = make([]string, 0)
+
 			for _, t := range allTools {
 				switch t {
 				case "pint":
@@ -501,10 +528,12 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 		} else {
 			selectedTools := make([]string, len(allTools))
 			copy(selectedTools, allTools)
+
 			options := make([]huh.Option[string], len(allTools))
 			for i, t := range allTools {
 				options[i] = huh.NewOption(t, t)
 			}
+
 			err := huh.NewForm(
 				huh.NewGroup(
 					huh.NewMultiSelect[string]().
@@ -516,6 +545,7 @@ func runFrankInit(cmd *cobra.Command, cfg *config.Config, dir, existingCompose s
 			if err != nil {
 				return err
 			}
+
 			cfg.Tools = selectedTools
 		}
 	}
@@ -590,6 +620,7 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 	if !flagNoTools {
 		allTools := tool.AllNames()
 		cfg.Tools = make([]string, 0)
+
 		for _, t := range allTools {
 			switch t {
 			case "pint":
@@ -619,17 +650,21 @@ func runSailInit(cfg *config.Config, dir, existingCompose string) error {
 	}
 
 	var sailServices []string
+
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
 			continue
 		}
+
 		sailServices = append(sailServices, svc)
 	}
+
 	if err := runSailInstall(dir, sailServices, cfg.PHP.Version); err != nil {
 		return fmt.Errorf("sail install: %w", err)
 	}
 
 	output.NextSteps([]string{"vendor/bin/sail up"})
+
 	return nil
 }
 
@@ -640,6 +675,7 @@ func normalizeLaravelVersion(v string) string {
 	v = strings.TrimSpace(v)
 	v = strings.TrimSuffix(v, ".*")
 	v = strings.TrimSuffix(v, ".x")
+
 	return v + ".*"
 }
 
@@ -647,11 +683,13 @@ func normalizeLaravelVersion(v string) string {
 func parseServices(s string) []string {
 	parts := strings.Split(s, ",")
 	out := make([]string, 0, len(parts))
+
 	for _, p := range parts {
 		if t := strings.TrimSpace(p); t != "" {
 			out = append(out, t)
 		}
 	}
+
 	return out
 }
 
@@ -662,6 +700,7 @@ func applyWorkersFromInit(cfg *config.Config, schedule bool, queueCount int) {
 	if schedule {
 		cfg.Workers.Schedule = true
 	}
+
 	if queueCount > 0 {
 		cfg.Workers.Queue = []config.QueuePool{{
 			Name:   "default",
@@ -680,9 +719,11 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 	if err != nil {
 		return err
 	}
+
 	if err := writeFile(filepath.Join(dir, config.ConfigFileName), yamlBytes); err != nil {
 		return err
 	}
+
 	output.Detail("wrote frank.yaml")
 	output.Group("Wrote frank.yaml", "")
 
@@ -691,6 +732,7 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 		stopGen(err)
 		return err
 	}
+
 	stopGen(nil)
 
 	if err := installLaravel(dir, cfg, true); err != nil {
@@ -704,6 +746,7 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 
 	if len(cfg.Tools) > 0 {
 		phpTools := tool.PHPTools(cfg.Tools)
+
 		packages := tool.ComposerDevPackages(dir, phpTools)
 		if len(packages) > 0 {
 			if err := composerRequireDev(dir, packages); err != nil {
@@ -713,10 +756,12 @@ func writeConfigAndGenerate(cfg *config.Config, dir, existingCompose string) err
 
 		stopTools := output.Spin("Installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
+
 		if err != nil {
 			stopTools(err)
 			return err
 		}
+
 		stopTools(nil)
 		output.Detail(fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
@@ -748,21 +793,26 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Services: cfg.Services,
 		Config:   cfg.Config,
 	}
+
 	if cfg.Workers.Schedule || len(cfg.Workers.Queue) > 0 {
 		w := cfg.Workers
 		out.Workers = &w
 	}
+
 	if cfg.Server.HTTPS != nil || cfg.Server.Port != 0 {
 		s := cfg.Server
 		out.Server = &s
 	}
+
 	if cfg.Node.PackageManager != "" && cfg.Node.PackageManager != "npm" {
 		n := cfg.Node
 		out.Node = &n
 	}
+
 	if len(cfg.Tools) > 0 {
 		out.Tools = cfg.Tools
 	}
+
 	if len(cfg.Aliases) > 0 {
 		out.Aliases = cfg.Aliases
 	}
@@ -771,6 +821,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshal frank.yaml: %w", err)
 	}
+
 	header := "# Generated by Frank — edit this file to customise your environment\n\n"
 	body := header + strings.TrimSpace(string(b)) + "\n"
 
@@ -778,6 +829,7 @@ func marshalConfig(cfg *config.Config) (string, error) {
 	if comment != "" {
 		body += "\n" + comment
 	}
+
 	return body, nil
 }
 
@@ -797,6 +849,7 @@ var serviceDefaults = map[string]config.ServiceConfig{
 // available configuration options that are not already set in the active config.
 func buildConfigComment(cfg *config.Config) string {
 	var sb strings.Builder
+
 	sb.WriteString("# All available configuration options with defaults shown.\n")
 	sb.WriteString("# Uncomment and edit as needed.\n")
 	sb.WriteString("#\n")
@@ -811,11 +864,13 @@ func buildConfigComment(cfg *config.Config) string {
 		sb.WriteString("#\n")
 		sb.WriteString("# node:\n")
 		sb.WriteString("#   packageManager: npm       # npm, pnpm, bun\n")
+
 		hasExtras = true
 	}
 
 	// config — show defaults for currently selected services (skip sqlite, no config)
 	configServices := make([]string, 0)
+
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
 			continue
@@ -824,19 +879,23 @@ func buildConfigComment(cfg *config.Config) string {
 		if _, already := cfg.Config[svc]; already {
 			continue
 		}
+
 		if _, ok := serviceDefaults[svc]; ok {
 			configServices = append(configServices, svc)
 		}
 	}
+
 	if len(configServices) > 0 {
 		sb.WriteString("#\n")
 		sb.WriteString("# config:\n")
+
 		for _, svc := range configServices {
 			d := serviceDefaults[svc]
 			sb.WriteString(fmt.Sprintf("#   %s:\n", svc))
 			sb.WriteString(fmt.Sprintf("#     port: %d\n", d.Port))
 			sb.WriteString(fmt.Sprintf("#     version: \"%s\"\n", d.Version))
 		}
+
 		hasExtras = true
 	}
 
@@ -848,6 +907,7 @@ func buildConfigComment(cfg *config.Config) string {
 		sb.WriteString("#   queue:\n")
 		sb.WriteString("#     - queues: [default]\n")
 		sb.WriteString("#       count: 1\n")
+
 		hasExtras = true
 	}
 
@@ -857,6 +917,7 @@ func buildConfigComment(cfg *config.Config) string {
 		sb.WriteString("# tools:\n")
 		sb.WriteString("#   - pint\n")
 		sb.WriteString("#   - phpstan\n")
+
 		hasExtras = true
 	}
 
@@ -865,10 +926,12 @@ func buildConfigComment(cfg *config.Config) string {
 		sb.WriteString("#\n")
 		sb.WriteString("# aliases:\n")
 		sb.WriteString("#   myalias: \"php artisan my:command\"\n")
+
 		hasExtras = true
 	}
 
 	_ = hasExtras
+
 	return sb.String()
 }
 
@@ -879,5 +942,6 @@ func detectExistingCompose(dir string) string {
 			return name
 		}
 	}
+
 	return ""
 }
