@@ -236,6 +236,7 @@ config:
 | `frank test [-- <artisan/pest flags>]` | Run tests inside the app container (`php artisan test`). Pest parallel works out of the box — see [`docs/testing.md`](docs/testing.md) |
 | `frank exec <cmd> [args...]` | Run a command inside the app container as sail (e.g. `frank exec bash`, `frank exec php vendor/bin/pint`) |
 | `frank compose [--] <args>` | Pass-through to `docker compose` (e.g. `frank compose ps`, `frank compose logs`) |
+| `frank dev [restart\|stop\|start]` | Attach to the frontend dev server (Vite) running as a compose sidecar; no args tails its logs (Ctrl-C detaches). Disable per-project with `dev.enabled: false` |
 | `frank worker queue [--count N] [--queue …] [--tries …] [-- <artisan flags>]` | Spawn ad-hoc `queue:work` workers |
 | `frank worker schedule` | Spawn an ad-hoc `schedule:work` container |
 | `frank worker ps` | Show declared + ad-hoc worker containers |

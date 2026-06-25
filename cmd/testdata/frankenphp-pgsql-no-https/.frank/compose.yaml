@@ -25,8 +25,38 @@ services:
             - frank
         ports:
             - 80:80
-            - 5173:5173
         stdin_open: true
+        tty: true
+        volumes:
+            - .:/var/www/html
+        working_dir: /var/www/html
+    laravel.vite:
+        build:
+            args:
+                WWWGROUP: ${GID:-1000}
+            context: .
+            dockerfile: .frank/Dockerfile
+        command:
+            - sh
+            - -c
+            - '[ -d node_modules ] || npm install; npm run dev'
+        container_name: laravel.vite
+        depends_on:
+            laravel.test:
+                condition: service_started
+        env_file:
+            - .env
+        environment:
+            - WWWUSER=${UID:-1000}
+            - COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+        healthcheck:
+            disable: true
+        image: frank-frankenphp-pgsql-no-https-laravel.test
+        networks:
+            - frank
+        ports:
+            - 5173:5173
+        restart: unless-stopped
         tty: true
         volumes:
             - .:/var/www/html

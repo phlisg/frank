@@ -108,6 +108,17 @@ var integrationFixtures = []integrationFixture{
 		},
 		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
+	{
+		// dev.enabled: false → no laravel.vite service, Vite port left unmapped.
+		name: "frankenphp-pgsql-no-dev",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+			Laravel:  config.Laravel{Version: "13.x"},
+			Services: []string{"pgsql", "mailpit"},
+			Dev:      config.Dev{Enabled: new(bool)},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+	},
 }
 
 func TestGenerate_Integration(t *testing.T) {
@@ -131,6 +142,7 @@ func TestGenerate_Integration(t *testing.T) {
 					t.Errorf("output file %s missing: %v", fname, err)
 					continue
 				}
+
 				got := string(data)
 				goldenPath := filepath.Join(goldenDir, fname)
 
@@ -138,10 +150,13 @@ func TestGenerate_Integration(t *testing.T) {
 					if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
 						t.Fatalf("mkdir golden: %v", err)
 					}
+
 					if err := os.WriteFile(goldenPath, []byte(got), 0644); err != nil {
 						t.Fatalf("write golden %s: %v", goldenPath, err)
 					}
+
 					t.Logf("updated golden: %s", goldenPath)
+
 					continue
 				}
 
@@ -150,6 +165,7 @@ func TestGenerate_Integration(t *testing.T) {
 					t.Errorf("golden file %s missing — run: go test ./cmd/ -update\nerror: %v", goldenPath, err)
 					continue
 				}
+
 				if got != string(goldenBytes) {
 					t.Errorf("file %s differs from golden\n--- want ---\n%s\n--- got ---\n%s", fname, string(goldenBytes), got)
 				}
@@ -171,6 +187,7 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 	if !strings.Contains(env, "APP_KEY=\n") {
 		t.Error(".env: APP_KEY must be present with an empty value")
 	}
+
 	if !strings.Contains(example, "APP_KEY=\n") {
 		t.Error(".env.example: APP_KEY must be present with an empty value")
 	}
@@ -190,6 +207,7 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 		if !strings.Contains(env, "DB_URL=postgresql://") {
 			t.Error(".env: DB_URL must be non-empty for pgsql")
 		}
+
 		if !strings.Contains(example, "DB_URL=\n") {
 			t.Error(".env.example: DB_URL must be present but empty (redacted)")
 		}
@@ -198,19 +216,23 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 	// .env and .env.example must expose the same set of keys
 	envKeys := extractTestKeys(env)
 	exampleKeys := extractTestKeys(example)
+
 	envKeySet := make(map[string]bool, len(envKeys))
 	for _, k := range envKeys {
 		envKeySet[k] = true
 	}
+
 	for _, k := range exampleKeys {
 		if !envKeySet[k] {
 			t.Errorf(".env.example has key %q not present in .env", k)
 		}
 	}
+
 	exKeySet := make(map[string]bool, len(exampleKeys))
 	for _, k := range exampleKeys {
 		exKeySet[k] = true
 	}
+
 	for _, k := range envKeys {
 		if !exKeySet[k] {
 			t.Errorf(".env has key %q not present in .env.example", k)
@@ -226,11 +248,13 @@ func checkInvariants(t *testing.T, fx integrationFixture, dir string) {
 
 func readTestFile(t *testing.T, dir, name string) string {
 	t.Helper()
+
 	data, err := os.ReadFile(filepath.Join(dir, name))
 	if err != nil {
 		t.Errorf("readTestFile: %s: %v", name, err)
 		return ""
 	}
+
 	return string(data)
 }
 
@@ -258,6 +282,7 @@ func TestGenerate_BaseDockerfile(t *testing.T) {
 	if !strings.Contains(base, "FROM dunglas/frankenphp") {
 		t.Errorf("base.Dockerfile must build from upstream image, got:\n%s", base)
 	}
+
 	if strings.Contains(base, "FROM frank/runtime") {
 		t.Error("base.Dockerfile must not reference frank/runtime (it IS the base)")
 	}
@@ -274,6 +299,7 @@ func TestWriteMCPConfig(t *testing.T) {
 		if err := writeMCPConfig(dir); err != nil {
 			t.Fatalf("writeMCPConfig: %v", err)
 		}
+
 		root := readMCPJSON(t, dir)
 		assertFrankServer(t, root)
 	})
@@ -288,9 +314,11 @@ func TestWriteMCPConfig(t *testing.T) {
     }
   }
 }`)
+
 		if err := writeMCPConfig(dir); err != nil {
 			t.Fatalf("writeMCPConfig: %v", err)
 		}
+
 		root := readMCPJSON(t, dir)
 		assertFrankServer(t, root)
 
@@ -310,9 +338,11 @@ func TestWriteMCPConfig(t *testing.T) {
     }
   }
 }`)
+
 		if err := writeMCPConfig(dir); err != nil {
 			t.Fatalf("writeMCPConfig: %v", err)
 		}
+
 		root := readMCPJSON(t, dir)
 		assertFrankServer(t, root)
 	})
@@ -320,9 +350,11 @@ func TestWriteMCPConfig(t *testing.T) {
 	t.Run("malformed_json", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTestFile(t, dir, ".mcp.json", "this is not json")
+
 		if err := writeMCPConfig(dir); err != nil {
 			t.Fatalf("writeMCPConfig: %v", err)
 		}
+
 		root := readMCPJSON(t, dir)
 		assertFrankServer(t, root)
 	})
@@ -333,9 +365,11 @@ func TestWriteMCPConfig(t *testing.T) {
   "mcpServers": {"existing": {"command": "x"}},
   "someOtherKey": "value"
 }`)
+
 		if err := writeMCPConfig(dir); err != nil {
 			t.Fatalf("writeMCPConfig: %v", err)
 		}
+
 		root := readMCPJSON(t, dir)
 		assertFrankServer(t, root)
 
@@ -343,6 +377,7 @@ func TestWriteMCPConfig(t *testing.T) {
 		if _, ok := servers["existing"]; !ok {
 			t.Error("existing server entry was lost during merge")
 		}
+
 		if v, ok := root["someOtherKey"]; !ok || v != "value" {
 			t.Errorf("someOtherKey lost or changed: got %v", v)
 		}
@@ -352,31 +387,38 @@ func TestWriteMCPConfig(t *testing.T) {
 // readMCPJSON reads and parses .mcp.json from dir.
 func readMCPJSON(t *testing.T, dir string) map[string]any {
 	t.Helper()
+
 	data, err := os.ReadFile(filepath.Join(dir, ".mcp.json"))
 	if err != nil {
 		t.Fatalf("read .mcp.json: %v", err)
 	}
+
 	var root map[string]any
 	if err := json.Unmarshal(data, &root); err != nil {
 		t.Fatalf("parse .mcp.json: %v\ncontent: %s", err, data)
 	}
+
 	return root
 }
 
 // assertFrankServer verifies the frank entry in mcpServers has the expected shape.
 func assertFrankServer(t *testing.T, root map[string]any) {
 	t.Helper()
+
 	servers, ok := root["mcpServers"].(map[string]any)
 	if !ok {
 		t.Fatal("mcpServers key missing or not an object")
 	}
+
 	frank, ok := servers["frank"].(map[string]any)
 	if !ok {
 		t.Fatal("mcpServers.frank missing or not an object")
 	}
+
 	if frank["command"] != "frank" {
 		t.Errorf("frank command: got %v, want frank", frank["command"])
 	}
+
 	args, ok := frank["args"].([]any)
 	if !ok || len(args) != 1 || args[0] != "mcp" {
 		t.Errorf("frank args: got %v, want [mcp]", frank["args"])
@@ -386,6 +428,7 @@ func assertFrankServer(t *testing.T, root map[string]any) {
 // writeTestFile is a test helper that writes content to dir/name.
 func writeTestFile(t *testing.T, dir, name, content string) {
 	t.Helper()
+
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
 		t.Fatalf("writeFile %s: %v", name, err)
 	}
@@ -398,6 +441,7 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 
 	cleanEnv := os.Environ()
 	filtered := cleanEnv[:0]
+
 	for _, e := range cleanEnv {
 		if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") && !strings.HasPrefix(e, "GIT_INDEX_FILE=") {
 			filtered = append(filtered, e)
@@ -406,9 +450,11 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 
 	git := func(dir string, args ...string) {
 		t.Helper()
+
 		c := exec.Command("git", args...)
 		c.Dir = dir
 		c.Env = filtered
+
 		if out, err := c.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %s (%v)", args, out, err)
 		}
@@ -447,9 +493,11 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 	if strings.Contains(wtCompose, "5432:5432") {
 		t.Error("worktree compose should not have host-bound pgsql port")
 	}
+
 	if !strings.Contains(wtCompose, `"5432"`) {
 		t.Error("worktree compose should have container-only pgsql port")
 	}
+
 	if strings.Contains(wtCompose, "1025:1025") {
 		t.Error("worktree compose should not have host-bound mailpit port")
 	}
@@ -459,6 +507,7 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 	if !strings.Contains(wtCompose, fmt.Sprintf("%d:5173", expectedVitePort)) {
 		t.Errorf("worktree compose should map vite to port %d", expectedVitePort)
 	}
+
 	if !strings.Contains(wtVite, fmt.Sprintf("localhost:%d", expectedVitePort)) {
 		t.Errorf("worktree vite-server.js should reference port %d", expectedVitePort)
 	}
@@ -474,9 +523,11 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 	if !strings.Contains(mainCompose, "5432:5432") {
 		t.Error("main compose should have host-bound pgsql port")
 	}
+
 	if !strings.Contains(mainCompose, "5173:5173") {
 		t.Error("main compose should have standard vite port")
 	}
+
 	if !strings.Contains(mainVite, "localhost:5173") {
 		t.Error("main vite-server.js should reference port 5173")
 	}
@@ -487,14 +538,17 @@ func TestGenerate_WorktreeIntegration(t *testing.T) {
 // the two packages cannot share test helpers in Go.
 func extractTestKeys(env string) []string {
 	var keys []string
+
 	for line := range strings.SplitSeq(env, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
 		if idx := strings.IndexByte(line, '='); idx > 0 {
 			keys = append(keys, line[:idx])
 		}
 	}
+
 	return keys
 }
