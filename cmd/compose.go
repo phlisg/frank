@@ -45,5 +45,14 @@ func runCompose(cmd *cobra.Command, args []string) error {
 		composeArgs = composeArgs[1:]
 	}
 
+	// Build-capable subcommands (build/up/run/create) need the shared base
+	// image present, since the thin .frank/Dockerfile is `FROM frank/runtime`.
+	// Read-only subcommands (ps/logs/down/…) skip this.
+	if composeSubcmdBuilds(composeArgs) {
+		if err := ensureBaseImage(dir); err != nil {
+			return err
+		}
+	}
+
 	return docker.New(dir).Run(composeArgs...)
 }
