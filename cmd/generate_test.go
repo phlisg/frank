@@ -234,6 +234,40 @@ func readTestFile(t *testing.T, dir, name string) string {
 	return string(data)
 }
 
+// TestGenerate_BaseDockerfile verifies generate() emits both a thin
+// .frank/Dockerfile (FROM frank/runtime:<tag>) and a self-contained
+// .frank/base.Dockerfile (FROM dunglas/frankenphp, no frank/runtime ref).
+// Uses the real generate() pipeline in a tempdir, matching the integration
+// harness above.
+func TestGenerate_BaseDockerfile(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "frankenphp-base")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql", "mailpit"},
+	}
+	if err := generate(cfg, dir, "dev"); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	base := readTestFile(t, dir, ".frank/base.Dockerfile")
+	if !strings.Contains(base, "FROM dunglas/frankenphp") {
+		t.Errorf("base.Dockerfile must build from upstream image, got:\n%s", base)
+	}
+	if strings.Contains(base, "FROM frank/runtime") {
+		t.Error("base.Dockerfile must not reference frank/runtime (it IS the base)")
+	}
+
+	thin := readTestFile(t, dir, ".frank/Dockerfile")
+	if !strings.Contains(thin, "FROM frank/runtime") {
+		t.Errorf("thin Dockerfile must derive from frank/runtime, got:\n%s", thin)
+	}
+}
+
 func TestWriteMCPConfig(t *testing.T) {
 	t.Run("create_new", func(t *testing.T) {
 		dir := t.TempDir()
