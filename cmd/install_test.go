@@ -276,3 +276,52 @@ func TestPatchComposerPHPVersion(t *testing.T) {
 		}
 	})
 }
+
+func TestComposerCacheDir(t *testing.T) {
+	t.Run("honors COMPOSER_CACHE_DIR", func(t *testing.T) {
+		want := filepath.Join(t.TempDir(), "explicit")
+		t.Setenv("COMPOSER_CACHE_DIR", want)
+		got, err := composerCacheDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+		if _, err := os.Stat(got); err != nil {
+			t.Errorf("dir not created: %v", err)
+		}
+	})
+
+	t.Run("falls back to XDG_CACHE_HOME/frank/composer", func(t *testing.T) {
+		base := t.TempDir()
+		t.Setenv("COMPOSER_CACHE_DIR", "")
+		t.Setenv("XDG_CACHE_HOME", base)
+		got, err := composerCacheDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(base, "frank", "composer"); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+}
+
+func TestComposerCacheArgs(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("COMPOSER_CACHE_DIR", "")
+	t.Setenv("XDG_CACHE_HOME", base)
+	args := composerCacheArgs()
+	want := []string{
+		"-v", filepath.Join(base, "frank", "composer") + ":/tmp/composer-cache",
+		"-e", "COMPOSER_CACHE_DIR=/tmp/composer-cache",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("got %v, want %v", args, want)
+	}
+	for i := range want {
+		if args[i] != want[i] {
+			t.Errorf("arg %d: got %q, want %q", i, args[i], want[i])
+		}
+	}
+}
