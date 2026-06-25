@@ -56,6 +56,7 @@ func Lookup(name string) (Tool, bool) {
 			return t, true
 		}
 	}
+
 	return Tool{}, false
 }
 
@@ -69,13 +70,16 @@ func AllNames() []string {
 	for i, t := range registry {
 		names[i] = t.Name
 	}
+
 	sort.Strings(names)
+
 	return names
 }
 
 func AllTools() []Tool {
 	out := make([]Tool, len(registry))
 	copy(out, registry)
+
 	return out
 }
 
@@ -84,12 +88,15 @@ func PHPTools(selected []string) []Tool {
 	for _, s := range selected {
 		set[s] = true
 	}
+
 	var out []Tool
+
 	for _, t := range registry {
 		if t.Category == "php" && set[t.Name] {
 			out = append(out, t)
 		}
 	}
+
 	return out
 }
 
@@ -99,5 +106,6 @@ func ValidateNames(names []string) error {
 			return fmt.Errorf("unknown tool %q — valid options: %v", n, AllNames())
 		}
 	}
+
 	return nil
 }

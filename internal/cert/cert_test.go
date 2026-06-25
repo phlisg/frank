@@ -44,9 +44,11 @@ func TestGenerate_CertsAlreadyExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.Skipped {
 		t.Error("expected Skipped=true")
 	}
+
 	if result.Generated || result.MkcertMissing || result.CANotTrusted {
 		t.Error("expected only Skipped to be true")
 	}
@@ -66,9 +68,11 @@ func TestGenerate_MkcertNotInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.MkcertMissing {
 		t.Error("expected MkcertMissing=true")
 	}
+
 	if result.Generated || result.Skipped {
 		t.Error("expected only MkcertMissing to be true")
 	}
@@ -99,9 +103,11 @@ func TestGenerate_CANotTrusted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.Generated {
 		t.Error("expected Generated=true")
 	}
+
 	if !result.CANotTrusted {
 		t.Error("expected CANotTrusted=true")
 	}
@@ -134,12 +140,15 @@ func TestGenerate_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	if !result.Generated {
 		t.Error("expected Generated=true")
 	}
+
 	if result.CANotTrusted {
 		t.Error("expected CANotTrusted=false")
 	}
+
 	if result.Skipped || result.MkcertMissing {
 		t.Error("expected Skipped and MkcertMissing to be false")
 	}
@@ -168,9 +177,11 @@ func TestGenerate_MkcertRunFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
+
 	if result.Generated || result.Skipped || result.MkcertMissing {
 		t.Error("expected all result fields to be false on error")
 	}
+
 	if !errors.Is(err, errors.Unwrap(err)) {
 		// Just verify the error message contains useful info
 		if got := err.Error(); got == "" {

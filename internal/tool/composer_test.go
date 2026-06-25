@@ -64,6 +64,7 @@ func TestPatchComposerScripts_AddNew(t *testing.T) {
 	}
 
 	doc := readJSON(t, dir)
+
 	scripts := doc["scripts"].(map[string]any)
 	if scripts["lint"] != "do-lint" {
 		t.Errorf("expected lint=do-lint, got %v", scripts["lint"])
@@ -85,6 +86,7 @@ func TestPatchComposerScripts_SkipExisting(t *testing.T) {
 	}
 
 	doc := readJSON(t, dir)
+
 	scripts := doc["scripts"].(map[string]any)
 	if scripts["lint"] != "old-lint" {
 		t.Errorf("existing script overwritten: got %v", scripts["lint"])
@@ -104,6 +106,7 @@ func TestPatchComposerScripts_Indent(t *testing.T) {
 	}
 
 	data, _ := os.ReadFile(filepath.Join(dir, "composer.json"))
+
 	content := string(data)
 	if !strings.Contains(content, "    ") {
 		t.Error("expected 4-space indent in output")
@@ -114,10 +117,12 @@ func TestPatchComposerScripts_Indent(t *testing.T) {
 
 func writeJSON(t *testing.T, dir string, doc map[string]any) {
 	t.Helper()
+
 	data, err := json.MarshalIndent(doc, "", "    ")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(dir, "composer.json"), data, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -125,13 +130,16 @@ func writeJSON(t *testing.T, dir string, doc map[string]any) {
 
 func readJSON(t *testing.T, dir string) map[string]any {
 	t.Helper()
+
 	data, err := os.ReadFile(filepath.Join(dir, "composer.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
 		t.Fatal(err)
 	}
+
 	return doc
 }

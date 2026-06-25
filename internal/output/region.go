@@ -68,8 +68,10 @@ func Region(label string) *LiveRegion {
 		r.lines = make(chan string, 128)
 		r.done = make(chan struct{})
 		r.finished = make(chan struct{})
+
 		go r.render()
 	}
+
 	return r
 }
 
@@ -88,11 +90,13 @@ func (r *LiveRegion) Write(p []byte) (int, error) {
 	// regionLive: accumulate, split on newlines, forward whole lines.
 	r.mu.Lock()
 	r.partial = append(r.partial, p...)
+
 	for {
 		i := bytes.IndexByte(r.partial, '\n')
 		if i < 0 {
 			break
 		}
+
 		line := strings.TrimRight(string(r.partial[:i]), "\r")
 		r.partial = r.partial[i+1:]
 		select {
@@ -101,6 +105,7 @@ func (r *LiveRegion) Write(p []byte) (int, error) {
 		}
 	}
 	r.mu.Unlock()
+
 	return len(p), nil
 }
 
@@ -120,6 +125,7 @@ func (r *LiveRegion) Stop(err error) {
 		close(r.done)
 		<-r.finished
 	}
+
 	if err != nil {
 		fmt.Printf("%s✗%s %s\n", ansiRed, ansiReset, r.label)
 	} else {
@@ -138,40 +144,50 @@ func (r *LiveRegion) render() {
 
 	draw := func() {
 		width := regionWidth()
+
 		var b strings.Builder
 		if prevRows > 0 {
 			fmt.Fprintf(&b, "\033[%dA", prevRows) // up to region top
 		}
+
 		b.WriteString("\r\033[2K")
 		fmt.Fprintf(&b, "%s%s%s %s\n", ansiYellow, spinFrames[frame], ansiReset, r.label)
+
 		for _, ln := range ring {
 			b.WriteString("\033[2K")
 			b.WriteString(body.MaxWidth(width).Render("  │ " + ln))
 			b.WriteByte('\n')
 		}
+
 		b.WriteString("\033[J") // wipe any leftover rows below
+
 		prevRows = 1 + len(ring)
+
 		fmt.Print(b.String())
 	}
 
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	draw()
+
 	for {
 		select {
 		case <-ticker.C:
 			frame = (frame + 1) % len(spinFrames)
+
 			draw()
 		case ln := <-r.lines:
 			ring = append(ring, ln)
 			if len(ring) > regionLines {
 				ring = ring[len(ring)-regionLines:]
 			}
+
 			draw()
 		case <-r.done:
 			if prevRows > 0 {
 				fmt.Printf("\033[%dA\r\033[J", prevRows) // erase whole region
 			}
+
 			return
 		}
 	}
@@ -182,5 +198,6 @@ func regionWidth() int {
 	if err != nil || w <= 0 {
 		return 80
 	}
+
 	return w
 }

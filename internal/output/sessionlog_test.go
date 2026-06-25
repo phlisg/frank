@@ -18,6 +18,7 @@ func TestSessionLog_TruncateVsAppend(t *testing.T) {
 	if err := OpenSessionLog(dir, "test", false); err != nil {
 		t.Fatalf("open append: %v", err)
 	}
+
 	r := Region("Doing thing")
 	r.Write([]byte("\x1b[37;44m INFO \x1b[39;49m line from disposable container\n"))
 	r.Stop(nil)
@@ -27,6 +28,7 @@ func TestSessionLog_TruncateVsAppend(t *testing.T) {
 	if !strings.Contains(first, "line from disposable container") {
 		t.Errorf("tee missing raw stream; got:\n%s", first)
 	}
+
 	if strings.Contains(first, "\x1b[") {
 		t.Errorf("ANSI escapes not stripped from log; got:\n%q", first)
 	}
@@ -35,15 +37,19 @@ func TestSessionLog_TruncateVsAppend(t *testing.T) {
 	if got := string(collapseCR([]byte("Downloading 45%\rDownloading 50%\rDownloading 100%\n"))); got != "Downloading 100%\n" {
 		t.Errorf("collapseCR redraw: got %q", got)
 	}
+
 	if got := string(collapseCR([]byte("plain text\r\n"))); got != "plain text\n" {
 		t.Errorf("collapseCR CRLF: got %q", got)
 	}
+
 	if got := string(collapseCR([]byte("no cr here"))); got != "no cr here" {
 		t.Errorf("collapseCR passthrough: got %q", got)
 	}
+
 	if !strings.Contains(first, "-- Doing thing ") {
 		t.Errorf("missing step header; got:\n%s", first)
 	}
+
 	if !strings.Contains(first, "OK Doing thing") {
 		t.Errorf("missing OK marker; got:\n%s", first)
 	}
@@ -52,8 +58,10 @@ func TestSessionLog_TruncateVsAppend(t *testing.T) {
 	if err := OpenSessionLog(dir, "test", false); err != nil {
 		t.Fatalf("open append 2: %v", err)
 	}
+
 	logLine("second session")
 	CloseSessionLog()
+
 	if got := readFile(t, logPath); !strings.Contains(got, "line from disposable container") || !strings.Contains(got, "second session") {
 		t.Errorf("append wiped prior session; got:\n%s", got)
 	}
@@ -62,7 +70,9 @@ func TestSessionLog_TruncateVsAppend(t *testing.T) {
 	if err := OpenSessionLog(dir, "test", true); err != nil {
 		t.Fatalf("open truncate: %v", err)
 	}
+
 	CloseSessionLog()
+
 	if got := readFile(t, logPath); strings.Contains(got, "line from disposable container") {
 		t.Errorf("truncate did not wipe prior content; got:\n%s", got)
 	}
@@ -77,6 +87,7 @@ func TestSessionLog_LevelIndependent(t *testing.T) {
 	if err := OpenSessionLog(dir, "test", true); err != nil {
 		t.Fatalf("open: %v", err)
 	}
+
 	Group("Quiet group", "")
 	Warning("quiet warning")
 	CloseSessionLog()
@@ -89,9 +100,11 @@ func TestSessionLog_LevelIndependent(t *testing.T) {
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
+
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
+
 	return string(b)
 }

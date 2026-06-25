@@ -60,6 +60,7 @@ func runSetupFrank(cmd *cobra.Command, dir string) error {
 	}
 
 	scheduleWorker := cfg.Workers.Schedule
+
 	queueCount := 1
 	if len(cfg.Workers.Queue) > 0 {
 		queueCount = cfg.Workers.Queue[0].Count
@@ -162,6 +163,7 @@ func runSetupFrank(cmd *cobra.Command, dir string) error {
 	for i, t := range allTools {
 		options[i] = huh.NewOption(t, t)
 	}
+
 	if err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
@@ -172,6 +174,7 @@ func runSetupFrank(cmd *cobra.Command, dir string) error {
 	).Run(); err != nil {
 		return err
 	}
+
 	cfg.Tools = selectedTools
 
 	// Write frank.yaml + generate .frank/ + install tools (no Laravel install).
@@ -187,7 +190,9 @@ func runSetupFrank(cmd *cobra.Command, dir string) error {
 	if cfg.Server.IsHTTPS() {
 		printViteHTTPSHint(dir)
 	}
+
 	output.NextSteps([]string{"frank up -d"})
+
 	return nil
 }
 
@@ -245,17 +250,21 @@ func runSetupSail(dir string) error {
 
 	// Sail install — no Frank file generation, just sail:install.
 	var sailServices []string
+
 	for _, svc := range cfg.Services {
 		if svc == "sqlite" {
 			continue
 		}
+
 		sailServices = append(sailServices, svc)
 	}
+
 	if err := runSailInstall(dir, sailServices, cfg.PHP.Version); err != nil {
 		return fmt.Errorf("sail install: %w", err)
 	}
 
 	output.NextSteps([]string{"vendor/bin/sail up"})
+
 	return nil
 }
 
@@ -272,9 +281,11 @@ func setupWriteAndGenerate(cfg *config.Config, dir string) error {
 	if err != nil {
 		return err
 	}
+
 	if err := writeFile(filepath.Join(dir, config.ConfigFileName), yamlBytes); err != nil {
 		return err
 	}
+
 	output.Detail("wrote frank.yaml")
 	output.Group("Wrote frank.yaml", "")
 
@@ -283,15 +294,18 @@ func setupWriteAndGenerate(cfg *config.Config, dir string) error {
 		stopGen(err)
 		return err
 	}
+
 	stopGen(nil)
 
 	if len(cfg.Tools) > 0 {
 		stopTools := output.Spin("Installing dev tools")
 		res, err := tool.Install(cfg.Tools, dir)
+
 		if err != nil {
 			stopTools(err)
 			return err
 		}
+
 		stopTools(nil)
 		output.Detail(fmt.Sprintf("%d created, %d skipped", len(res.Created), len(res.Skipped)))
 	}
@@ -331,5 +345,6 @@ func setupRebuildPrompt(dir string) error {
 	region := output.Region("Building image")
 	err := dc.RunStream(region, "build")
 	region.Stop(err)
+
 	return err
 }

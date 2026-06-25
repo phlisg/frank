@@ -39,11 +39,13 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := cfg.Services[:0]
+
 	for _, svc := range cfg.Services {
 		if svc != service {
 			filtered = append(filtered, svc)
 		}
 	}
+
 	cfg.Services = filtered
 
 	// Drop any per-service config entry too.
@@ -52,8 +54,10 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	if err := saveConfig(cfg, dir); err != nil {
 		return err
 	}
+
 	fmt.Printf("  removed  %s\n", service)
 
 	fmt.Println("\nRegenerating Docker files...")
+
 	return generate(cfg, dir, rootCmd.Version)
 }

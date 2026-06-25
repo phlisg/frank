@@ -33,10 +33,12 @@ var workerTopCmd = &cobra.Command{
 
 func runWorkerTop(cmd *cobra.Command, _ []string) error {
 	dir := resolveDir()
+
 	cfg, err := config.Load(dir)
 	if err != nil {
 		return fmt.Errorf("load frank.yaml: %w", err)
 	}
+
 	projectName := config.ProjectName(dir)
 	client := docker.New(dir)
 

@@ -29,12 +29,15 @@ func newDockerRunner(projectDir, composeFile string) *dockerRunner {
 	if composeFile == "" {
 		composeFile = ".frank/compose.yaml"
 	}
+
 	return &dockerRunner{projectDir: projectDir, composeFile: composeFile}
 }
 
 func (d *dockerRunner) Trigger(ctx context.Context, kind TriggerKind) error {
 	prefix := []string{"compose", "--project-directory", ".", "-f", d.composeFile}
+
 	var args []string
+
 	switch kind {
 	case TriggerQueueRestart:
 		args = append(prefix, "exec", "-T", "laravel.test", "php", "artisan", "queue:restart")
@@ -43,18 +46,23 @@ func (d *dockerRunner) Trigger(ctx context.Context, kind TriggerKind) error {
 	default:
 		return fmt.Errorf("watch: unknown trigger kind %d", kind)
 	}
+
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = d.projectDir
+
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
+
 	if err := cmd.Run(); err != nil {
 		out := bytes.TrimSpace(buf.Bytes())
 		if len(out) > 0 {
 			return fmt.Errorf("%w: %s", err, string(out))
 		}
+
 		return err
 	}
+
 	return nil
 }
 
@@ -76,10 +84,12 @@ func (w *Watcher) runDebouncer(ctx context.Context) {
 	if base <= 0 {
 		base = defaultDebounceBase
 	}
+
 	max := w.cfg.DebounceMax
 	if max <= 0 {
 		max = defaultDebounceMax
 	}
+
 	if base > max {
 		base = max
 	}
@@ -125,6 +135,7 @@ func (w *Watcher) runDebouncer(ctx context.Context) {
 		// in-flight docker calls promptly.
 		dispatchCtx, cancel := context.WithCancel(ctx)
 		ok := w.dispatch(dispatchCtx)
+
 		cancel()
 
 		if ok {
@@ -158,24 +169,30 @@ func (w *Watcher) dispatch(ctx context.Context) bool {
 	}
 
 	results := make(chan result, len(kinds))
+
 	var wg sync.WaitGroup
 	for _, k := range kinds {
 		wg.Add(1)
+
 		go func(kind TriggerKind) {
 			defer wg.Done()
 			results <- result{kind: kind, err: w.runner.Trigger(ctx, kind)}
 		}(k)
 	}
+
 	wg.Wait()
 	close(results)
 
 	allOK := true
+
 	for r := range results {
 		if r.err != nil {
 			allOK = false
+
 			fmt.Fprintf(os.Stderr, "frank watch: WARN %s failed: %v\n", triggerLabel(r.kind), r.err)
 		}
 	}
+
 	return allOK
 }
 

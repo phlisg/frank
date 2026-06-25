@@ -83,12 +83,15 @@ func TestGenerateEnv_RedisOverridesCacheSession(t *testing.T) {
 	if !strings.Contains(out, "REDIS_HOST=redis") {
 		t.Error("expected REDIS_HOST=redis")
 	}
+
 	if !strings.Contains(out, "CACHE_STORE=redis") {
 		t.Error("expected CACHE_STORE=redis")
 	}
+
 	if !strings.Contains(out, "SESSION_DRIVER=redis") {
 		t.Error("expected SESSION_DRIVER=redis")
 	}
+
 	if !strings.Contains(out, "QUEUE_CONNECTION=redis") {
 		t.Error("expected QUEUE_CONNECTION=redis")
 	}
@@ -109,9 +112,11 @@ func TestGenerateEnv_MailpitOverridesMail(t *testing.T) {
 	if !strings.Contains(out, "MAIL_MAILER=smtp") {
 		t.Error("expected MAIL_MAILER=smtp")
 	}
+
 	if !strings.Contains(out, "MAIL_HOST=mailpit") {
 		t.Error("expected MAIL_HOST=mailpit")
 	}
+
 	if !strings.Contains(out, "MAIL_PORT=1025") {
 		t.Error("expected MAIL_PORT=1025")
 	}
@@ -132,6 +137,7 @@ func TestGenerateEnv_MeilisearchOverridesScout(t *testing.T) {
 	if !strings.Contains(out, "SCOUT_DRIVER=meilisearch") {
 		t.Error("expected SCOUT_DRIVER=meilisearch")
 	}
+
 	if !strings.Contains(out, "MEILISEARCH_HOST=http://meilisearch:7700") {
 		t.Error("expected MEILISEARCH_HOST")
 	}
@@ -169,6 +175,7 @@ func TestGenerateEnvExample_RedactsSensitive(t *testing.T) {
 	if strings.Contains(out, "DB_PASSWORD=password") {
 		t.Error(".env.example should not contain real DB_PASSWORD")
 	}
+
 	if !strings.Contains(out, "DB_PASSWORD=") {
 		t.Error(".env.example should still have DB_PASSWORD key")
 	}
@@ -188,6 +195,7 @@ func TestGenerateEnvExample_NoSensitiveValues(t *testing.T) {
 		Laravel:  config.Laravel{Version: "13.x"},
 		Services: []string{"pgsql", "redis"},
 	}
+
 	out, err := g.GenerateEnvExample(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnvExample error: %v", err)
@@ -198,6 +206,7 @@ func TestGenerateEnvExample_NoSensitiveValues(t *testing.T) {
 		key      string
 		badValue string // a value that must NOT appear
 	}
+
 	checks := []sensitiveCheck{
 		{"APP_KEY", "base64"},
 		{"DB_PASSWORD", "password"},
@@ -208,6 +217,7 @@ func TestGenerateEnvExample_NoSensitiveValues(t *testing.T) {
 		if !strings.Contains(out, c.key+"=") {
 			t.Errorf(".env.example missing key %q", c.key)
 		}
+
 		if strings.Contains(out, c.key+"="+c.badValue) {
 			t.Errorf(".env.example key %q must not contain value %q", c.key, c.badValue)
 		}
@@ -222,6 +232,7 @@ func TestGenerateEnvExample_StructureMatchesEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateEnv error: %v", err)
 	}
+
 	example, err := g.GenerateEnvExample(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnvExample error: %v", err)
@@ -230,6 +241,7 @@ func TestGenerateEnvExample_StructureMatchesEnv(t *testing.T) {
 	// Both should have same keys
 	envKeys := extractKeys(env)
 	exampleKeys := extractKeys(example)
+
 	if len(envKeys) != len(exampleKeys) {
 		t.Errorf(".env has %d keys, .env.example has %d keys", len(envKeys), len(exampleKeys))
 	}
@@ -250,6 +262,7 @@ func TestWriteEnv_CreatesBothFiles(t *testing.T) {
 			t.Errorf("%s not created: %v", name, err)
 			continue
 		}
+
 		if !strings.Contains(string(data), "APP_NAME=myapp") {
 			t.Errorf("%s missing APP_NAME", name)
 		}
@@ -262,6 +275,7 @@ func TestGenerateEnv_Laravel12(t *testing.T) {
 		PHP:     config.PHP{Version: "8.5", Runtime: "frankenphp"},
 		Laravel: config.Laravel{Version: "12.x"},
 	}
+
 	out, err := g.GenerateEnv(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnv error: %v", err)
@@ -270,6 +284,7 @@ func TestGenerateEnv_Laravel12(t *testing.T) {
 	if !strings.Contains(out, "#PHP_CLI_SERVER_WORKERS=4") {
 		t.Error("expected #PHP_CLI_SERVER_WORKERS=4 (disabled) for Laravel 12.x")
 	}
+
 	if strings.Contains(out, "\nPHP_CLI_SERVER_WORKERS=4") {
 		t.Error("PHP_CLI_SERVER_WORKERS must not be active for Laravel 12.x")
 	}
@@ -281,6 +296,7 @@ func TestGenerateEnv_Laravel13(t *testing.T) {
 		PHP:     config.PHP{Version: "8.5", Runtime: "frankenphp"},
 		Laravel: config.Laravel{Version: "13.x"},
 	}
+
 	out, err := g.GenerateEnv(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnv error: %v", err)
@@ -301,13 +317,16 @@ func TestMarshalEnv_DisabledLine(t *testing.T) {
 		{disabled: true, key: "DISABLED_KEY", value: "original"},
 		comment("# a comment"),
 	}
+
 	out := marshalEnv(lines)
 	if !strings.Contains(out, "ACTIVE=value\n") {
 		t.Error("expected ACTIVE=value")
 	}
+
 	if !strings.Contains(out, "#DISABLED_KEY=original\n") {
 		t.Error("expected #DISABLED_KEY=original (no space)")
 	}
+
 	if strings.Contains(out, "\nDISABLED_KEY=original\n") {
 		t.Error("disabled key must not appear as active KEY=value")
 	}
@@ -318,6 +337,7 @@ func TestParseFullEnvFile_DisabledKey(t *testing.T) {
 	lines := parseFullEnvFile(input)
 
 	var active, disabledHost, disabledPort, pureComment envLine
+
 	for _, l := range lines {
 		switch {
 		case !l.comment && !l.disabled && l.key == "ACTIVE":
@@ -334,12 +354,15 @@ func TestParseFullEnvFile_DisabledKey(t *testing.T) {
 	if active.key != "ACTIVE" || active.value != "yes" {
 		t.Error("expected active ACTIVE=yes")
 	}
+
 	if disabledHost.key != "DB_HOST" || disabledHost.value != "127.0.0.1" {
 		t.Errorf("expected disabled DB_HOST=127.0.0.1, got key=%q value=%q", disabledHost.key, disabledHost.value)
 	}
+
 	if disabledPort.key != "DB_PORT" || disabledPort.value != "3306" {
 		t.Errorf("expected disabled DB_PORT=3306, got key=%q value=%q", disabledPort.key, disabledPort.value)
 	}
+
 	if pureComment.value != "# This is a comment" {
 		t.Error("expected pure comment line preserved")
 	}
@@ -352,6 +375,7 @@ func TestGenerateEnv_DisabledKeyEnabled(t *testing.T) {
 		Laravel:  config.Laravel{Version: "13.x"},
 		Services: []string{"pgsql"},
 	}
+
 	out, err := g.GenerateEnv(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnv error: %v", err)
@@ -367,6 +391,7 @@ func TestGenerateEnv_DisabledKeyEnabled(t *testing.T) {
 		if !strings.Contains(out, want+"\n") {
 			t.Errorf("expected active %q in output", want)
 		}
+
 		if strings.Contains(out, "#"+want) {
 			t.Errorf("%q must not appear as a disabled key", want)
 		}
@@ -381,13 +406,16 @@ func TestGenerateEnv_DisabledKeyUnchanged(t *testing.T) {
 		Laravel:  config.Laravel{Version: "13.x"},
 		Services: []string{},
 	}
+
 	out, err := g.GenerateEnv(cfg, "myapp")
 	if err != nil {
 		t.Fatalf("GenerateEnv error: %v", err)
 	}
+
 	if !strings.Contains(out, "#DB_HOST=127.0.0.1") {
 		t.Error("expected #DB_HOST=127.0.0.1 (disabled) when no DB service configured")
 	}
+
 	if strings.Contains(out, "\nDB_HOST=") {
 		t.Error("DB_HOST must not be active when no DB service is configured")
 	}
@@ -416,6 +444,7 @@ func TestWriteEnv_AppKeyPreserved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .env: %v", err)
 	}
+
 	example, err := os.ReadFile(filepath.Join(dir, ".env.example"))
 	if err != nil {
 		t.Fatalf("read .env.example: %v", err)
@@ -424,9 +453,11 @@ func TestWriteEnv_AppKeyPreserved(t *testing.T) {
 	if !strings.Contains(string(env), "APP_KEY=base64:testkey==") {
 		t.Errorf(".env should contain preserved APP_KEY, got:\n%s", string(env))
 	}
+
 	if strings.Contains(string(example), "APP_KEY=base64") {
 		t.Error(".env.example must not contain real APP_KEY")
 	}
+
 	if !strings.Contains(string(example), "APP_KEY=") {
 		t.Error(".env.example must still contain APP_KEY= key")
 	}
@@ -474,15 +505,18 @@ REDIS_HOST=redis
 	if err != nil {
 		t.Fatalf("read .env: %v", err)
 	}
+
 	out := string(env)
 
 	// User custom keys must survive.
 	if !strings.Contains(out, "STRIPE_KEY=sk_live_abc123") {
 		t.Error("user's STRIPE_KEY was lost")
 	}
+
 	if !strings.Contains(out, "OPENAI_API_KEY=sk-proj-xyz") {
 		t.Error("user's OPENAI_API_KEY was lost")
 	}
+
 	if !strings.Contains(out, "CUSTOM_FEATURE_FLAG=true") {
 		t.Error("user's CUSTOM_FEATURE_FLAG was lost")
 	}
@@ -496,6 +530,7 @@ REDIS_HOST=redis
 	if !strings.Contains(out, "APP_ENV=production") {
 		t.Error("user's APP_ENV=production was overwritten")
 	}
+
 	if !strings.Contains(out, "APP_DEBUG=false") {
 		t.Error("user's APP_DEBUG=false was overwritten")
 	}
@@ -514,9 +549,11 @@ REDIS_HOST=redis
 	if !strings.Contains(out, "APP_NAME=myapp") {
 		t.Error("APP_NAME missing or wrong")
 	}
+
 	if !strings.Contains(out, "APP_URL=https://localhost") {
 		t.Error("APP_URL missing or wrong")
 	}
+
 	if !strings.Contains(out, "DB_CONNECTION=pgsql") {
 		t.Error("DB_CONNECTION missing")
 	}
@@ -543,10 +580,12 @@ func TestGenerateEnv_AppURL(t *testing.T) {
 				PHP:    config.PHP{Version: "8.5", Runtime: "frankenphp"},
 				Server: tt.server,
 			}
+
 			out, err := g.GenerateEnv(cfg, "myapp")
 			if err != nil {
 				t.Fatalf("GenerateEnv error: %v", err)
 			}
+
 			if !strings.Contains(out, tt.want+"\n") {
 				t.Errorf("expected %q in output, got:\n%s", tt.want, out)
 			}
@@ -557,14 +596,17 @@ func TestGenerateEnv_AppURL(t *testing.T) {
 // extractKeys returns all non-comment KEY names from a .env string.
 func extractKeys(env string) []string {
 	var keys []string
+
 	for _, line := range strings.Split(env, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
 		if idx := strings.IndexByte(line, '='); idx > 0 {
 			keys = append(keys, line[:idx])
 		}
 	}
+
 	return keys
 }

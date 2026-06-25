@@ -31,13 +31,17 @@ func composerCacheDir() (string, error) {
 			if err != nil {
 				return "", err
 			}
+
 			base = filepath.Join(home, ".cache")
 		}
+
 		dir = filepath.Join(base, "frank", "composer")
 	}
+
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
+
 	return dir, nil
 }
 
@@ -51,6 +55,7 @@ func composerCacheArgs() []string {
 		output.Warning(fmt.Sprintf("composer cache disabled: %v", err))
 		return nil
 	}
+
 	return []string{
 		"-v", dir + ":/tmp/composer-cache",
 		"-e", "COMPOSER_CACHE_DIR=/tmp/composer-cache",
@@ -99,6 +104,7 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 	if err != nil {
 		return fmt.Errorf("read laravel-init.sh: %w", err)
 	}
+
 	script := string(scriptBytes)
 
 	laravelVersion := cfg.Laravel.Version
@@ -133,6 +139,7 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 		region.Stop(err)
 		return fmt.Errorf("laravel-init container: %w", err)
 	}
+
 	region.Stop(nil)
 
 	if err := patchComposerPHPVersion(dir, cfg.PHP.Version); err != nil {
@@ -141,6 +148,7 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 
 	if regenerate {
 		output.Detail("regenerating Docker files")
+
 		if err := generate(cfg, dir, rootCmd.Version); err != nil {
 			return err
 		}
@@ -189,6 +197,7 @@ func composerRequireDev(dir string, packages []string) error {
 	c.Stderr = region
 	err = c.Run()
 	region.Stop(err)
+
 	return err
 }
 
@@ -240,7 +249,9 @@ php artisan sail:install --with="$1" --php="$2"
 		region.Stop(err)
 		return fmt.Errorf("sail-install container: %w", err)
 	}
+
 	region.Stop(nil)
+
 	return nil
 }
 
@@ -260,16 +271,19 @@ var composerPHPRe = regexp.MustCompile(`("php":\s*")[^"]*(")`)
 
 func patchComposerPHPVersion(dir, phpVersion string) error {
 	path := filepath.Join(dir, "composer.json")
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
+
 		return err
 	}
 
 	original := string(data)
 	patched := composerPHPRe.ReplaceAllString(original, "${1}^"+phpVersion+"${2}")
+
 	if patched == original {
 		// Nothing changed — either php constraint already matches or key not found.
 		return nil
@@ -278,7 +292,9 @@ func patchComposerPHPVersion(dir, phpVersion string) error {
 	if err := os.WriteFile(path, []byte(patched), 0644); err != nil {
 		return err
 	}
+
 	output.Detail(fmt.Sprintf("patched composer.json (php constraint → ^%s)", phpVersion))
+
 	return nil
 }
 
@@ -290,15 +306,19 @@ func patchComposerPHPVersion(dir, phpVersion string) error {
 // already reference vite-server. Covers Docker host binding, CORS, and HTTPS.
 func patchViteConfig(dir string) error {
 	var name string
+
 	var data []byte
+
 	for _, n := range []string{"vite.config.js", "vite.config.ts"} {
 		d, err := os.ReadFile(filepath.Join(dir, n))
 		if err == nil {
 			name = n
 			data = d
+
 			break
 		}
 	}
+
 	if name == "" {
 		return nil
 	}
@@ -308,12 +328,15 @@ func patchViteConfig(dir string) error {
 	// Migrate old static import → dynamic import with fallback.
 	oldImport := "import frankServer from './.frank/vite-server.js';"
 	newImport := "const frankServer = await import('./.frank/vite-server.js').then(m => m.default).catch(() => ({}));"
+
 	if strings.Contains(content, oldImport) {
 		content = strings.Replace(content, oldImport, newImport, 1)
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
 			return err
 		}
+
 		output.Detail("migrated vite.config (dynamic import)")
+
 		return nil
 	}
 
@@ -325,35 +348,43 @@ func patchViteConfig(dir string) error {
 
 	// Insert import after the last import line.
 	lastImport := -1
+
 	for i, line := range lines {
 		if strings.HasPrefix(strings.TrimSpace(line), "import ") {
 			lastImport = i
 		}
 	}
+
 	if lastImport == -1 {
 		return fmt.Errorf("no import lines found")
 	}
+
 	importLine := "const frankServer = await import('./.frank/vite-server.js').then(m => m.default).catch(() => ({}));"
 	lines = append(lines[:lastImport+1], append([]string{importLine}, lines[lastImport+1:]...)...)
 
 	// Insert server: frankServer before closing });
 	closingIdx := -1
+
 	for i := len(lines) - 1; i >= 0; i-- {
 		if strings.TrimSpace(lines[i]) == "});" {
 			closingIdx = i
 			break
 		}
 	}
+
 	if closingIdx == -1 {
 		return fmt.Errorf("could not find closing });")
 	}
+
 	serverLine := "    server: frankServer,"
 	lines = append(lines[:closingIdx], append([]string{serverLine}, lines[closingIdx:]...)...)
 
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(strings.Join(lines, "\n")), 0644); err != nil {
 		return err
 	}
+
 	output.Detail("patched vite.config (Frank server)")
+
 	return nil
 }
 
@@ -372,6 +403,8 @@ func copyPsysh(dir string) error {
 	if err := os.WriteFile(dst, content, 0644); err != nil {
 		return err
 	}
+
 	output.Detail("wrote .psysh.php")
+
 	return nil
 }

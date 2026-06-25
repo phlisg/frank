@@ -30,10 +30,12 @@ func (f *fakeInspector) InspectContainer(name string) (string, int, string, erro
 	if err := f.inspectErr[name]; err != nil {
 		return "", 0, "", err
 	}
+
 	c, ok := f.containers[name]
 	if !ok {
 		return "", 0, "", nil
 	}
+
 	return c.status, c.exitCode, c.id, nil
 }
 
@@ -41,6 +43,7 @@ func (f *fakeInspector) AdhocWorkerNames(projectName string) ([]string, error) {
 	if f.adhocErr != nil {
 		return nil, f.adhocErr
 	}
+
 	return f.adhoc, nil
 }
 
@@ -210,11 +213,14 @@ func TestDiscoverWorkers(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("pane specs mismatch\n got: %#v\nwant: %#v", got, tt.want)
 			}
@@ -226,6 +232,7 @@ func TestDiscoverWorkers_NilArgs(t *testing.T) {
 	if _, err := discoverWorkers(nil, "p", &fakeInspector{}); err == nil {
 		t.Errorf("expected error for nil config")
 	}
+
 	if _, err := discoverWorkers(&config.Config{}, "p", nil); err == nil {
 		t.Errorf("expected error for nil inspector")
 	}

@@ -55,11 +55,14 @@ func TestParseStatsLine(t *testing.T) {
 				if err == nil {
 					t.Fatalf("parseStatsLine(%q): want error, got nil (sample=%+v)", tc.line, got)
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("parseStatsLine(%q): unexpected error: %v", tc.line, err)
 			}
+
 			if got != tc.want {
 				t.Fatalf("parseStatsLine(%q): got %+v, want %+v", tc.line, got, tc.want)
 			}
@@ -92,11 +95,14 @@ func TestParseBytes(t *testing.T) {
 				if err == nil {
 					t.Fatalf("parseBytes(%q): want error, got %d", tc.in, got)
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("parseBytes(%q): unexpected error: %v", tc.in, err)
 			}
+
 			if got != tc.want {
 				t.Fatalf("parseBytes(%q): got %d, want %d", tc.in, got, tc.want)
 			}
@@ -112,11 +118,14 @@ func TestHubRunEmitsSnapshot(t *testing.T) {
 		calls int
 		args  [][]string
 	)
+
 	mockExec := func(ctx context.Context, name string, a ...string) ([]byte, error) {
 		mu.Lock()
 		calls++
+
 		args = append(args, append([]string(nil), a...))
 		mu.Unlock()
+
 		return []byte(canned), nil
 	}
 
@@ -142,9 +151,11 @@ func TestHubRunEmitsSnapshot(t *testing.T) {
 	if len(snap) != 2 {
 		t.Fatalf("snapshot size: got %d, want 2 (snap=%+v)", len(snap), snap)
 	}
+
 	if s, ok := snap["abc123"]; !ok || s.MemBytes != 128*1024*1024 || s.MemPct != 42.12 {
 		t.Fatalf("abc123 entry wrong: %+v", s)
 	}
+
 	if s, ok := snap["def456"]; !ok || s.MemBytes != 256*1024*1024 {
 		t.Fatalf("def456 entry wrong: %+v", s)
 	}
@@ -154,12 +165,15 @@ func TestHubRunEmitsSnapshot(t *testing.T) {
 	mu.Lock()
 	gotArgs := args[0]
 	mu.Unlock()
+
 	if len(gotArgs) < 5 {
 		t.Fatalf("docker args too short: %v", gotArgs)
 	}
+
 	if gotArgs[0] != "stats" || gotArgs[1] != "--no-stream" || gotArgs[2] != "--format" {
 		t.Fatalf("docker args prefix wrong: %v", gotArgs)
 	}
+
 	if !strings.Contains(gotArgs[3], "{{.ID}}") {
 		t.Fatalf("docker format missing ID template: %q", gotArgs[3])
 	}
@@ -249,6 +263,7 @@ func TestHubRunSkipsMalformedLines(t *testing.T) {
 	}
 
 	hub := NewHub([]string{"abc123", "def456", "ghi789"}, 10*time.Millisecond, mockExec)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -259,12 +274,15 @@ func TestHubRunSkipsMalformedLines(t *testing.T) {
 		if len(snap) != 2 {
 			t.Fatalf("want 2 valid entries, got %d: %+v", len(snap), snap)
 		}
+
 		if _, ok := snap["abc123"]; !ok {
 			t.Fatal("abc123 missing")
 		}
+
 		if _, ok := snap["ghi789"]; !ok {
 			t.Fatal("ghi789 missing")
 		}
+
 		if _, ok := snap["def456"]; ok {
 			t.Fatal("def456 should have been skipped (bad percent)")
 		}

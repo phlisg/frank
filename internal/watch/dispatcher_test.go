@@ -37,9 +37,11 @@ func (f *fakeRunner) Trigger(_ context.Context, kind TriggerKind) error {
 	if f.onTrigger != nil {
 		return f.onTrigger(kind)
 	}
+
 	if err, ok := f.errByKind[kind]; ok {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (f *fakeRunner) snapshot() []TriggerKind {
 	defer f.mu.Unlock()
 	out := make([]TriggerKind, len(f.calls))
 	copy(out, f.calls)
+
 	return out
 }
 
@@ -56,6 +59,7 @@ func (f *fakeRunner) snapshot() []TriggerKind {
 // runDebouncer directly or push to w.events manually.
 func newTestWatcher(t *testing.T, runner Runner, scheduleEnabled bool) *Watcher {
 	t.Helper()
+
 	w, err := New(Config{
 		ProjectRoot:     t.TempDir(),
 		ScheduleEnabled: scheduleEnabled,
@@ -66,6 +70,7 @@ func newTestWatcher(t *testing.T, runner Runner, scheduleEnabled bool) *Watcher 
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+
 	return w
 }
 
@@ -82,12 +87,14 @@ func TestDebounce_CoalescesBurst(t *testing.T) {
 
 	// Push 100 events into the channel within ~50ms.
 	start := time.Now()
+
 	for i := 0; i < 100; i++ {
 		select {
 		case w.events <- fsnotify.Event{Name: "x.php", Op: fsnotify.Write}:
 		default:
 			// Channel full — ignore; the debouncer already sees *something*.
 		}
+
 		if time.Since(start) > 50*time.Millisecond {
 			break
 		}
@@ -103,9 +110,11 @@ func TestDebounce_CoalescesBurst(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected exactly 1 trigger after coalesced burst, got %d (calls=%v)", len(calls), calls)
 	}
+
 	if calls[0] != TriggerQueueRestart {
 		t.Errorf("coalesced trigger should be queue:restart, got %v", calls[0])
 	}
+
 	if n := atomic.LoadInt32(&fake.scheduleCalls); n != 0 {
 		t.Errorf("schedule restart should NOT fire when ScheduleEnabled=false, got %d", n)
 	}
@@ -120,9 +129,11 @@ func TestDispatch_SkipsScheduleWhenDisabled(t *testing.T) {
 	if ok := w.dispatch(context.Background()); !ok {
 		t.Fatalf("dispatch should succeed with no errors")
 	}
+
 	if n := atomic.LoadInt32(&fake.queueCalls); n != 1 {
 		t.Errorf("expected 1 queue:restart, got %d", n)
 	}
+
 	if n := atomic.LoadInt32(&fake.scheduleCalls); n != 0 {
 		t.Errorf("expected 0 schedule restarts, got %d", n)
 	}
@@ -136,9 +147,11 @@ func TestDispatch_FiresBothWhenScheduleEnabled(t *testing.T) {
 	if ok := w.dispatch(context.Background()); !ok {
 		t.Fatalf("dispatch should succeed")
 	}
+
 	if n := atomic.LoadInt32(&fake.queueCalls); n != 1 {
 		t.Errorf("expected 1 queue:restart, got %d", n)
 	}
+
 	if n := atomic.LoadInt32(&fake.scheduleCalls); n != 1 {
 		t.Errorf("expected 1 schedule restart, got %d", n)
 	}
@@ -157,9 +170,11 @@ func TestDispatch_PartialFailure(t *testing.T) {
 	if ok := w.dispatch(context.Background()); ok {
 		t.Fatalf("dispatch should report failure when any trigger errors")
 	}
+
 	if n := atomic.LoadInt32(&fake.queueCalls); n != 1 {
 		t.Errorf("queue:restart must still attempt despite schedule failure, got %d", n)
 	}
+
 	if n := atomic.LoadInt32(&fake.scheduleCalls); n != 1 {
 		t.Errorf("schedule restart must attempt once, got %d", n)
 	}
@@ -170,6 +185,7 @@ func TestDispatch_PartialFailure(t *testing.T) {
 // runner starts succeeding → next window uses base (20ms) again.
 func TestBackoff_EscalatesOnFailureAndResets(t *testing.T) {
 	var attempts int32
+
 	fake := &fakeRunner{
 		onTrigger: func(kind TriggerKind) error {
 			n := atomic.AddInt32(&attempts, 1)
@@ -223,12 +239,16 @@ func TestBackoff_EscalatesOnFailureAndResets(t *testing.T) {
 	// more window with a tight timing budget.
 	fake2 := &fakeRunner{}
 	w2 := newTestWatcher(t, fake2, false)
+
 	ctx2, cancel2 := context.WithCancel(context.Background())
 	defer cancel2()
+
 	done2 := make(chan struct{})
+
 	go func() { w2.runDebouncer(ctx2); close(done2) }()
 
 	w2.events <- fsnotify.Event{Name: "x.php", Op: fsnotify.Write}
+
 	time.Sleep(60 * time.Millisecond) // 3x base
 	cancel2()
 	<-done2

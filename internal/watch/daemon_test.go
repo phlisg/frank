@@ -18,12 +18,14 @@ func TestAcquirePidfile_WritesCurrentPid(t *testing.T) {
 	if err := w.acquirePidfile(); err != nil {
 		t.Fatalf("acquirePidfile: %v", err)
 	}
+
 	t.Cleanup(w.releasePidfile)
 
 	pid, err := ReadPidfile(PidfilePath(root))
 	if err != nil {
 		t.Fatalf("ReadPidfile: %v", err)
 	}
+
 	if pid != os.Getpid() {
 		t.Errorf("pidfile pid = %d, want %d", pid, os.Getpid())
 	}
@@ -46,12 +48,14 @@ func TestAcquirePidfile_OverwritesStalePid(t *testing.T) {
 	if err := w.acquirePidfile(); err != nil {
 		t.Fatalf("acquirePidfile: %v", err)
 	}
+
 	t.Cleanup(w.releasePidfile)
 
 	pid, err := ReadPidfile(path)
 	if err != nil {
 		t.Fatalf("ReadPidfile: %v", err)
 	}
+
 	if pid != os.Getpid() {
 		t.Errorf("pidfile = %d, want overwrite to %d", pid, os.Getpid())
 	}
@@ -69,10 +73,12 @@ func TestAcquirePidfile_RejectsLiveOther(t *testing.T) {
 	}
 
 	w := &Watcher{cfg: Config{ProjectRoot: root}}
+
 	err := w.acquirePidfile()
 	if err == nil {
 		t.Fatalf("expected already-running error, got nil")
 	}
+
 	if !containsAll(err.Error(), "already running", "pid 1") {
 		t.Errorf("error %q missing expected phrases", err.Error())
 	}
@@ -82,10 +88,12 @@ func TestAcquirePidfile_RejectsLiveOther(t *testing.T) {
 // it and writes our pid.
 func TestAcquirePidfile_OverwritesMalformed(t *testing.T) {
 	root := t.TempDir()
+
 	path := PidfilePath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(path, []byte("not-a-pid"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -94,12 +102,14 @@ func TestAcquirePidfile_OverwritesMalformed(t *testing.T) {
 	if err := w.acquirePidfile(); err != nil {
 		t.Fatalf("acquirePidfile: %v", err)
 	}
+
 	t.Cleanup(w.releasePidfile)
 
 	pid, err := ReadPidfile(path)
 	if err != nil {
 		t.Fatalf("ReadPidfile: %v", err)
 	}
+
 	if pid != os.Getpid() {
 		t.Errorf("pidfile = %d, want %d", pid, os.Getpid())
 	}
@@ -109,10 +119,12 @@ func TestAcquirePidfile_OverwritesMalformed(t *testing.T) {
 // detection already removed it before Stop runs).
 func TestReleasePidfile_Idempotent(t *testing.T) {
 	root := t.TempDir()
+
 	w := &Watcher{cfg: Config{ProjectRoot: root}}
 	if err := w.acquirePidfile(); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
+
 	w.releasePidfile()
 	w.releasePidfile() // no panic, no error
 }
@@ -140,6 +152,7 @@ func TestStart_WritesAndUnlinksPidfile(t *testing.T) {
 	// Wait until Start has armed + written the pidfile.
 	path := PidfilePath(root)
 	deadline := time.After(2 * time.Second)
+
 	for {
 		if _, err := os.Stat(path); err == nil {
 			break
@@ -161,6 +174,7 @@ func TestStart_WritesAndUnlinksPidfile(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatalf("Start did not return")
 	}
+
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("pidfile should be unlinked after Stop, stat err = %v", err)
 	}
@@ -173,12 +187,14 @@ func TestStart_RefusesSecondInstance(t *testing.T) {
 	if err := WritePidfile(PidfilePath(root), 1); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
+
 	t.Cleanup(func() { _ = os.Remove(PidfilePath(root)) })
 
 	w, err := New(Config{ProjectRoot: root, Runner: &fakeRunner{}})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -186,6 +202,7 @@ func TestStart_RefusesSecondInstance(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected already-running error")
 	}
+
 	if !containsAll(err.Error(), "already running") {
 		t.Errorf("error %q missing 'already running'", err.Error())
 	}
@@ -212,12 +229,15 @@ func TestDaemonize_SpawnsSurvivingChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Daemonize: %v", err)
 	}
+
 	if pid <= 0 {
 		t.Fatalf("expected positive pid, got %d", pid)
 	}
+
 	if !pidAlive(pid) {
 		t.Fatalf("child pid %d not alive immediately after Daemonize", pid)
 	}
+
 	if _, err := os.Stat(logPath); err != nil {
 		t.Errorf("log file not created: %v", err)
 	}
@@ -236,6 +256,7 @@ func containsAll(s string, subs ...string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -245,5 +266,6 @@ func contains(s, sub string) bool {
 			return true
 		}
 	}
+
 	return false
 }

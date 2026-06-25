@@ -49,10 +49,12 @@ func fakeLaravelProject(t *testing.T) string {
 		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", abs, err)
 		}
+
 		if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", abs, err)
 		}
 	}
+
 	return root
 }
 
@@ -60,6 +62,7 @@ func fakeLaravelProject(t *testing.T) string {
 // relative to the project root. Used by multiple tests.
 func watchedDirs(t *testing.T, root string, withGitignore bool) (map[string]struct{}, *Watcher) {
 	t.Helper()
+
 	if !withGitignore {
 		// Remove .gitignore to test baseline-only path.
 		_ = os.Remove(filepath.Join(root, ".gitignore"))
@@ -69,6 +72,7 @@ func watchedDirs(t *testing.T, root string, withGitignore bool) (map[string]stru
 	if err != nil {
 		t.Fatalf("fsnotify.NewWatcher: %v", err)
 	}
+
 	t.Cleanup(func() { _ = fsw.Close() })
 
 	w := &Watcher{
@@ -84,13 +88,16 @@ func watchedDirs(t *testing.T, root string, withGitignore bool) (map[string]stru
 	}
 
 	set := make(map[string]struct{})
+
 	for _, p := range fsw.WatchList() {
 		rel, err := filepath.Rel(root, p)
 		if err != nil {
 			t.Fatalf("rel: %v", err)
 		}
+
 		set[filepath.ToSlash(rel)] = struct{}{}
 	}
+
 	return set, w
 }
 
@@ -132,11 +139,13 @@ func TestWalker_RootParentAddedOnce(t *testing.T) {
 	}
 
 	count := 0
+
 	for p := range watched {
 		if p == "." {
 			count++
 		}
 	}
+
 	if count != 1 {
 		t.Errorf("project root added %d times, want 1", count)
 	}
@@ -173,6 +182,7 @@ func TestWalker_DegradedExtraWatches(t *testing.T) {
 	if err := os.MkdirAll(gen, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(gen, "gen.php"), []byte("<?php"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -193,6 +203,7 @@ func TestWalker_DotFrankPruned(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".frank"), 0o755); err != nil {
 		t.Fatalf("mkdir .frank: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(root, ".frank", "compose.yaml"), []byte("x"), 0o644); err != nil {
 		t.Fatalf("write .frank/compose.yaml: %v", err)
 	}
@@ -237,6 +248,7 @@ func TestClassify_Events(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ev := fsnotify.Event{Name: filepath.Join(root, tc.path), Op: tc.op}
+
 			_, fire := w.classify(ev)
 			if fire != tc.want {
 				t.Errorf("classify(%q, %v) = %v, want %v", tc.path, tc.op, fire, tc.want)
@@ -287,6 +299,7 @@ func TestCompileIgnore_ReadError(t *testing.T) {
 	origStderr := os.Stderr
 	r, wr, _ := os.Pipe()
 	os.Stderr = wr
+
 	defer func() { os.Stderr = origStderr }()
 
 	gi := compileIgnore(root)
@@ -298,6 +311,7 @@ func TestCompileIgnore_ReadError(t *testing.T) {
 	if gi == nil {
 		t.Fatalf("compileIgnore returned nil; baseline-only matcher expected")
 	}
+
 	if !strings.Contains(stderr, "WARN") {
 		t.Errorf("expected WARN on stderr, got: %q", stderr)
 	}
@@ -317,6 +331,7 @@ func TestStartStop_LifecycleFiresTriggerOnPhpEdit(t *testing.T) {
 	root := fakeLaravelProject(t)
 
 	fake := &fakeRunner{}
+
 	w, err := New(Config{
 		ProjectRoot:  root,
 		Runner:       fake,
@@ -343,6 +358,7 @@ func TestStartStop_LifecycleFiresTriggerOnPhpEdit(t *testing.T) {
 
 	// Wait for dispatch — up to a few debounce windows + margin.
 	deadline := time.After(2 * time.Second)
+
 	for {
 		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
 			break
@@ -374,6 +390,7 @@ func TestArmSuppression_DropsEventsDuringQuietWindow(t *testing.T) {
 	root := fakeLaravelProject(t)
 
 	fake := &fakeRunner{}
+
 	w, err := New(Config{
 		ProjectRoot:    root,
 		Runner:         fake,
@@ -387,7 +404,9 @@ func TestArmSuppression_DropsEventsDuringQuietWindow(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	done := make(chan error, 1)
+
 	go func() { done <- w.Start(ctx) }()
 
 	// Let Start arm watches and start the suppression window.
@@ -401,6 +420,7 @@ func TestArmSuppression_DropsEventsDuringQuietWindow(t *testing.T) {
 
 	// Wait past the debounce window but still under suppression.
 	time.Sleep(100 * time.Millisecond)
+
 	if n := atomic.LoadInt32(&fake.queueCalls); n != 0 {
 		t.Fatalf("dispatch fired inside suppression window: got %d calls", n)
 	}
@@ -414,6 +434,7 @@ func TestArmSuppression_DropsEventsDuringQuietWindow(t *testing.T) {
 	}
 
 	deadline := time.After(2 * time.Second)
+
 	for {
 		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
 			break
@@ -443,9 +464,11 @@ func TestStop_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+
 	if err := w.Stop(); err != nil {
 		t.Fatalf("first Stop: %v", err)
 	}
+
 	if err := w.Stop(); err != nil {
 		t.Fatalf("second Stop: %v", err)
 	}
@@ -457,6 +480,7 @@ func TestNewSubdir_AutoWatched(t *testing.T) {
 	root := fakeLaravelProject(t)
 
 	fake := &fakeRunner{}
+
 	w, err := New(Config{
 		ProjectRoot:  root,
 		Runner:       fake,
@@ -490,6 +514,7 @@ func TestNewSubdir_AutoWatched(t *testing.T) {
 	}
 
 	deadline := time.After(2 * time.Second)
+
 	for {
 		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
 			break
@@ -520,11 +545,13 @@ func TestDeletedSubdir_WatchRemoved(t *testing.T) {
 	if err := os.MkdirAll(jobsDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(jobsDir, "Job.php"), []byte("<?php"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
 	fake := &fakeRunner{}
+
 	w, err := New(Config{
 		ProjectRoot:  root,
 		Runner:       fake,
@@ -557,6 +584,7 @@ func TestDeletedSubdir_WatchRemoved(t *testing.T) {
 	}
 
 	deadline := time.After(2 * time.Second)
+
 	for {
 		if n := atomic.LoadInt32(&fake.queueCalls); n >= 1 {
 			break
@@ -582,5 +610,6 @@ func keys(m map[string]struct{}) []string {
 	for k := range m {
 		out = append(out, k)
 	}
+
 	return out
 }

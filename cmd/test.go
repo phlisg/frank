@@ -42,6 +42,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 	}
 
 	client := docker.New(dir)
+
 	state, _, _ := client.ContainerStatus()
 	if state != docker.StateRunning && state != docker.StatePartial {
 		return fmt.Errorf("containers are not running — run frank up first")

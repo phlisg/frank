@@ -48,13 +48,16 @@ type CmdStartFn func(ctx context.Context, name string, args ...string) (io.ReadC
 // returns cmd.Wait so callers can reap the process.
 func DefaultCmdStartFn(ctx context.Context, name string, args ...string) (io.ReadCloser, func() error, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
+
 	return stdout, cmd.Wait, nil
 }
 
@@ -86,6 +89,7 @@ func NewLogsReader(spec PaneSpec, exec CmdStartFn) *LogsReader {
 	}
 
 	var argv []string
+
 	argv = append(argv, "docker")
 	if spec.Kind == KindAdhoc {
 		argv = append(argv, "logs", "-f", "--tail", "25", spec.Name)
@@ -156,8 +160,10 @@ func (r *LogsReader) Run(ctx context.Context) {
 			// and fall through to cleanup. Draining stdout here would
 			// just delay teardown.
 			close(r.lines)
+
 			_ = stdout.Close()
 			_ = wait()
+
 			return
 		case r.lines <- line:
 		}
@@ -165,6 +171,7 @@ func (r *LogsReader) Run(ctx context.Context) {
 
 	// Scanner is done (EOF, scan error, or underlying reader closed).
 	close(r.lines)
+
 	_ = stdout.Close()
 	_ = wait()
 }

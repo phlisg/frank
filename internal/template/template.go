@@ -115,17 +115,21 @@ func (e *Engine) RenderRuntime(runtime, file string, data Data) (string, error) 
 func (e *Engine) RenderWorker(kind string, data WorkerData) (string, error) {
 	tmplPath := path.Join("templates", "workers", kind+".fragment.tmpl")
 	content, err := fs.ReadFile(e.fs, tmplPath)
+
 	if err != nil {
 		return "", fmt.Errorf("worker template %q not found: %w", tmplPath, err)
 	}
+
 	t, err := texttemplate.New(path.Base(tmplPath)).Parse(string(content))
 	if err != nil {
 		return "", fmt.Errorf("worker template %q parse error: %w", tmplPath, err)
 	}
+
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("worker template %q render error: %w", tmplPath, err)
 	}
+
 	return buf.String(), nil
 }
 
@@ -142,6 +146,7 @@ func (e *Engine) ReadFile(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read %q: %w", filePath, err)
 	}
+
 	return string(data), nil
 }
 

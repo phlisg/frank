@@ -110,19 +110,25 @@ func buildQueueArtisanArgs(queue string, tries, timeout, memory, sleep, backoff 
 	if tries > 0 {
 		args = append(args, fmt.Sprintf("--tries=%d", tries))
 	}
+
 	if timeout > 0 {
 		args = append(args, fmt.Sprintf("--timeout=%d", timeout))
 	}
+
 	if memory > 0 {
 		args = append(args, fmt.Sprintf("--memory=%d", memory))
 	}
+
 	if sleep > 0 {
 		args = append(args, fmt.Sprintf("--sleep=%d", sleep))
 	}
+
 	if backoff > 0 {
 		args = append(args, fmt.Sprintf("--backoff=%d", backoff))
 	}
+
 	args = append(args, passthrough...)
+
 	return args
 }
 
@@ -177,10 +183,12 @@ func runWorkerQueue(cmd *cobra.Command, args []string) error {
 		if err := client.RunAdhoc(name, labels, cmdArgs); err != nil {
 			return fmt.Errorf("spawn %s: %w", name, err)
 		}
+
 		fmt.Println(name)
 	}
 
 	printWatcherHintIfNeeded(dir, client)
+
 	return nil
 }
 
@@ -196,6 +204,7 @@ func runWorkerSchedule(cmd *cobra.Command, args []string) error {
 			if line == "" {
 				continue
 			}
+
 			parts := strings.Split(line, "\t")
 			if len(parts) >= 2 && parts[1] == "schedule" {
 				return fmt.Errorf("ad-hoc schedule already running: %s", parts[0])
@@ -221,9 +230,11 @@ func runWorkerSchedule(cmd *cobra.Command, args []string) error {
 	if err := client.RunAdhoc(name, labels, cmdArgs); err != nil {
 		return fmt.Errorf("spawn %s: %w", name, err)
 	}
+
 	fmt.Println(name)
 
 	printWatcherHintIfNeeded(dir, client)
+
 	return nil
 }
 
@@ -239,6 +250,7 @@ func printWatcherHintIfNeeded(projectRoot string, client *docker.Client) {
 	checker := watch.NewStatusChecker(projectRoot, func() bool {
 		return client.ComposePSServiceExists("laravel.test")
 	})
+
 	st, _ := checker.Check()
 	switch st.State {
 	case watch.StatusRunning:
@@ -256,6 +268,7 @@ func runWorkerList(cmd *cobra.Command, args []string) error {
 	client := docker.New(dir)
 
 	format := "table {{.Names}}\t{{.Label \"frank.worker\"}}\t{{.Label \"frank.worker.pool\"}}\t{{.Command}}\t{{.RunningFor}}\t{{.Status}}"
+
 	out, err := client.ListContainers(projectName, "", format)
 	if err != nil {
 		fmt.Printf("No worker containers found for project %s.\n", projectName)
@@ -272,6 +285,7 @@ func runWorkerList(cmd *cobra.Command, args []string) error {
 	// Replace default header with our column names (TYPE=frank.worker, POOL=frank.worker.pool).
 	lines[0] = "NAME\tTYPE\tPOOL\tCOMMAND\tUPTIME\tSTATUS"
 	fmt.Println(strings.Join(lines, "\n"))
+
 	return nil
 }
 
@@ -282,7 +296,9 @@ func runWorkerStop(cmd *cobra.Command, args []string) error {
 
 	// Always collect ad-hoc names (force-removed via `docker rm -f`).
 	adhocOut, _ := client.ListContainers(projectName, "adhoc", "{{.Names}}")
+
 	var adhocNames []string
+
 	for _, line := range strings.Split(strings.TrimSpace(adhocOut), "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
@@ -294,6 +310,7 @@ func runWorkerStop(cmd *cobra.Command, args []string) error {
 		if err := client.StopContainers(adhocNames); err != nil {
 			return fmt.Errorf("stop ad-hoc workers: %w", err)
 		}
+
 		for _, n := range adhocNames {
 			fmt.Println(n)
 		}
@@ -303,6 +320,7 @@ func runWorkerStop(cmd *cobra.Command, args []string) error {
 		if len(adhocNames) == 0 {
 			fmt.Println("No ad-hoc workers running.")
 		}
+
 		return nil
 	}
 
@@ -312,26 +330,33 @@ func runWorkerStop(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return nil
 	}
+
 	var declaredNames []string
+
 	for _, line := range strings.Split(strings.TrimSpace(declaredOut), "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			declaredNames = append(declaredNames, line)
 		}
 	}
+
 	if len(declaredNames) == 0 {
 		if len(adhocNames) == 0 {
 			fmt.Println("No workers running.")
 		}
+
 		return nil
 	}
+
 	stopArgs := append([]string{"stop"}, declaredNames...)
 	if err := client.Run(stopArgs...); err != nil {
 		return fmt.Errorf("stop declared workers: %w", err)
 	}
+
 	for _, n := range declaredNames {
 		fmt.Println(n)
 	}
+
 	return nil
 }
 
@@ -346,6 +371,7 @@ func runWorkerLogs(cmd *cobra.Command, args []string) error {
 		if client.ComposePSServiceExists(name) {
 			return client.LogsForWorkers([]string{name}, workerLogsFollow)
 		}
+
 		return client.LogsRaw(name, workerLogsFollow)
 	}
 
@@ -359,6 +385,7 @@ func runWorkerLogs(cmd *cobra.Command, args []string) error {
 	if len(adhoc) == 0 {
 		return client.LogsForWorkers(declared, workerLogsFollow)
 	}
+
 	if len(declared) == 0 && len(adhoc) == 1 && !workerLogsFollow {
 		return client.LogsRaw(adhoc[0], workerLogsFollow)
 	}
@@ -378,7 +405,9 @@ func listWorkerNames(client *docker.Client, projectName string) (declared, adhoc
 	if err != nil {
 		return nil, nil, err
 	}
+
 	declared, adhoc = parseWorkerList(out)
+
 	return declared, adhoc, nil
 }
 
@@ -392,15 +421,19 @@ func parseWorkerList(out string) (declared, adhoc []string) {
 		if line == "" {
 			continue
 		}
+
 		parts := strings.SplitN(line, "\t", 3)
+
 		name := strings.TrimSpace(parts[0])
 		if name == "" {
 			continue
 		}
+
 		kind := ""
 		if len(parts) >= 2 {
 			kind = strings.TrimSpace(parts[1])
 		}
+
 		if kind == "adhoc" {
 			adhoc = append(adhoc, name)
 		} else {
@@ -408,6 +441,7 @@ func parseWorkerList(out string) (declared, adhoc []string) {
 			if len(parts) >= 3 {
 				svc = strings.TrimSpace(parts[2])
 			}
+
 			if svc != "" {
 				declared = append(declared, svc)
 			} else {
@@ -415,6 +449,7 @@ func parseWorkerList(out string) (declared, adhoc []string) {
 			}
 		}
 	}
+
 	return declared, adhoc
 }
 
@@ -425,21 +460,27 @@ func parseWorkerList(out string) (declared, adhoc []string) {
 // so the prefix form matches. Blocks until every backend exits.
 func streamMixedWorkerLogs(client *docker.Client, declared, adhoc []string, follow bool) error {
 	var wg sync.WaitGroup
+
 	errs := make(chan error, len(adhoc)+1)
 
 	if len(declared) > 0 {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			if err := client.LogsForWorkers(declared, follow); err != nil {
 				errs <- fmt.Errorf("declared logs: %w", err)
 			}
 		}()
 	}
+
 	for _, name := range adhoc {
 		wg.Add(1)
+
 		go func(n string) {
 			defer wg.Done()
+
 			if err := client.LogsRawPrefixed(n, follow); err != nil {
 				errs <- fmt.Errorf("%s logs: %w", n, err)
 			}
@@ -448,11 +489,13 @@ func streamMixedWorkerLogs(client *docker.Client, declared, adhoc []string, foll
 
 	wg.Wait()
 	close(errs)
+
 	var firstErr error
 	for e := range errs {
 		if firstErr == nil {
 			firstErr = e
 		}
 	}
+
 	return firstErr
 }

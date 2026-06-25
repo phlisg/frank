@@ -34,9 +34,11 @@ func detectFromPath(path string) Method {
 	if strings.Contains(lower, "/cellar/") || strings.Contains(lower, "/homebrew/") {
 		return MethodBrew
 	}
+
 	if strings.Contains(lower, "/go/bin/") {
 		return MethodGo
 	}
+
 	return MethodUnknown
 }
 
@@ -45,9 +47,11 @@ func executablePath() string {
 	if err != nil {
 		return ""
 	}
+
 	resolved, err := filepath.EvalSymlinks(exe)
 	if err != nil {
 		return exe
 	}
+
 	return resolved
 }

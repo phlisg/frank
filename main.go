@@ -18,5 +18,6 @@ func main() {
 			version = info.Main.Version
 		}
 	}
+
 	cmd.Execute(templateFS, version)
 }

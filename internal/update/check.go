@@ -45,6 +45,7 @@ func Check(currentVersion string) (Status, error) {
 	}
 
 	writeCache(cacheFile, latest)
+
 	return compareVersions(currentVersion, latest), nil
 }
 
@@ -101,6 +102,7 @@ func fetchLatest() (string, error) {
 	var release struct {
 		TagName string `json:"tag_name"`
 	}
+
 	if err := json.Unmarshal(body, &release); err != nil {
 		return "", err
 	}

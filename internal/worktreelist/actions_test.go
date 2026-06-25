@@ -136,6 +136,7 @@ func TestPortSummary(t *testing.T) {
 	}
 	got := item.PortSummary()
 	want := ":443 :5173 :5432"
+
 	if got != want {
 		t.Errorf("PortSummary() = %q, want %q", got, want)
 	}

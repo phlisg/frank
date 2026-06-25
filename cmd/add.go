@@ -52,9 +52,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err := saveConfig(cfg, dir); err != nil {
 		return err
 	}
+
 	fmt.Printf("  added    %s\n", service)
 
 	fmt.Println("\nRegenerating Docker files...")
+
 	return generate(cfg, dir, rootCmd.Version)
 }
 
@@ -63,5 +65,6 @@ func saveConfig(cfg *config.Config, dir string) error {
 	if err != nil {
 		return err
 	}
+
 	return writeFile(filepath.Join(dir, config.ConfigFileName), content)
 }

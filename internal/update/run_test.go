@@ -42,12 +42,14 @@ func TestRun(t *testing.T) {
 				if len(mock.calls) != 0 {
 					t.Fatalf("expected no calls, got %v", mock.calls)
 				}
+
 				return
 			}
 
 			if len(mock.calls) != 1 {
 				t.Fatalf("expected 1 call, got %d: %v", len(mock.calls), mock.calls)
 			}
+
 			if mock.calls[0] != tt.wantCall {
 				t.Errorf("got %q, want %q", mock.calls[0], tt.wantCall)
 			}

@@ -13,9 +13,11 @@ func TestUpCmd_TypedDetachFlag(t *testing.T) {
 	if f := upCmd.Flags().Lookup("detach"); f == nil || f.Shorthand != "d" {
 		t.Fatalf("upCmd missing -d/--detach typed flag")
 	}
+
 	if f := upCmd.Flags().Lookup("quick"); f == nil {
 		t.Fatalf("upCmd missing --quick typed flag")
 	}
+
 	if upCmd.Flags().Lookup("build") != nil {
 		t.Fatalf("upCmd should not own --build (belongs to docker compose)")
 	}
@@ -27,6 +29,7 @@ func TestUpCmd_UnknownFlagHintsAtDash(t *testing.T) {
 	if err == nil {
 		t.Fatalf("upFlagError returned nil")
 	}
+
 	if !strings.Contains(err.Error(), "--") || !strings.Contains(err.Error(), "docker compose") {
 		t.Errorf("unknown-flag error should hint about `--` and compose, got: %v", err)
 	}
@@ -39,12 +42,14 @@ func buildUpComposeArgs(detach bool, passthrough []string) []string {
 	if detach {
 		out = append([]string{"-d"}, out...)
 	}
+
 	return out
 }
 
 func TestUpCmd_DetachInjectedIntoComposeArgs(t *testing.T) {
 	got := buildUpComposeArgs(true, []string{"--remove-orphans"})
 	want := []string{"-d", "--remove-orphans"}
+
 	if !equalSlice(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -53,6 +58,7 @@ func TestUpCmd_DetachInjectedIntoComposeArgs(t *testing.T) {
 func TestUpCmd_NoDetachNoInjection(t *testing.T) {
 	got := buildUpComposeArgs(false, []string{"--remove-orphans"})
 	want := []string{"--remove-orphans"}
+
 	if !equalSlice(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -61,6 +67,7 @@ func TestUpCmd_NoDetachNoInjection(t *testing.T) {
 func TestShouldRunWatcher_ScheduleEnabled(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Workers.Schedule = true
+
 	if !shouldRunWatcher(cfg, nil, t.TempDir()) {
 		t.Errorf("schedule=true should request watcher")
 	}
@@ -69,6 +76,7 @@ func TestShouldRunWatcher_ScheduleEnabled(t *testing.T) {
 func TestShouldRunWatcher_QueueDeclared(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Workers.Queue = []config.QueuePool{{Count: 1}}
+
 	if !shouldRunWatcher(cfg, nil, t.TempDir()) {
 		t.Errorf("queue count > 0 should request watcher")
 	}

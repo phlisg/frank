@@ -64,13 +64,16 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	// Line 1: branch name
 	title := wt.Branch
+
 	if busy {
 		frame := spinnerFrames[0]
 		if d.SpinnerFrame != nil {
 			frame = spinnerFrames[*d.SpinnerFrame%len(spinnerFrames)]
 		}
+
 		title = busyStyle.Render(frame) + " " + title
 	}
+
 	if selected {
 		title = itemTitleSelected.Render(title)
 	} else {
@@ -86,11 +89,13 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	if !busy {
 		descParts = append(descParts, indicatorStyle.Render(indicator))
 	}
+
 	if selected {
 		descParts = append(descParts, itemDescSelected.Render(label))
 	} else {
 		descParts = append(descParts, itemDesc.Render(label))
 	}
+
 	if ports != "" {
 		if selected {
 			descParts = append(descParts, itemDescSelected.Render("— "+ports))
@@ -98,6 +103,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 			descParts = append(descParts, itemDesc.Render("— "+ports))
 		}
 	}
+
 	descLine := strings.Join(descParts, " ")
 
 	// Line 3: shortened path
@@ -112,6 +118,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	if selected {
 		prefix = "→ "
 	}
+
 	fmt.Fprintf(w, "%s%s\n%s\n%s", prefix, title, descLine, path)
 }
 
@@ -119,21 +126,27 @@ func statusIndicator(wt WorktreeItem) (string, lipgloss.Style) {
 	if !wt.HasFrank {
 		return indicatorNotConfigured, indicatorNotConfiguredStyle
 	}
+
 	if len(wt.Services) == 0 {
 		return indicatorStopped, indicatorStoppedStyle
 	}
+
 	running := 0
+
 	for _, s := range wt.Services {
 		if s.State == "running" {
 			running++
 		}
 	}
+
 	if running == 0 {
 		return indicatorStopped, indicatorStoppedStyle
 	}
+
 	if running == len(wt.Services) {
 		return indicatorRunning, indicatorRunningStyle
 	}
+
 	return indicatorPartial, indicatorPartialStyle
 }
 
@@ -142,11 +155,14 @@ func shortenHome(path string) string {
 	if err != nil || home == "" {
 		return path
 	}
+
 	if path == home {
 		return "~"
 	}
+
 	if strings.HasPrefix(path, home+"/") {
 		return "~" + path[len(home):]
 	}
+
 	return path
 }

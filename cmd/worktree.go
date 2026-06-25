@@ -15,14 +15,17 @@ import (
 
 func branchForPath(porcelain, path string) string {
 	var current string
+
 	for _, line := range strings.Split(porcelain, "\n") {
 		if strings.HasPrefix(line, "worktree ") {
 			current = strings.TrimPrefix(line, "worktree ")
 		}
+
 		if current == path && strings.HasPrefix(line, "branch refs/heads/") {
 			return strings.TrimPrefix(line, "branch refs/heads/")
 		}
 	}
+
 	return ""
 }
 
@@ -33,8 +36,8 @@ func init() {
 }
 
 var worktreeCmd = &cobra.Command{
-	Use:   "worktree",
-	Short: "Manage git worktrees",
+	Use:               "worktree",
+	Short:             "Manage git worktrees",
 	ValidArgsFunction: cobra.NoFileCompletions,
 }
 

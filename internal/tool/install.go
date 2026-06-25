@@ -30,6 +30,7 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 			if _, err := os.Stat(destPath); err == nil {
 				output.Detail(fmt.Sprintf("skipped %s (already exists)", dest))
 				res.Skipped = append(res.Skipped, dest)
+
 				continue
 			}
 
@@ -41,6 +42,7 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 			if err := os.WriteFile(destPath, data, 0644); err != nil {
 				return nil, fmt.Errorf("write %s: %w", dest, err)
 			}
+
 			output.Detail(fmt.Sprintf("created %s", dest))
 			res.Created = append(res.Created, dest)
 		}
@@ -52,13 +54,16 @@ func Install(tools []string, dir string) (*InstallResult, error) {
 		lefthookPath := filepath.Join(dir, "lefthook.yml")
 		if _, err := os.Stat(lefthookPath); err == nil {
 			output.Detail("skipped lefthook.yml (already exists)")
+
 			res.Skipped = append(res.Skipped, "lefthook.yml")
 		} else {
 			content := AssembleLefthook(tools)
 			if err := os.WriteFile(lefthookPath, []byte(content), 0644); err != nil {
 				return nil, fmt.Errorf("write lefthook.yml: %w", err)
 			}
+
 			output.Detail("created lefthook.yml")
+
 			res.Created = append(res.Created, "lefthook.yml")
 		}
 	}
@@ -82,22 +87,27 @@ func runLefthookInstall(dir string) {
 	if _, err := os.Stat(gitDir); err != nil {
 		initCmd := exec.Command("git", "init")
 		initCmd.Dir = dir
+
 		if err := initCmd.Run(); err != nil {
 			output.Detail("hint: run `lefthook install` after git init")
 			return
 		}
 	}
+
 	path, err := exec.LookPath("lefthook")
 	if err != nil {
 		output.Detail("hint: install lefthook to enable git hooks: https://github.com/evilmartians/lefthook")
 		return
 	}
+
 	cmd := exec.Command(path, "install", "--force")
 	cmd.Dir = dir
+
 	if output.GetLevel() == output.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
+
 	if err := cmd.Run(); err != nil {
 		output.Warning(fmt.Sprintf("lefthook install failed: %v", err))
 	}
@@ -108,5 +118,6 @@ func LefthookHint(toolName string) string {
 	if !ok || t.Category != "php" {
 		return ""
 	}
+
 	return lefthookEntry(t)
 }

@@ -16,10 +16,13 @@ func captureStdout(fn func()) string {
 	fn()
 
 	w.Close()
+
 	os.Stdout = old
 
 	var buf bytes.Buffer
+
 	io.Copy(&buf, r)
+
 	return buf.String()
 }
 
@@ -31,10 +34,13 @@ func captureStderr(fn func()) string {
 	fn()
 
 	w.Close()
+
 	os.Stderr = old
 
 	var buf bytes.Buffer
+
 	io.Copy(&buf, r)
+
 	return buf.String()
 }
 
@@ -120,6 +126,7 @@ func TestNextSteps_Normal(t *testing.T) {
 	if !strings.Contains(out, "Next steps:") {
 		t.Fatalf("expected header, got: %q", out)
 	}
+
 	if !strings.Contains(out, "  run frank up") {
 		t.Fatalf("expected indented line, got: %q", out)
 	}
@@ -167,6 +174,7 @@ func TestSpin_Quiet(t *testing.T) {
 func TestWarning_Always(t *testing.T) {
 	for _, level := range []Level{Quiet, Normal, Verbose} {
 		SetLevel(level)
+
 		out := captureStderr(func() {
 			Warning("something broke")
 		})
@@ -174,5 +182,6 @@ func TestWarning_Always(t *testing.T) {
 			t.Fatalf("expected warning at level %d, got: %q", level, out)
 		}
 	}
+
 	SetLevel(Normal)
 }

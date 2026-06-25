@@ -39,14 +39,17 @@ func (h *handlers) handleStatus(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 
 	// docker compose ps --format json outputs one JSON object per line
 	var services []json.RawMessage
+
 	for _, line := range splitLines(out) {
 		if line == "" {
 			continue
 		}
+
 		var obj map[string]any
 		if err := json.Unmarshal([]byte(line), &obj); err != nil {
 			continue
 		}
+
 		compact := map[string]any{
 			"Name":       obj["Name"],
 			"State":      obj["State"],
@@ -60,6 +63,7 @@ func (h *handlers) handleStatus(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 	response := map[string]any{
 		"services": services,
 	}
+
 	if config.IsWorktree(h.dir) {
 		projectName := config.ProjectName(h.dir)
 		response["worktree"] = map[string]any{
@@ -69,6 +73,7 @@ func (h *handlers) handleStatus(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 	}
 
 	result, _ := json.MarshalIndent(response, "", "  ")
+
 	return textResult(string(result)), nil
 }
 
@@ -77,6 +82,7 @@ func (h *handlers) handleConfig(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 	if err != nil {
 		return errorResult(fmt.Sprintf(`{"error": %q}`, err.Error())), nil
 	}
+
 	return textResult(string(b)), nil
 }
 
@@ -93,6 +99,7 @@ func (h *handlers) handleLogs(_ context.Context, req mcp.CallToolRequest) (*mcp.
 	if err != nil {
 		return errorResult(err.Error()), nil
 	}
+
 	return textResult(out), nil
 }
 
@@ -101,6 +108,7 @@ func (h *handlers) handleExec(_ context.Context, req mcp.CallToolRequest) (*mcp.
 	if err != nil {
 		return errorResult(err.Error()), nil
 	}
+
 	if len(command) == 0 {
 		return errorResult("command array must not be empty"), nil
 	}
@@ -111,6 +119,7 @@ func (h *handlers) handleExec(_ context.Context, req mcp.CallToolRequest) (*mcp.
 	if err != nil {
 		return errorResult(err.Error()), nil
 	}
+
 	return textResult(out), nil
 }
 
@@ -123,6 +132,7 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 		if err != nil {
 			return errorResult(fmt.Sprintf("discover: %v", err)), nil
 		}
+
 		type wtJSON struct {
 			Path     string `json:"path"`
 			Branch   string `json:"branch"`
@@ -130,6 +140,7 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 			Status   string `json:"status"`
 			Ports    string `json:"ports,omitempty"`
 		}
+
 		var result []wtJSON
 		for _, item := range items {
 			result = append(result, wtJSON{
@@ -140,7 +151,9 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 				Ports:    item.PortSummary(),
 			})
 		}
+
 		b, _ := json.MarshalIndent(result, "", "  ")
+
 		return textResult(string(b)), nil
 
 	case "remove":
@@ -148,21 +161,27 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 		if path == "" {
 			return errorResult("path required for remove"), nil
 		}
+
 		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return errorResult(fmt.Sprintf("resolve path: %v", err)), nil
 		}
+
 		items, _ := worktreelist.Discover(h.dir)
+
 		var branch string
+
 		for _, item := range items {
 			if item.Path == absPath {
 				branch = item.Branch
 				break
 			}
 		}
+
 		if err := worktreelist.RemoveWorktree(absPath, branch); err != nil {
 			return errorResult(fmt.Sprintf("remove: %v", err)), nil
 		}
+
 		return textResult(fmt.Sprintf("removed worktree %s", absPath)), nil
 
 	case "create":
@@ -170,13 +189,16 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 		if branch == "" {
 			return errorResult("branch required for create"), nil
 		}
+
 		projectName := config.ProjectName(h.dir)
 		kebab := worktreelist.BranchToKebab(branch)
 		parentDir := filepath.Dir(h.dir)
+
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
 		if err := worktreelist.CreateWorktree(h.dir, wtPath, branch); err != nil {
 			return errorResult(fmt.Sprintf("create: %v", err)), nil
 		}
+
 		return textResult(fmt.Sprintf("created worktree at %s", wtPath)), nil
 
 	default:
@@ -187,15 +209,19 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 // splitLines splits a string into non-empty lines.
 func splitLines(s string) []string {
 	var lines []string
+
 	start := 0
+
 	for i := 0; i < len(s); i++ {
 		if s[i] == '\n' {
 			lines = append(lines, s[start:i])
 			start = i + 1
 		}
 	}
+
 	if start < len(s) {
 		lines = append(lines, s[start:])
 	}
+
 	return lines
 }

@@ -68,6 +68,7 @@ func BranchToKebab(branch string) string {
 	s = strings.ReplaceAll(s, "_", "-")
 	s = nonAlphanumDash.ReplaceAllString(s, "")
 	s = strings.Trim(s, "-")
+
 	return s
 }
 
@@ -111,6 +112,7 @@ func New(items []WorktreeItem, dir string) Model {
 	}
 
 	m.list = l
+
 	return m
 }
 
@@ -132,12 +134,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.list.FilterState() == list.Filtering {
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)
+
 			return m, cmd
 		}
 
 		if m.confirmRemove {
 			return m.handleConfirmKey(msg)
 		}
+
 		return m.handleKey(msg)
 
 	case actionDoneMsg:
@@ -147,6 +151,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.statusMsg = "done"
 		}
+
 		return m, m.refresh()
 
 	case refreshMsg:
@@ -157,11 +162,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.shared.spinnerFrame++
 			return m, spinnerTick()
 		}
+
 		return m, nil
 	}
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+
 	return m, cmd
 }
 
@@ -176,6 +183,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.branchInput.Reset()
 		m.branchInput.Focus()
 		m.statusMsg = ""
+
 		return m, m.branchInput.Cursor.BlinkCmd()
 
 	case "o":
@@ -183,10 +191,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		err := openBrowser(item)
 		if err != nil {
 			m.statusMsg = fmt.Sprintf("browser: %v", err)
 		}
+
 		return m, nil
 
 	case "r":
@@ -194,8 +204,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.confirmRemove = true
 		m.statusMsg = fmt.Sprintf("remove %s? (y/n)", item.Branch)
+
 		return m, nil
 
 	case "u":
@@ -203,12 +215,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.shared.busyIdx = m.list.Index()
 		if needsGenerate(item.Path) {
 			m.statusMsg = "generating + starting containers..."
 		} else {
 			m.statusMsg = "starting containers..."
 		}
+
 		return m, tea.Batch(m.runAction(func() error {
 			return upContainers(item.Path)
 		}), spinnerTick())
@@ -218,8 +232,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "stopping containers..."
+
 		return m, tea.Batch(m.runAction(func() error {
 			return downContainers(item.Path)
 		}), spinnerTick())
@@ -229,8 +245,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.postQuit = &PostQuitAction{Kind: "logs", Path: item.Path}
 		m.quitting = true
+
 		return m, tea.Quit
 
 	case "g":
@@ -238,8 +256,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "regenerating..."
+
 		return m, tea.Batch(m.runAction(func() error {
 			return regenerate(item.Path)
 		}), spinnerTick())
@@ -249,13 +269,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			break
 		}
+
 		m.postQuit = &PostQuitAction{Kind: "editor", Path: item.Path}
 		m.quitting = true
+
 		return m, tea.Quit
 	}
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+
 	return m, cmd
 }
 
@@ -266,8 +289,10 @@ func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if branch == "" {
 			m.creating = false
 			m.statusMsg = ""
+
 			return m, nil
 		}
+
 		m.creating = false
 
 		projectName := config.ProjectName(m.dir)
@@ -276,6 +301,7 @@ func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
 
 		m.statusMsg = fmt.Sprintf("creating %s...", kebab)
+
 		return m, tea.Batch(m.runAction(func() error {
 			return CreateWorktree(m.dir, wtPath, branch)
 		}), spinnerTick())
@@ -283,11 +309,13 @@ func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEsc:
 		m.creating = false
 		m.statusMsg = ""
+
 		return m, nil
 	}
 
 	var cmd tea.Cmd
 	m.branchInput, cmd = m.branchInput.Update(msg)
+
 	return m, cmd
 }
 
@@ -296,11 +324,14 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y", "Y":
 		m.confirmRemove = false
 		item, ok := m.selectedItem()
+
 		if !ok {
 			return m, nil
 		}
+
 		m.shared.busyIdx = m.list.Index()
 		m.statusMsg = "removing worktree..."
+
 		return m, tea.Batch(m.runAction(func() error {
 			return RemoveWorktree(item.Path, item.Branch)
 		}), spinnerTick())
@@ -308,6 +339,7 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		m.confirmRemove = false
 		m.statusMsg = ""
+
 		return m, nil
 	}
 }
@@ -335,7 +367,9 @@ func (m Model) doRefresh() (tea.Model, tea.Cmd) {
 	for i, item := range items {
 		listItems[i] = item
 	}
+
 	m.list.SetItems(listItems)
+
 	return m, nil
 }
 
@@ -344,7 +378,9 @@ func (m Model) selectedItem() (WorktreeItem, bool) {
 	if item == nil {
 		return WorktreeItem{}, false
 	}
+
 	wt, ok := item.(WorktreeItem)
+
 	return wt, ok
 }
 
@@ -352,13 +388,16 @@ func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
+
 	if m.creating {
 		return m.list.View() + "\n\n  Branch name: " + m.branchInput.View()
 	}
+
 	if m.statusMsg != "" {
 		m.list.NewStatusMessage(m.statusMsg)
 		m.statusMsg = ""
 	}
+
 	return m.list.View()
 }
 
@@ -391,5 +430,6 @@ func Run(dir string, items []WorktreeItem) error {
 	case "editor":
 		return openEditor(pq.Path)
 	}
+
 	return nil
 }

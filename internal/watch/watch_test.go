@@ -14,6 +14,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() returned error: %v", err)
 	}
+
 	if w == nil {
 		t.Fatal("New() returned nil watcher")
 	}

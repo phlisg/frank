@@ -55,6 +55,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		if msg != "" {
 			fmt.Println(msg)
 		}
+
 		return err
 	case watchStatus:
 		return runWatchStatus(dir)
@@ -80,7 +81,9 @@ func runWatchForeground(projectRoot string) error {
 	// returns cleanly, flushing any in-flight dispatch.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
 	defer signal.Stop(sigCh)
+
 	go func() {
 		select {
 		case <-sigCh:
@@ -99,10 +102,13 @@ func runWatchForeground(projectRoot string) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Fprintf(os.Stderr, "frank watch: foreground (pid %d) — Ctrl-C to stop\n", os.Getpid())
+
 	if err := w.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
+
 	return nil
 }
 
@@ -112,19 +118,23 @@ func runWatchForeground(projectRoot string) error {
 func runWatchStop(projectRoot string) (bool, string, error) {
 	path := watch.PidfilePath(projectRoot)
 	pid, err := watch.ReadPidfile(path)
+
 	if err != nil {
 		// Malformed pidfile: unlink + report.
 		_ = os.Remove(path)
 		return false, "", fmt.Errorf("stale or malformed pidfile removed: %w", err)
 	}
+
 	if pid == 0 {
 		return false, "frank watch: no watcher running", nil
 	}
+
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		if errors.Is(err, syscall.ESRCH) {
 			_ = os.Remove(path)
 			return false, fmt.Sprintf("frank watch: stale pidfile (pid %d not running) removed", pid), nil
 		}
+
 		return false, "", fmt.Errorf("SIGTERM %d: %w", pid, err)
 	}
 
@@ -135,9 +145,12 @@ func runWatchStop(projectRoot string) (bool, string, error) {
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			return true, fmt.Sprintf("frank watch: stopped (pid %d)", pid), nil
 		}
+
 		time.Sleep(50 * time.Millisecond)
 	}
+
 	_ = os.Remove(path)
+
 	return true, fmt.Sprintf("frank watch: sent SIGTERM to pid %d; pidfile force-unlinked after timeout", pid), nil
 }
 
@@ -156,19 +169,23 @@ func runWatchStatus(projectRoot string) error {
 
 	fmt.Printf("project:  %s\n", projectName)
 	fmt.Printf("state:    %s\n", st.State)
+
 	if st.PID != 0 {
 		fmt.Printf("pid:      %d\n", st.PID)
 	}
+
 	if !st.StartedAt.IsZero() {
 		fmt.Printf("uptime:   %s (started %s)\n",
 			formatUptime(st.Uptime()),
 			st.StartedAt.Format(time.RFC3339),
 		)
 	}
+
 	fmt.Printf("pidfile:  %s\n", watch.PidfilePath(projectRoot))
 	fmt.Printf("logfile:  %s\n", watch.LogfilePath(projectRoot))
 	fmt.Println()
 	fmt.Println(".gitignore edit? restart `frank watch` — new ignore rules only apply after a re-arm.")
+
 	return nil
 }
 
@@ -177,11 +194,13 @@ func runWatchStatus(projectRoot string) error {
 // actual container names come from compose.
 func totalQueueCount(cfg *config.Config) int {
 	total := 0
+
 	for _, pool := range cfg.Workers.Queue {
 		if pool.Count > 0 {
 			total += pool.Count
 		}
 	}
+
 	return total
 }
 
@@ -190,13 +209,17 @@ func formatUptime(d time.Duration) string {
 	if d < time.Minute {
 		return fmt.Sprintf("%ds", int(d.Seconds()))
 	}
+
 	if d < time.Hour {
 		return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
 	}
+
 	if d < 24*time.Hour {
 		return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
 	}
+
 	days := int(d / (24 * time.Hour))
 	rem := d - time.Duration(days)*24*time.Hour
+
 	return fmt.Sprintf("%dd%02dh", days, int(rem.Hours()))
 }

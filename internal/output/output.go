@@ -41,9 +41,11 @@ func Group(label, detail string) {
 	} else {
 		logLine("OK %s (%s)", label, detail)
 	}
+
 	if current == Quiet {
 		return
 	}
+
 	if detail == "" {
 		fmt.Printf("%s✓%s %s\n", ansiGreen, ansiReset, label)
 	} else {
@@ -60,14 +62,17 @@ func Spin(label string) func(err error) {
 	}
 
 	var once sync.Once
+
 	done := make(chan struct{})
 
 	go func() {
 		i := 0
+
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 		// Print initial frame immediately.
 		fmt.Printf("%s%s%s %s", ansiYellow, spinFrames[0], ansiReset, label)
+
 		for {
 			select {
 			case <-done:
@@ -82,6 +87,7 @@ func Spin(label string) func(err error) {
 	return func(err error) {
 		once.Do(func() {
 			close(done)
+
 			if err != nil {
 				fmt.Printf("%s%s✗%s %s\n", ansiClear, ansiRed, ansiReset, label)
 			} else {
@@ -94,9 +100,11 @@ func Spin(label string) func(err error) {
 // Detail prints a single operation line. Shown in Verbose only.
 func Detail(msg string) {
 	logLine("   %s", msg)
+
 	if current != Verbose {
 		return
 	}
+
 	fmt.Printf("  %s\n", msg)
 }
 
@@ -106,7 +114,9 @@ func NextSteps(lines []string) {
 	if current == Quiet || len(lines) == 0 {
 		return
 	}
+
 	fmt.Println("\nNext steps:")
+
 	for _, l := range lines {
 		fmt.Printf("  %s\n", l)
 	}

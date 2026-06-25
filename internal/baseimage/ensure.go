@@ -30,10 +30,12 @@ func needsBuild(present bool, gotLabel, wantHash string) bool {
 	if !present {
 		return true
 	}
+
 	gotLabel = strings.TrimSpace(gotLabel)
 	if gotLabel == "" || gotLabel == "<no value>" {
 		return true
 	}
+
 	return gotLabel != wantHash
 }
 
@@ -50,6 +52,7 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("render base Dockerfile: %w", err)
 	}
+
 	hash := Hash(rendered)
 	tag := Tag(cfg)
 
@@ -68,19 +71,24 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+
 	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return fmt.Errorf("open base lock %s: %w", lockPath, err)
 	}
+
 	defer lockFile.Close()
+
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
 		return fmt.Errorf("lock base image build: %w", err)
 	}
+
 	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
 
 	// Re-check under the lock: another holder may have finished building while
 	// we waited, so we don't rebuild needlessly.
 	var oldID string
+
 	present, gotLabel, oldID = inspectBase(tag)
 	if !needsBuild(present, gotLabel, hash) {
 		output.Detail(fmt.Sprintf("base image %s up to date", tag))
@@ -92,6 +100,7 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 		region.Stop(err)
 		return fmt.Errorf("build base image %s: %w", tag, err)
 	}
+
 	region.Stop(nil)
 
 	// Best-effort prune of the prior base: an in-place rebuild leaves the old
@@ -102,6 +111,7 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 			pruneImage(oldID)
 		}
 	}
+
 	return nil
 }
 
@@ -111,26 +121,33 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 func inspectBase(tag string) (present bool, gotLabel, oldID string) {
 	cmd := exec.Command("docker", "image", "inspect", tag,
 		"--format", fmt.Sprintf(`{{ index .Config.Labels "%s" }}`, labelKey))
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = io.Discard
+
 	if err := cmd.Run(); err != nil {
 		return false, "", ""
 	}
+
 	gotLabel = strings.TrimSpace(stdout.String())
 	_, oldID, _ = inspectID(tag)
+
 	return true, gotLabel, oldID
 }
 
 // inspectID returns the image ID for tag. present is false when absent.
 func inspectID(tag string) (present bool, id string, err error) {
 	cmd := exec.Command("docker", "image", "inspect", tag, "--format", "{{.Id}}")
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = io.Discard
+
 	if err := cmd.Run(); err != nil {
 		return false, "", err
 	}
+
 	return true, strings.TrimSpace(stdout.String()), nil
 }
 
@@ -147,6 +164,7 @@ func buildBase(tag, hash, rendered string, w io.Writer) error {
 	cmd.Stdin = strings.NewReader(rendered)
 	cmd.Stdout = w
 	cmd.Stderr = w
+
 	return cmd.Run()
 }
 
@@ -166,10 +184,12 @@ func baseLockPath(tag string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve user cache dir: %w", err)
 	}
+
 	dir := filepath.Join(cacheDir, "frank")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create lock dir %s: %w", dir, err)
 	}
+
 	return filepath.Join(dir, "base-"+sanitizeTag(tag)+".lock"), nil
 }
 

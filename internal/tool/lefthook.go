@@ -40,11 +40,13 @@ func AssembleLefthook(tools []string) string {
 		b.WriteString("pre-commit:\n")
 		b.WriteString("  parallel: true\n")
 		b.WriteString("  commands:\n")
+
 		for _, name := range selected {
 			t := lookupTool(name)
 			if t == nil {
 				continue
 			}
+
 			b.WriteString(lefthookEntry(*t))
 		}
 	}
@@ -81,16 +83,20 @@ func lefthookEntry(t Tool) string {
 // in a stable order (pint, rector, larastan).
 func phpToolsSelected(tools []string) []string {
 	order := []string{"pint", "rector", "larastan"}
+
 	set := make(map[string]bool, len(tools))
 	for _, t := range tools {
 		set[t] = true
 	}
+
 	var result []string
+
 	for _, name := range order {
 		if set[name] {
 			result = append(result, name)
 		}
 	}
+
 	return result
 }
 
@@ -101,5 +107,6 @@ func lookupTool(name string) *Tool {
 			return &registry[i]
 		}
 	}
+
 	return nil
 }
