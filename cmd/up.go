@@ -330,6 +330,16 @@ func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, e
 		}
 	}
 
+	// Structural migration trigger: a pre-split project has a monolithic
+	// .frank/Dockerfile but no .frank/base.Dockerfile. Regenerate so the split
+	// templates (+ shared base) materialize, even if version arithmetic didn't fire.
+	if !stale {
+		if _, statErr := os.Stat(filepath.Join(dir, ".frank", "base.Dockerfile")); os.IsNotExist(statErr) {
+			stale = true
+			reason = ".frank/base.Dockerfile missing (pre-split project)"
+		}
+	}
+
 	if !stale {
 		return false, false, nil
 	}
@@ -371,7 +381,10 @@ func dockerfileChanged(dir string, cfg *config.Config) bool {
 	data := dockerfileData(cfg, config.ProjectName(dir))
 	frankDir := filepath.Join(dir, ".frank")
 
-	dockerfiles := []struct{ tmpl, file string }{{"Dockerfile.tmpl", "Dockerfile"}}
+	dockerfiles := []struct{ tmpl, file string }{
+		{"Dockerfile.tmpl", "Dockerfile"},
+		{"base.Dockerfile.tmpl", "base.Dockerfile"},
+	}
 	if cfg.PHP.Runtime == "fpm" {
 		dockerfiles = append(dockerfiles, struct{ tmpl, file string }{"nginx.Dockerfile.tmpl", "nginx.Dockerfile"})
 	}

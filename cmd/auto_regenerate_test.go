@@ -210,6 +210,30 @@ func TestAutoRegenerate(t *testing.T) {
 			wantBuild: true,
 		},
 		{
+			name:     "missing base.Dockerfile forces structural regen + build",
+			seedYAML: yamlFrankenphpBase,
+			mutate: func(t *testing.T, dir string) string {
+				// Pre-split project: monolithic Dockerfile present, base absent.
+				// Version + hash both match, so only the structural trigger fires.
+				os.Remove(filepath.Join(dir, ".frank", "base.Dockerfile"))
+				return "1.0.0"
+			},
+			wantRegen: true,
+			wantBuild: true, // base.Dockerfile missing → dockerfileChanged fail-safe
+		},
+		{
+			name:     "edited base.Dockerfile forces build on regen",
+			seedYAML: yamlFrankenphpBase,
+			mutate: func(t *testing.T, dir string) string {
+				// base.Dockerfile drifted from template; dev fires Tier 1 regen,
+				// dockerfileChanged then sees the mismatch and forces --build.
+				os.WriteFile(filepath.Join(dir, ".frank", "base.Dockerfile"), []byte("FROM scratch\n"), 0644)
+				return "dev"
+			},
+			wantRegen: true,
+			wantBuild: true,
+		},
+		{
 			name:     "malformed yaml skips gracefully",
 			seedYAML: yamlFrankenphpBase,
 			mutate: func(t *testing.T, dir string) string {
@@ -261,6 +285,38 @@ func TestAutoRegenerate_QueueRepro(t *testing.T) {
 	compose := readTestFile(t, dir, ".frank/compose.yaml")
 	if !strings.Contains(compose, "priority,default,low") {
 		t.Errorf("regenerated compose missing new queue CSV --queue=priority,default,low\n%s", compose)
+	}
+}
+
+// TestDockerfileChanged_BaseDockerfile proves base.Dockerfile is part of the
+// diff set: a freshly generated project reports no change, while deleting or
+// editing base.Dockerfile (leaving the primary Dockerfile intact) flips it true.
+func TestDockerfileChanged_BaseDockerfile(t *testing.T) {
+	dir := seedFrankProject(t, yamlFrankenphpBase, "1.0.0")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+
+	if dockerfileChanged(dir, cfg) {
+		t.Fatal("freshly generated project should report no dockerfile change")
+	}
+
+	// Edit base.Dockerfile only → must report changed.
+	base := filepath.Join(dir, ".frank", "base.Dockerfile")
+	if err := os.WriteFile(base, []byte("FROM scratch\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !dockerfileChanged(dir, cfg) {
+		t.Error("edited base.Dockerfile should report changed")
+	}
+
+	// Delete base.Dockerfile → must report changed.
+	if err := os.Remove(base); err != nil {
+		t.Fatal(err)
+	}
+	if !dockerfileChanged(dir, cfg) {
+		t.Error("missing base.Dockerfile should report changed")
 	}
 }
 
