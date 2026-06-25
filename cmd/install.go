@@ -18,6 +18,45 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 }
 
+// composerCacheDir resolves the host directory used to persist composer's
+// download cache across disposable container runs, and ensures it exists.
+// Honors COMPOSER_CACHE_DIR; otherwise XDG_CACHE_HOME (or ~/.cache) under
+// frank/composer. Created as the host user, so cache files stay host-owned.
+func composerCacheDir() (string, error) {
+	dir := os.Getenv("COMPOSER_CACHE_DIR")
+	if dir == "" {
+		base := os.Getenv("XDG_CACHE_HOME")
+		if base == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			base = filepath.Join(home, ".cache")
+		}
+		dir = filepath.Join(base, "frank", "composer")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+// composerCacheArgs returns docker run flags that bind the host composer cache
+// into a disposable container so a second `frank new`/`install` reuses already
+// downloaded packages instead of refetching them. Returns nil (cache disabled,
+// warned) on resolution failure — caching is best-effort, never fatal.
+func composerCacheArgs() []string {
+	dir, err := composerCacheDir()
+	if err != nil {
+		output.Warning(fmt.Sprintf("composer cache disabled: %v", err))
+		return nil
+	}
+	return []string{
+		"-v", dir + ":/tmp/composer-cache",
+		"-e", "COMPOSER_CACHE_DIR=/tmp/composer-cache",
+	}
+}
+
 var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install a new Laravel project",
@@ -75,9 +114,12 @@ func installLaravel(dir string, cfg *config.Config, regenerate bool) error {
 		"-u", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", dir + ":/app",
 		"-w", "/app",
+	}
+	dockerArgs = append(dockerArgs, composerCacheArgs()...)
+	dockerArgs = append(dockerArgs,
 		"composer:latest",
 		"sh", "-s", "--", laravelVersion,
-	}
+	)
 
 	output.Detail("installing Laravel (this may take a moment on first run while composer:latest is pulled)")
 
@@ -131,9 +173,12 @@ func composerRequireDev(dir string, packages []string) error {
 		"-u", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", absDir + ":/app",
 		"-w", "/app",
+	}
+	args = append(args, composerCacheArgs()...)
+	args = append(args,
 		"composer:latest",
 		"composer", "require", "--dev", "--no-interaction", "--ignore-platform-reqs",
-	}
+	)
 	args = append(args, packages...)
 
 	output.Detail(fmt.Sprintf("composer require --dev %d packages", len(packages)))
@@ -176,9 +221,12 @@ php artisan sail:install --with="$1" --php="$2"
 		"-u", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", dir + ":/app",
 		"-w", "/app",
+	}
+	dockerArgs = append(dockerArgs, composerCacheArgs()...)
+	dockerArgs = append(dockerArgs,
 		"composer:latest",
 		"sh", "-s", "--", withList, phpVersion,
-	}
+	)
 
 	output.Detail("installing Sail")
 
