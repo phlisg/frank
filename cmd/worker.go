@@ -147,6 +147,12 @@ func runWorkerQueue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--count must be >= 1")
 	}
 
+	// Ad-hoc workers reuse the thin laravel.test image (`FROM frank/runtime`),
+	// so the shared base must exist before `docker compose run` launches them.
+	if err := ensureBaseImage(dir); err != nil {
+		return err
+	}
+
 	passthrough := splitPassthrough(cmd, args)
 	epoch := time.Now().Unix()
 
@@ -195,6 +201,12 @@ func runWorkerSchedule(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("ad-hoc schedule already running: %s", parts[0])
 			}
 		}
+	}
+
+	// Ad-hoc schedule reuses the thin laravel.test image (`FROM frank/runtime`),
+	// so the shared base must exist before `docker compose run` launches it.
+	if err := ensureBaseImage(dir); err != nil {
+		return err
 	}
 
 	epoch := time.Now().Unix()

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/phlisg/frank/internal/baseimage"
 	"github.com/phlisg/frank/internal/cert"
 	"github.com/phlisg/frank/internal/compose"
 	"github.com/phlisg/frank/internal/config"
@@ -161,6 +162,18 @@ func generate(cfg *config.Config, dir, version string) error {
 		return err
 	}
 	output.Detail("wrote .frank/Dockerfile")
+
+	// Render the shared base Dockerfile (project-invariant; built once and reused
+	// by the thin .frank/Dockerfile via FROM frank/runtime:<tag>). One render for
+	// both runtimes — baseimage.Render selects the template by cfg.PHP.Runtime.
+	baseDockerfile, err := baseimage.Render(engine, cfg)
+	if err != nil {
+		return fmt.Errorf("render base.Dockerfile: %w", err)
+	}
+	if err := writeFile(filepath.Join(frankDir, "base.Dockerfile"), baseDockerfile); err != nil {
+		return err
+	}
+	output.Detail("wrote .frank/base.Dockerfile")
 
 	switch cfg.PHP.Runtime {
 	case "frankenphp":

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/phlisg/frank/internal/baseimage"
 	"github.com/phlisg/frank/internal/cert"
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
@@ -103,6 +104,15 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 			composeArgs = append(composeArgs, "--build")
 		}
 		quick = false
+	}
+
+	// Pre-flight: build/refresh the shared frank/runtime base image. The thin
+	// .frank/Dockerfile is `FROM frank/runtime:<tag>`, so compose would try to
+	// pull that base from docker.io and fail without it. Placed AFTER
+	// autoRegenerate because regen can change the base templates, requiring a
+	// fresh base. Fatal — if the base can't build, compose will certainly fail.
+	if err := ensureBaseImage(dir); err != nil {
+		return err
 	}
 
 	// Pre-flight: generate APP_KEY before containers start so docker's
@@ -211,6 +221,57 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	return nil
 }
 
+// ensureBaseImage builds/refreshes the shared frank/runtime base for dir's
+// config before any compose build. Graceful skip on config-load failure
+// (mirrors autoRegenerate) so a missing/broken frank.yaml doesn't block — the
+// normal flow surfaces the config error instead. When the image is already
+// present and fresh this is an instant inspect+label compare, so it is safe to
+// call before every up / compose-build / worker launch.
+func ensureBaseImage(dir string) error {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return nil // let the normal flow surface the config error
+	}
+	engine := template.New(TemplateFS)
+	return baseimage.EnsureBase(engine, cfg)
+}
+
+// composeSubcmdBuilds reports whether a `frank compose` passthrough argv will
+// trigger an image build (and therefore needs the shared base image present).
+// It skips leading flags (anything starting with "-", plus the value of a
+// space-separated flag like `-f file`) to find the first subcommand, then
+// checks it against the build-capable set {build, up, run, create}. Read-only
+// subcommands (ps, logs, down, …) return false.
+func composeSubcmdBuilds(args []string) bool {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			continue
+		}
+		if strings.HasPrefix(a, "-") {
+			// `-f file` / `--file file` style: skip the value too when the
+			// flag has no "=" and isn't a bundled short flag. We can't know
+			// every compose flag's arity, but the build-detection only needs
+			// to land on the first non-flag token; treating a following
+			// non-flag token as the flag's value risks misclassifying. The
+			// common pre-subcommand flag here is `-f <file>`, so honor that.
+			if (a == "-f" || a == "--file" || a == "-p" || a == "--project-name" ||
+				a == "--project-directory" || a == "--profile" || a == "--env-file") &&
+				i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		switch a {
+		case "build", "up", "run", "create":
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 // autoRegenerate detects a stale .frank/ and regenerates it. Two tiers:
 //
 //   Tier 1 (should we regenerate at all?): stale if .state is missing/corrupt,
@@ -269,6 +330,16 @@ func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, e
 		}
 	}
 
+	// Structural migration trigger: a pre-split project has a monolithic
+	// .frank/Dockerfile but no .frank/base.Dockerfile. Regenerate so the split
+	// templates (+ shared base) materialize, even if version arithmetic didn't fire.
+	if !stale {
+		if _, statErr := os.Stat(filepath.Join(dir, ".frank", "base.Dockerfile")); os.IsNotExist(statErr) {
+			stale = true
+			reason = ".frank/base.Dockerfile missing"
+		}
+	}
+
 	if !stale {
 		return false, false, nil
 	}
@@ -310,7 +381,10 @@ func dockerfileChanged(dir string, cfg *config.Config) bool {
 	data := dockerfileData(cfg, config.ProjectName(dir))
 	frankDir := filepath.Join(dir, ".frank")
 
-	dockerfiles := []struct{ tmpl, file string }{{"Dockerfile.tmpl", "Dockerfile"}}
+	dockerfiles := []struct{ tmpl, file string }{
+		{"Dockerfile.tmpl", "Dockerfile"},
+		{"base.Dockerfile.tmpl", "base.Dockerfile"},
+	}
 	if cfg.PHP.Runtime == "fpm" {
 		dockerfiles = append(dockerfiles, struct{ tmpl, file string }{"nginx.Dockerfile.tmpl", "nginx.Dockerfile"})
 	}

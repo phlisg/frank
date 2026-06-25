@@ -9,6 +9,14 @@ import (
 )
 
 const (
+	// dc is the raw docker compose prefix used by the shell aliases. These
+	// aliases bypass Frank entirely, so they do NOT run ensure-base: the thin
+	// .frank/Dockerfile is `FROM frank/runtime:<tag>`, which only Frank builds.
+	// A cold-start raw `dc up` (run before ANY frank command in the project)
+	// is therefore UNSUPPORTED — compose will try to pull frank/runtime from
+	// docker.io and fail. The shared base is materialized by any preceding
+	// Frank command (frank up / frank compose <build|up|run|create> / frank
+	// worker), after which raw `dc` aliases work fine.
 	dc       = "docker compose --project-directory . -f .frank/compose.yaml"
 	execSail = dc + " exec --user sail laravel.test"
 )

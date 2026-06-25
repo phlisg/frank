@@ -43,6 +43,9 @@ var downCmd = &cobra.Command{
 			}
 		}
 
+		// `docker compose down` runs without --rmi, so the shared base
+		// (frank/runtime:*) is NOT removed — other Frank projects depend on it.
+		// Do not add --rmi here.
 		region := output.Region("Stopping containers")
 		err := client.RunStream(region, "down")
 		region.Stop(err)
