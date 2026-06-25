@@ -87,12 +87,12 @@ func EnsureBase(engine *template.Engine, cfg *config.Config) error {
 		return nil
 	}
 
-	stop := output.Spin(fmt.Sprintf("Building base image %s (once, shared by all projects)", tag))
-	if err := buildBase(tag, hash, rendered); err != nil {
-		stop(err)
+	region := output.Region(fmt.Sprintf("Building base image %s", tag))
+	if err := buildBase(tag, hash, rendered, region); err != nil {
+		region.Stop(err)
 		return fmt.Errorf("build base image %s: %w", tag, err)
 	}
-	stop(nil)
+	region.Stop(nil)
 
 	// Best-effort prune of the prior base: an in-place rebuild leaves the old
 	// layers dangling as <none> (~2GB), so reap it. Ignore errors ("image is
@@ -138,19 +138,15 @@ func inspectID(tag string) (present bool, id string, err error) {
 // the Dockerfile is fed on stdin (`docker build ... -`). The empty context is
 // load-bearing — it keeps the base byte-identical across every project so
 // docker maximizes layer dedup. Non-verbose runs discard docker's output.
-func buildBase(tag, hash, rendered string) error {
+func buildBase(tag, hash, rendered string, w io.Writer) error {
 	cmd := exec.Command("docker", "build",
+		"--progress=plain",
 		"--label", labelKey+"="+hash,
 		"-t", tag,
 		"-")
 	cmd.Stdin = strings.NewReader(rendered)
-	if output.GetLevel() == output.Verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	} else {
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
-	}
+	cmd.Stdout = w
+	cmd.Stderr = w
 	return cmd.Run()
 }
 

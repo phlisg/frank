@@ -336,7 +336,7 @@ func autoRegenerate(dir, currentVersion string) (regenerated, needsBuild bool, e
 	if !stale {
 		if _, statErr := os.Stat(filepath.Join(dir, ".frank", "base.Dockerfile")); os.IsNotExist(statErr) {
 			stale = true
-			reason = ".frank/base.Dockerfile missing (pre-split project)"
+			reason = ".frank/base.Dockerfile missing"
 		}
 	}
 
