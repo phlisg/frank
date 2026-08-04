@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/phlisg/frank/internal/activeproject"
 	"github.com/phlisg/frank/internal/baseimage"
 	"github.com/phlisg/frank/internal/cert"
 	"github.com/phlisg/frank/internal/config"
@@ -77,6 +78,10 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bool) error {
 	client := docker.New(dir)
+
+	// IsWorktree shells out to git — resolve once here and reuse for both the
+	// active-project bookkeeping below and the worktree-mode hint further down.
+	isWorktree := config.IsWorktree(dir)
 
 	composeArgs := passthrough
 	if detach {
@@ -144,6 +149,19 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 
 	wantWatcher := shouldRunWatcher(cfg, client, dir)
 
+	// Auto-down of the previously active project. This must stay AFTER the
+	// whole pre-flight chain above: every step of it can return an error, and
+	// stopping the previous project before one of those aborts (missing
+	// frank.yaml, base image build failure, …) would leave the user with
+	// nothing running at all. It also sits before the watcher goroutine —
+	// no point arming a watcher for a project we may still fail to start.
+	//
+	// Worktrees publish ephemeral ports and can co-exist, so they neither stop
+	// anything nor claim the pointer.
+	if !isWorktree {
+		stopPreviousProject(dir)
+	}
+
 	// Foreground mode: spawn watcher goroutine BEFORE compose so a .php
 	// edit during container boot still lands a reload trigger once the
 	// arm-suppression window clears. SIGINT/SIGTERM cancels both.
@@ -207,7 +225,7 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		}
 	}
 
-	if config.IsWorktree(dir) {
+	if isWorktree {
 		output.Group("Worktree mode", "ports are ephemeral — use `frank compose port <service> <port>` to find mapped ports")
 	}
 
@@ -238,6 +256,52 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 	}
 
 	return nil
+}
+
+// stopPreviousProject stops whatever project the active-project pointer names
+// before dir's containers try to bind the same fixed host ports, then re-points
+// the pointer at dir. Nothing here is fatal: a stale pointer must never block a
+// legitimate `frank up`.
+func stopPreviousProject(dir string) {
+	// Any read failure (missing, unreadable, malformed) means "no active
+	// project" — there is nothing to stop either way.
+	if state, err := activeproject.Read(); err == nil && state.Dir != "" && !sameDir(state.Dir, dir) {
+		output.Group("Stopping previously active project", state.Project)
+
+		if err := doDown(state.Dir); err != nil {
+			// Directory deleted, .frank/compose.yaml gone, docker unreachable:
+			// drop the dangling pointer and start this project anyway.
+			output.Warning(fmt.Sprintf("could not stop previously active project %s: %v", state.Project, err))
+
+			if err := activeproject.Clear(state.Dir); err != nil {
+				output.Warning(fmt.Sprintf("could not clear active project: %v", err))
+			}
+		}
+	}
+
+	// Written BEFORE compose up, deliberately. In foreground mode RunStream
+	// only returns after Ctrl-C, by which point compose has already torn this
+	// project down, so a write-on-success would record a stopped project — and
+	// Ctrl-C's non-zero exit would skip the write entirely even though the
+	// project ran. This file points at "the last project Frank started here",
+	// it is not a liveness claim.
+	if err := activeproject.Write(dir, config.ProjectName(dir)); err != nil {
+		output.Warning(fmt.Sprintf("could not record active project: %v", err))
+	}
+}
+
+// sameDir compares two project dirs the way activeproject stores them —
+// absolute and cleaned — so a relative `--dir` matches a pointer written by an
+// earlier bare `frank up` in the same project.
+func sameDir(a, b string) bool {
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+
+	if errA != nil || errB != nil {
+		return false
+	}
+
+	return filepath.Clean(absA) == filepath.Clean(absB)
 }
 
 // ensureBaseImage builds/refreshes the shared frank/runtime base for dir's
