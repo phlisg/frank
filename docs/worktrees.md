@@ -23,8 +23,11 @@ When Frank detects it's running inside a git worktree:
 - **Ephemeral ports**: Services use container-only port mappings instead of fixed host ports. Docker picks random available host ports, so no conflicts between worktrees.
 - **Deterministic Vite port**: The Vite dev server gets a port derived from the project name (range 5174–5199), so HMR works reliably.
 - **Separate project name**: Each worktree's directory name becomes its compose project name, keeping containers isolated.
+- **Exempt from the auto-stop**: Frank normally runs one project at a time and `frank up` stops the previously active project (see [One Project at a Time](../README.md#one-project-at-a-time)). Worktrees are outside that rule entirely — starting one stops nothing, and it never becomes the "active" project that a later `frank up` elsewhere would stop.
 
 No config changes needed — Frank detects worktrees automatically.
+
+Worktrees are therefore the supported way to run several Frank environments simultaneously. If you want two things up at once, make one of them a worktree.
 
 ## Managing Worktrees
 
