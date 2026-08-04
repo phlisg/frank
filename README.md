@@ -231,7 +231,7 @@ config:
 | `frank install` | Install Laravel into the project directory |
 | `frank add <service>` | Add a service to `frank.yaml` and regenerate |
 | `frank remove <service>` | Remove a service from `frank.yaml` and regenerate |
-| `frank up [-d] [--quick] [-- <compose args>]` | Start containers. Frank owns `-d/--detach` and `--quick`; all other docker compose flags must come after a literal `--` (e.g. `frank up -- --build`). Auto-spawns the watcher when workers are declared |
+| `frank up [-d] [--quick] [-- <compose args>]` | Start containers. Frank owns `-d/--detach` and `--quick`; all other docker compose flags must come after a literal `--` (e.g. `frank up -- --build`). Auto-spawns the watcher when workers are declared. Stops the previously active project first — see [One Project at a Time](#one-project-at-a-time) |
 | `frank down` | Stop containers and the watcher. Use `frank down -- -v` to also remove volumes |
 | `frank test [-- <artisan/pest flags>]` | Run tests inside the app container (`php artisan test`). Pest parallel works out of the box — see [`docs/testing.md`](docs/testing.md) |
 | `frank exec <cmd> [args...]` | Run a command inside the app container as sail (e.g. `frank exec bash`, `frank exec php vendor/bin/pint`) |
@@ -254,6 +254,12 @@ config:
 | `frank import [-f path]` | Import from a Sail `docker-compose.yml` |
 | `frank eject` | Install Laravel Sail into the running containers and hand off to Sail |
 | `frank version [--check\|--update]` | Print version and check for updates. `--check` shows update status; `--update` self-updates via Homebrew or `go install` |
+
+---
+
+## One Project at a Time
+
+Frank publishes fixed host ports (443, 5432, 8025, …), so only one project can run at a time. You don't have to manage that yourself: `frank up` stops whichever project was running before starting the current one — no need to `cd` back and `frank down` it first. `frank down` clears the record. Worktrees are exempt in both directions: they use ephemeral ports, so they co-exist with your main project and with each other, and starting one never stops anything.
 
 ---
 

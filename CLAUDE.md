@@ -222,3 +222,23 @@ Staleness triggers (any one → auto-regenerate + `--build` + override `--quick`
 Downgrade (stored > current) → no action. Config load failure → skip auto-regen gracefully.
 
 `generate(cfg, dir, version)` takes version as explicit param (testability). All callers pass `rootCmd.Version`. Tests pass `"dev"`.
+
+## Active Project State
+
+Two state files, easy to confuse:
+
+- `.frank/.state` — **per-project**, `{phpVersion, runtime, frankVersion}`, drives auto-regeneration (above).
+- `~/.local/state/frank/active-project.json` (`$XDG_STATE_HOME/frank/`) — **global**, one record `{dir, project}`, names the project Frank last started. Owned by `internal/activeproject` (`Read`/`Write`/`Clear`). Spec: `docs/superpowers/specs/2026-08-04-active-project-state-design.md`.
+
+Non-worktree projects publish fixed host ports, so only one can run. `frank up` stops whatever the pointer names before starting its own. `dir` is normalized (`filepath.Abs` + `Clean`) on write and compare — `--dir .` must match a pointer written by a bare `frank up`. `project` is display-only.
+
+Invariants, all load-bearing:
+
+- The hook is `stopPreviousProject(dir)` in **`doUp`**, not `runUp` — `cmd/new.go` and `cmd/setup.go` call `doUp` too, and they bind the same fixed ports.
+- It sits **after** the entire error-returning pre-flight chain (auto-generate, `autoRegenerate`, `ensureBaseImage`, APP_KEY, config load) and **before** the compose-up `RunStream`. Hooking earlier means a pre-flight error stops the old project and then aborts, leaving nothing running.
+- The pointer is written **before** `RunStream`, not after. Foreground `RunStream` returns only on Ctrl-C, by which point compose already tore the project down — and Ctrl-C's non-zero exit would skip a write-on-success entirely. The file means "last project Frank started", not "currently running".
+- Worktrees are invisible in **both** directions: `config.IsWorktree(dir)` true → not read, not written, not cleared. They use `ephemeralPorts` and legitimately co-exist; auto-downing a sibling worktree would be a regression.
+- `doDown(dir)` in `cmd/down.go` is the single teardown entry point (watcher stop → ad-hoc workers → `compose down` → `Clear`). Teardown always goes through `docker.New(dir)` — never a hand-rolled `--project-directory <dir>` argv, which breaks the compose invariant.
+- Nothing on this path is fatal. A stale pointer warns, clears, and the `up` proceeds.
+
+No flag, no env var to opt out. `frank compose down` deliberately has no hook — the resulting stale pointer costs one idempotent no-op `down`.
