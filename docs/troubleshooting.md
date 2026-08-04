@@ -1,5 +1,21 @@
 # Troubleshooting
 
+## `frank up` stopped my other project
+
+**Symptom:** Starting a project prints `✓ Stopping previously active project <name>` and the containers of a different project go down.
+
+**Cause:** Not a bug. Frank publishes fixed host ports (443, 5432, 8025, …) for normal projects, so only one can run at a time. Frank records the running project in `~/.local/state/frank/active-project.json` and stops it before starting the next one — otherwise the second `frank up` would simply fail to bind those ports.
+
+**Fix:** If you need both running at once, make one a [worktree](worktrees.md). Worktrees use ephemeral ports, co-exist by design, and are exempt from the auto-stop. There is no flag to disable it.
+
+## Frank says it's stopping a project that isn't running
+
+**Symptom:** `frank up` announces it's stopping a project, warns that it couldn't, and then starts normally.
+
+**Cause:** The state file points at a project that was stopped some other way — `frank compose down`, `docker compose down`, a Docker restart, or a deleted project directory. Frank doesn't hook every path that can stop containers.
+
+**Fix:** Nothing. The warning is cosmetic; Frank clears the stale pointer and continues. If you want to reset it by hand, delete `~/.local/state/frank/active-project.json`.
+
 ## Vite dev server CORS errors (fpm runtime)
 
 **Symptom:** Running `npm run dev` works without errors, but the browser reports CORS failures when loading `http://localhost:5173/@vite/client` or `http://localhost:5173/resources/js/app.js`. Status code shows `(null)`, meaning the connection was refused rather than rejected with a response.

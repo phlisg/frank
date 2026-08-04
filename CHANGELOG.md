@@ -19,9 +19,19 @@ This changelog starts at `v1.11.0`. For earlier history, see the
   the next manual `frank generate`.
 - `.frank/.state` gains a `configHash` field (sha256 of `frank.yaml`) used to
   detect config drift.
+- Frank now records the running project in a global state file
+  (`$XDG_STATE_HOME/frank/active-project.json`, default
+  `~/.local/state/frank/active-project.json`). It holds one record — Frank runs
+  one project at a time.
 
 ### Changed
 
+- **`frank up` stops the previously active project before starting.** Switching
+  projects no longer requires going back to the old directory to run
+  `frank down` first. `frank down` clears the record.
+- Worktrees are exempt in both directions: they publish ephemeral ports and
+  legitimately co-exist, so starting a worktree stops nothing and never claims
+  the pointer.
 - Image rebuilds are now scoped: a config change only forces `--build` when it
   alters the rendered Dockerfile (e.g. `php.version`, `php.runtime`). Pure
   compose-level edits (queue lists, service selection, ports) regenerate without
@@ -39,3 +49,7 @@ This changelog starts at `v1.11.0`. For earlier history, see the
 - If you hand-edited files under `.frank/`, a subsequent `frank up` that also
   sees a `frank.yaml` change will overwrite them — as it already did on version
   bumps. Edit `frank.yaml`, not the generated files.
+- If you deliberately ran two projects at once by giving them non-conflicting
+  `server.port` values, `frank up` will now stop one when you start the other.
+  There is no opt-out flag. Use a worktree instead — worktrees are built for
+  exactly this and are exempt from the auto-stop.
