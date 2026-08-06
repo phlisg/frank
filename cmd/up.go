@@ -162,6 +162,17 @@ func doUp(dir string, detach, quick bool, passthrough []string, showNextSteps bo
 		stopPreviousProject(dir)
 	}
 
+	// Sail (or any other compose file in this directory) shares Frank's compose
+	// project name and laravel.test service name, so its containers get adopted
+	// by every Frank compose call. `up` recreates them — say so first, because
+	// until it does, `frank exec` and the shell aliases silently run in the
+	// other stack's image.
+	if foreign := client.ForeignComposeFile(config.ProjectName(dir)); foreign != "" {
+		output.Warning(fmt.Sprintf(
+			"laravel.test is currently running from %s, not .frank/compose.yaml — Frank is about to recreate it.\n"+
+				"  Stop it first with `docker compose -f %s down` if you did not intend that.", foreign, foreign))
+	}
+
 	// Foreground mode: spawn watcher goroutine BEFORE compose so a .php
 	// edit during container boot still lands a reload trigger once the
 	// arm-suppression window clears. SIGINT/SIGTERM cancels both.
