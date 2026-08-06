@@ -10,7 +10,6 @@ import (
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
 	"github.com/phlisg/frank/internal/output"
-	selfupdate "github.com/phlisg/frank/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -56,11 +55,10 @@ func Execute(fsys fs.FS, version string) {
 			output.SetLevel(output.Normal)
 		}
 
-		name := cmd.Name()
-		if name == "up" || name == "setup" || name == "frank" {
-			if status, err := selfupdate.Check(rootCmd.Version); err == nil && status.Available {
-				fmt.Fprintf(os.Stderr, "Update available: %s (run frank version --update)\n", status.Latest)
-			}
+		// ponytail: only up/setup — bare `frank` runs from shell startup files,
+		// where a network check + prompt hangs the console.
+		if name := cmd.Name(); name == "up" || name == "setup" {
+			offerUpdate()
 		}
 
 		return nil

@@ -24,7 +24,9 @@ type httpClient interface {
 	Get(url string) (*http.Response, error)
 }
 
-var client httpClient = http.DefaultClient
+// Timeout matters: this runs before user-facing commands, so a hung GitHub
+// connection must not block the CLI.
+var client httpClient = &http.Client{Timeout: 3 * time.Second}
 
 const (
 	cacheTTL = 15 * time.Minute
