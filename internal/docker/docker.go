@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -237,6 +238,65 @@ func (c *Client) AdhocWorkerNames(projectName string) ([]string, error) {
 	}
 
 	return strings.Split(out, "\n"), nil
+}
+
+// ForeignComposeFile returns the compose file a running laravel.test container
+// for projectName was actually created from, when that file is not Frank's
+// .frank/compose.yaml. Empty string means nothing foreign is running.
+//
+// Compose keys containers on (project name, service name). Frank's project name
+// is the directory basename and its app service is laravel.test — exactly what
+// Laravel Sail uses in the same directory. A Sail container left running is
+// therefore adopted by every subsequent `docker compose -f .frank/compose.yaml`
+// call, so `exec` lands in Sail's image (uid 1337, no WWWUSER remap) instead of
+// Frank's. Advisory only: any docker error reports "nothing foreign".
+func (c *Client) ForeignComposeFile(projectName string) string {
+	own, err := filepath.Abs(filepath.Join(c.dir, ".frank", "compose.yaml"))
+	if err != nil {
+		return ""
+	}
+
+	args := []string{
+		"ps",
+		"--filter", "label=com.docker.compose.project=" + projectName,
+		"--filter", "label=com.docker.compose.service=laravel.test",
+		"--format", `{{.Label "com.docker.compose.project.config_files"}}`,
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Dir = c.dir
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+
+	if err := runCmd(cmd); err != nil {
+		return ""
+	}
+
+	for _, line := range strings.Split(buf.String(), "\n") {
+		if foreign := foreignComposeFile(line, own); foreign != "" {
+			return foreign
+		}
+	}
+
+	return ""
+}
+
+// foreignComposeFile reports the config_files label when it does not include
+// own. The label is compose's comma-separated list of the files the container
+// was created from.
+func foreignComposeFile(configFiles, own string) string {
+	configFiles = strings.TrimSpace(configFiles)
+	if configFiles == "" {
+		return ""
+	}
+
+	for _, f := range strings.Split(configFiles, ",") {
+		if filepath.Clean(strings.TrimSpace(f)) == own {
+			return ""
+		}
+	}
+
+	return configFiles
 }
 
 // AdhocWorker is one row from `docker ps` matching label=frank.worker=adhoc,
