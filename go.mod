@@ -1,6 +1,6 @@
 module github.com/phlisg/frank
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
@@ -367,7 +367,7 @@ require (
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/mail.v2 v2.3.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	honnef.co/go/tools v0.7.0 // indirect
+	honnef.co/go/tools v0.8.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 	sigs.k8s.io/kind v0.31.0 // indirect
