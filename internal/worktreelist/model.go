@@ -2,6 +2,7 @@ package worktreelist
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -27,6 +28,9 @@ type PostQuitAction struct {
 type shared struct {
 	busyIdx      int
 	spinnerFrame int
+	// send delivers messages from action goroutines back into the program.
+	// Set by Run once the program exists; nil in tests.
+	send func(tea.Msg)
 }
 
 // Model is the root bubbletea model for frank worktree list.
@@ -37,6 +41,9 @@ type Model struct {
 	creating      bool
 	branchInput   textinput.Model
 	statusMsg     string
+	progress      []string
+	width         int
+	height        int
 	postQuit      *PostQuitAction
 	quitting      bool
 	shared        *shared
@@ -123,7 +130,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.list.SetSize(msg.Width, msg.Height)
+		m.width, m.height = msg.Width, msg.Height
+		m.applySize()
+
 		return m, nil
 
 	case tea.KeyMsg:
@@ -146,6 +155,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case actionDoneMsg:
 		m.shared.busyIdx = -1
+		m.progress = nil
+		m.applySize()
 		if msg.err != nil {
 			m.statusMsg = fmt.Sprintf("error: %v", msg.err)
 		} else {
@@ -156,6 +167,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshMsg:
 		return m.doRefresh()
+
+	case progressMsg:
+		// Lines are truncated and the list is shrunk by the region's height, so
+		// the total row count never changes — otherwise the view jitters on
+		// every line of output.
+		m.progress = append(m.progress, truncate(msg.line, m.width-4))
+		if len(m.progress) > progressLines {
+			m.progress = m.progress[len(m.progress)-progressLines:]
+		}
+
+		m.applySize()
+
+		return m, nil
 
 	case spinnerTickMsg:
 		if m.shared.busyIdx >= 0 {
@@ -170,6 +194,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.list, cmd = m.list.Update(msg)
 
 	return m, cmd
+}
+
+// progressLines is how many trailing output lines the action region shows.
+const progressLines = 5
+
+// applySize re-sizes the list to whatever the progress region leaves over.
+func (m *Model) applySize() {
+	if m.height == 0 {
+		return
+	}
+
+	m.list.SetSize(m.width, m.height-m.progressHeight())
+}
+
+func (m Model) progressHeight() int {
+	if len(m.progress) == 0 {
+		return 0
+	}
+
+	// Fixed height + blank separator. Growing the region line by line would
+	// shift the list under the cursor on every write.
+	return progressLines + 1
+}
+
+func truncate(s string, max int) string {
+	r := []rune(s)
+	if max < 4 || len(r) <= max {
+		return s
+	}
+
+	return string(r[:max-1]) + "…"
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -224,7 +279,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, tea.Batch(m.runAction(func() error {
-			return upContainers(item.Path)
+			return upContainers(item.Path, m.progressWriter())
 		}), spinnerTick())
 
 	case "d":
@@ -237,7 +292,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "stopping containers..."
 
 		return m, tea.Batch(m.runAction(func() error {
-			return downContainers(item.Path)
+			return downContainers(item.Path, m.progressWriter())
 		}), spinnerTick())
 
 	case "l":
@@ -261,7 +316,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "regenerating..."
 
 		return m, tea.Batch(m.runAction(func() error {
-			return regenerate(item.Path)
+			return regenerate(item.Path, m.progressWriter())
 		}), spinnerTick())
 
 	case "e":
@@ -333,7 +388,7 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "removing worktree..."
 
 		return m, tea.Batch(m.runAction(func() error {
-			return RemoveWorktree(item.Path, item.Branch)
+			return RemoveWorktree(item.Path, item.Branch, m.progressWriter())
 		}), spinnerTick())
 
 	default:
@@ -342,6 +397,13 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 	}
+}
+
+// progressWriter returns the io.Writer that streams an action's output into the
+// status line. Actions run off the UI goroutine, so they must not print to the
+// terminal directly — that scribbles over the alt-screen.
+func (m Model) progressWriter() io.Writer {
+	return &lineWriter{send: m.shared.send}
 }
 
 func (m Model) runAction(fn func() error) tea.Cmd {
@@ -398,7 +460,15 @@ func (m Model) View() string {
 		m.statusMsg = ""
 	}
 
-	return m.list.View()
+	if len(m.progress) == 0 {
+		return m.list.View()
+	}
+
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	lines := make([]string, progressLines)
+	copy(lines[progressLines-len(m.progress):], m.progress)
+
+	return m.list.View() + "\n\n" + dim.Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) PostQuit() *PostQuitAction {
@@ -408,6 +478,7 @@ func (m Model) PostQuit() *PostQuitAction {
 func Run(dir string, items []WorktreeItem) error {
 	m := New(items, dir)
 	p := tea.NewProgram(m, tea.WithAltScreen())
+	m.shared.send = p.Send
 
 	finalModel, err := p.Run()
 	if err != nil {

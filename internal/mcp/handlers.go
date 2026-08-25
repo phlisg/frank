@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 
@@ -178,7 +179,7 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 			}
 		}
 
-		if err := worktreelist.RemoveWorktree(absPath, branch); err != nil {
+		if err := worktreelist.RemoveWorktree(absPath, branch, io.Discard); err != nil {
 			return errorResult(fmt.Sprintf("remove: %v", err)), nil
 		}
 

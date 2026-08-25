@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/phlisg/frank/internal/worktreelist"
 	"github.com/spf13/cobra"
 )
@@ -23,12 +21,6 @@ var worktreeListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if len(items) == 0 {
-			fmt.Println("No linked worktrees found.")
-			fmt.Println("Create one with: frank worktree create <branch>")
-			return nil
-		}
-
 		return worktreelist.Run(dir, items)
 	},
 }

@@ -285,21 +285,23 @@ func emitVite(services map[string]interface{}, cfg *config.Config, projectName s
 
 	cmd := cfg.Dev.EffectiveCommand(cfg.Node.PackageManager)
 	services["laravel.vite"] = map[string]interface{}{
-		"image":          fmt.Sprintf("frank-%s-laravel.test", projectName),
-		"container_name": "laravel.vite",
-		"tty":            true,
-		"command":        []interface{}{"sh", "-c", cmd},
-		"volumes":        []interface{}{".:/var/www/html"},
-		"working_dir":    "/var/www/html",
+		"image": fmt.Sprintf("frank-%s-laravel.test", projectName),
+		// No container_name: a pinned name is global to the docker daemon, so a
+		// second project (or git worktree) starting its own sidecar collides on
+		// "/laravel.vite". Compose's <project>-laravel.vite-1 is already unique.
+		"tty":         true,
+		"command":     []interface{}{"sh", "-c", cmd},
+		"volumes":     []interface{}{".:/var/www/html"},
+		"working_dir": "/var/www/html",
 		// COREPACK_ENABLE_DOWNLOAD_PROMPT=0: pnpm pinned via package.json's
 		// packageManager field is fetched by corepack, which otherwise prompts
 		// "about to download … continue?" and wedges — the container has no stdin.
 		"environment": []interface{}{"WWWUSER=${UID:-1000}", "COREPACK_ENABLE_DOWNLOAD_PROMPT=0"},
-		"env_file":       []interface{}{".env"},
-		"healthcheck":    map[string]interface{}{"disable": true},
-		"restart":        "unless-stopped",
-		"networks":       []interface{}{"frank"},
-		"ports":          []interface{}{fmt.Sprintf("%d:5173", vitePort)},
+		"env_file":    []interface{}{".env"},
+		"healthcheck": map[string]interface{}{"disable": true},
+		"restart":     "unless-stopped",
+		"networks":    []interface{}{"frank"},
+		"ports":       []interface{}{fmt.Sprintf("%d:5173", vitePort)},
 		"depends_on": map[string]interface{}{
 			"laravel.test": map[string]interface{}{"condition": "service_started"},
 		},

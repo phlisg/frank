@@ -1,11 +1,17 @@
 package worktreelist
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/phlisg/frank/internal/config"
 	"github.com/phlisg/frank/internal/docker"
@@ -45,8 +51,8 @@ func openBrowser(item WorktreeItem) error {
 	return exec.Command(opener, url).Start()
 }
 
-func RemoveWorktree(path, branch string) error {
-	_ = docker.New(path).Down()
+func RemoveWorktree(path, branch string, w io.Writer) error {
+	_ = docker.New(path).RunStream(w, "down")
 
 	out, err := exec.Command("git", "worktree", "remove", "--force", path).CombinedOutput()
 	if err != nil {
@@ -65,35 +71,38 @@ func needsGenerate(path string) bool {
 	return os.IsNotExist(err)
 }
 
-func upContainers(path string) error {
+func upContainers(path string, w io.Writer) error {
 	if needsGenerate(path) {
-		if err := regenerate(path); err != nil {
+		if err := regenerate(path, w); err != nil {
 			return err
 		}
 	}
 
-	frank, err := os.Executable()
-	if err != nil {
-		frank = "frank"
-	}
-
-	out, err := exec.Command(frank, "up", "-d", "--dir", path).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("frank up: %s", out)
-	}
-
-	return nil
+	return runFrank(w, "up", "-d", "--dir", path)
 }
 
-func downContainers(path string) error {
+func downContainers(path string, w io.Writer) error {
+	return runFrank(w, "down", "--dir", path)
+}
+
+// runFrank shells out to this same binary, streaming its output to w (the TUI
+// progress line) while keeping a copy for the error message. Piping the child's
+// stdout means output.Region sees a non-TTY and emits plain tick lines instead
+// of its ANSI-redrawing live region, which would trash the alt-screen.
+func runFrank(w io.Writer, args ...string) error {
 	frank, err := os.Executable()
 	if err != nil {
 		frank = "frank"
 	}
 
-	out, err := exec.Command(frank, "down", "--dir", path).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("frank down: %s", out)
+	var buf bytes.Buffer
+
+	cmd := exec.Command(frank, args...)
+	cmd.Stdout = io.MultiWriter(w, &buf)
+	cmd.Stderr = cmd.Stdout
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("frank %s: %s", args[0], strings.TrimSpace(buf.String()))
 	}
 
 	return nil
@@ -149,16 +158,41 @@ func copyIfExists(srcDir, dstDir, name string) {
 	_ = os.WriteFile(filepath.Join(dstDir, name), data, perm)
 }
 
-func regenerate(path string) error {
-	frank, err := os.Executable()
-	if err != nil {
-		frank = "frank"
-	}
-
-	out, err := exec.Command(frank, "generate", "--dir", path).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("frank generate: %s", out)
-	}
-
-	return nil
+func regenerate(path string, w io.Writer) error {
+	return runFrank(w, "generate", "--dir", path)
 }
+
+// progressMsg carries one line of a running action's output to the TUI.
+type progressMsg struct{ line string }
+
+// lineWriter splits streamed command output into lines and forwards each one to
+// the bubbletea program. Compose and output.Region redraw in place with \r, so
+// \r counts as a line break too. A nil send makes it a sink (tests).
+type lineWriter struct {
+	send func(tea.Msg)
+	buf  []byte
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.buf = append(w.buf, p...)
+
+	for {
+		i := bytes.IndexAny(w.buf, "\r\n")
+		if i < 0 {
+			break
+		}
+
+		line := strings.TrimSpace(stripANSI(string(w.buf[:i])))
+		w.buf = w.buf[i+1:]
+
+		if line != "" && w.send != nil {
+			w.send(progressMsg{line: line})
+		}
+	}
+
+	return len(p), nil
+}
+
+var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+func stripANSI(s string) string { return ansiSeq.ReplaceAllString(s, "") }

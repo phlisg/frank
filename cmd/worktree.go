@@ -38,7 +38,18 @@ func init() {
 var worktreeCmd = &cobra.Command{
 	Use:               "worktree",
 	Short:             "Manage git worktrees",
+	Args:              cobra.NoArgs,
+	SilenceUsage:      true,
 	ValidArgsFunction: cobra.NoFileCompletions,
+	// Bare `frank worktree` opens the interactive list when there is
+	// something to list; otherwise it falls back to usage.
+	RunE: func(cmd *cobra.Command, args []string) error {
+		items, err := worktreelist.Discover(resolveDir())
+		if err != nil || len(items) == 0 {
+			return cmd.Help()
+		}
+		return worktreelist.Run(resolveDir(), items)
+	},
 }
 
 var worktreeCreateCmd = &cobra.Command{
