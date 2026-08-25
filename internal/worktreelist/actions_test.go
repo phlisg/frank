@@ -1,6 +1,10 @@
 package worktreelist
 
-import "testing"
+import (
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func TestWebPort_HTTPS(t *testing.T) {
 	item := WorktreeItem{
@@ -160,5 +164,28 @@ func TestIsRunning(t *testing.T) {
 	empty := WorktreeItem{}
 	if empty.IsRunning() {
 		t.Error("expected IsRunning()=false for empty services")
+	}
+}
+
+// lineWriter must split on both \n and \r (compose redraws in place with \r)
+// and strip ANSI so the status line never carries escape codes into the list.
+func TestLineWriterSplitsAndStripsANSI(t *testing.T) {
+	var got []string
+	w := &lineWriter{send: func(msg tea.Msg) {
+		got = append(got, msg.(progressMsg).line)
+	}}
+
+	_, _ = w.Write([]byte("\x1b[32m✓ Starting\x1b[0m\n[+] Running 1/2\r"))
+	_, _ = w.Write([]byte("  partial"))
+
+	want := []string{"✓ Starting", "[+] Running 1/2"}
+	if len(got) != len(want) {
+		t.Fatalf("lines = %q, want %q", got, want)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, got[i], want[i])
+		}
 	}
 }

@@ -6,8 +6,8 @@ import (
 )
 
 func TestAdhocQueueName(t *testing.T) {
-	name := adhocQueueName(1700000000, 3)
-	want := "queue.adhoc.1700000000.3"
+	name := adhocQueueName("frank", 1700000000, 3)
+	want := "frank-queue.adhoc.1700000000.3"
 
 	if name != want {
 		t.Errorf("adhocQueueName = %q, want %q", name, want)
@@ -15,8 +15,8 @@ func TestAdhocQueueName(t *testing.T) {
 }
 
 func TestAdhocScheduleName(t *testing.T) {
-	name := adhocScheduleName(1700000000)
-	want := "schedule.adhoc.1700000000"
+	name := adhocScheduleName("frank", 1700000000)
+	want := "frank-schedule.adhoc.1700000000"
 
 	if name != want {
 		t.Errorf("adhocScheduleName = %q, want %q", name, want)

@@ -134,14 +134,16 @@ func buildQueueArtisanArgs(queue string, tries, timeout, memory, sleep, backoff 
 
 // adhocQueueName returns the ad-hoc queue worker container name for index i
 // (1-based) at the given epoch.
-func adhocQueueName(epoch int64, i int) string {
-	return fmt.Sprintf("queue.adhoc.%d.%d", epoch, i)
+// The project name prefix keeps the daemon-global container name unique across
+// git worktrees of the same repo, which can spawn ad-hoc workers in the same second.
+func adhocQueueName(projectName string, epoch int64, i int) string {
+	return fmt.Sprintf("%s-queue.adhoc.%d.%d", projectName, epoch, i)
 }
 
 // adhocScheduleName returns the ad-hoc schedule container name at the given
 // epoch.
-func adhocScheduleName(epoch int64) string {
-	return fmt.Sprintf("schedule.adhoc.%d", epoch)
+func adhocScheduleName(projectName string, epoch int64) string {
+	return fmt.Sprintf("%s-schedule.adhoc.%d", projectName, epoch)
 }
 
 func runWorkerQueue(cmd *cobra.Command, args []string) error {
@@ -179,7 +181,7 @@ func runWorkerQueue(cmd *cobra.Command, args []string) error {
 	)
 
 	for i := 1; i <= workerQueueCount; i++ {
-		name := adhocQueueName(epoch, i)
+		name := adhocQueueName(projectName, epoch, i)
 		if err := client.RunAdhoc(name, labels, cmdArgs); err != nil {
 			return fmt.Errorf("spawn %s: %w", name, err)
 		}
@@ -219,7 +221,7 @@ func runWorkerSchedule(cmd *cobra.Command, args []string) error {
 	}
 
 	epoch := time.Now().Unix()
-	name := adhocScheduleName(epoch)
+	name := adhocScheduleName(projectName, epoch)
 	labels := map[string]string{
 		"frank.project":     projectName,
 		"frank.worker":      "adhoc",
