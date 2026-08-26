@@ -8,8 +8,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         depends_on:
             mysql:
                 condition: service_healthy
@@ -32,8 +32,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - sh
             - -c
@@ -87,8 +87,8 @@ services:
             - .frank/scripts/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh
     nginx:
         build:
-            context: .
-            dockerfile: .frank/nginx.Dockerfile
+            context: .frank
+            dockerfile: nginx.Dockerfile
         depends_on:
             - laravel.test
         networks:
