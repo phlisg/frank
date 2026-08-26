@@ -111,6 +111,32 @@ func (c *Client) ExecStream(w io.Writer, service string, command ...string) erro
 	return c.RunStream(w, args...)
 }
 
+// RemoveImages force-removes the given image tags, ignoring ones that are absent
+// or still referenced. Used when a worktree is deleted for good.
+func RemoveImages(w io.Writer, tags []string) {
+	for _, tag := range tags {
+		cmd := exec.Command("docker", "rmi", "-f", tag)
+		cmd.Stdout = w
+		cmd.Stderr = io.Discard // "no such image" is the normal case, not an error
+
+		_ = cmd.Run()
+	}
+}
+
+// ExecPipe runs `docker compose exec -T <service> <command...>` wired to the given
+// streams. -T disables the TTY so the stream stays binary-clean — required when a
+// database dump is piped through. No --user: database images have no sail user.
+func (c *Client) ExecPipe(stdin io.Reader, stdout, stderr io.Writer, service string, command ...string) error {
+	args := append([]string{"exec", "-T", service}, command...)
+
+	cmd := c.composeCmd(args...)
+	cmd.Stdin = stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	return runCmd(cmd)
+}
+
 // ExecQuiet runs `docker compose exec --user sail <service> <command...>` and captures output.
 func (c *Client) ExecQuiet(service string, command ...string) (string, error) {
 	args := append([]string{"exec", "--user", "sail", service}, command...)

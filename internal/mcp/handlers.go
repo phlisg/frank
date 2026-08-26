@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -196,11 +197,36 @@ func (h *handlers) handleWorktrees(_ context.Context, req mcp.CallToolRequest) (
 		parentDir := filepath.Dir(h.dir)
 
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
-		if err := worktreelist.CreateWorktree(h.dir, wtPath, branch); err != nil {
+
+		seedDatabase := req.GetBool("seedDatabase", true)
+		if err := worktreelist.CreateWorktree(h.dir, wtPath, branch, seedDatabase, io.Discard); err != nil {
 			return errorResult(fmt.Sprintf("create: %v", err)), nil
 		}
 
-		return textResult(fmt.Sprintf("created worktree at %s", wtPath)), nil
+		msg := fmt.Sprintf("created worktree at %s", wtPath)
+		if seedDatabase {
+			msg += " — the main project's database will be cloned into it on the next `frank up` (start the main project first)"
+		}
+
+		return textResult(msg), nil
+
+	case "clone-db":
+		path := req.GetString("path", "")
+		if path == "" {
+			return errorResult("path required for clone-db"), nil
+		}
+
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return errorResult(fmt.Sprintf("resolve path: %v", err)), nil
+		}
+
+		var buf bytes.Buffer
+		if err := worktreelist.CloneDB(absPath, h.dir, &buf); err != nil {
+			return errorResult(fmt.Sprintf("clone-db: %v\n%s", err, buf.String())), nil
+		}
+
+		return textResult(fmt.Sprintf("cloned database into %s\n%s", absPath, buf.String())), nil
 
 	default:
 		return errorResult(fmt.Sprintf("unknown action: %s", action)), nil
