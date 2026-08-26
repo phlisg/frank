@@ -8,8 +8,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         depends_on:
             mailpit:
                 condition: service_healthy
@@ -37,8 +37,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - sh
             - -c
@@ -85,8 +85,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - /bin/bash
             - -lc
@@ -148,8 +148,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - php
             - artisan
@@ -183,8 +183,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - php
             - artisan
@@ -218,8 +218,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - php
             - artisan

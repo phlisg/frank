@@ -29,7 +29,7 @@ IDEs that support project-scoped MCP servers (Claude Code, Cursor) will discover
 | `frank_config` | Fully resolved `frank.yaml` configuration as JSON |
 | `frank_logs` | Tail container logs (all services or a specific one) |
 | `frank_exec` | Run a command inside a container (artisan, composer, npm, etc.) |
-| `frank_worktrees` | List, create, or remove git worktrees — see below |
+| `frank_worktrees` | List, create, remove git worktrees, or clone a database into one — see below |
 
 ## Usage
 
@@ -60,8 +60,9 @@ Manages git worktrees programmatically. Takes an `action` parameter:
 | Action | Parameters | Description |
 |--------|-----------|-------------|
 | `list` | — | Returns all linked worktrees with branch, status, and ports as JSON |
-| `create` | `branch` (required) | Creates a new worktree as a sibling directory (`../<project>-<kebab-branch>`) |
-| `remove` | `path` (required) | Tears down containers, removes the worktree directory, and deletes the branch |
+| `create` | `branch` (required), `seedDatabase` (optional, default `true`) | Creates a new worktree as a sibling directory (`../<project>-<kebab-branch>`). By default marks it to receive a clone of the main project's database on its first `frank up` — pass `seedDatabase: false` for a worktree that only needs code |
+| `remove` | `path` (required) | Full teardown: containers, named volumes, images, the worktree directory and the branch |
+| `clone-db` | `path` (required) | Clones the main project's database into an existing worktree immediately. For worktrees created before seeding existed, or to refresh stale data. Both projects must be running |
 
 Example response from `list`:
 
@@ -78,6 +79,8 @@ Example response from `list`:
 ```
 
 This lets AI assistants create isolated worktrees, start/stop their containers, and clean them up when done — without shelling out to git or docker.
+
+`remove` is destructive in a way a plain `git worktree remove` is not: it deletes the worktree's database volume along with everything else. See [Removing a Worktree](worktrees.md#removing-a-worktree).
 
 ## Manual Use
 

@@ -8,8 +8,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         environment:
             - APP_ENV=local
             - APP_DEBUG=true
@@ -32,8 +32,8 @@ services:
         build:
             args:
                 WWWGROUP: ${GID:-1000}
-            context: .
-            dockerfile: .frank/Dockerfile
+            context: .frank
+            dockerfile: Dockerfile
         command:
             - sh
             - -c

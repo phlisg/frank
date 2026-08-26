@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -51,8 +52,26 @@ func openBrowser(item WorktreeItem) error {
 	return exec.Command(opener, url).Start()
 }
 
+// RemoveWorktree deletes everything the worktree owns: ad-hoc workers, containers,
+// named volumes, orphans and the images built for it. All of those are scoped to
+// the worktree's compose project, so once its directory and branch are gone nothing
+// can address them again and they are pure wasted disk. Deliberately far more
+// destructive than `frank down`, which must preserve data.
 func RemoveWorktree(path, branch string, w io.Writer) error {
-	_ = docker.New(path).RunStream(w, "down")
+	// Route the teardown through frank itself so ad-hoc workers — which live
+	// outside compose.yaml and so survive a plain `compose down` — are cleaned up.
+	_ = runFrank(w, "down", "--dir", path)
+
+	_ = docker.New(path).RunStream(w, "down", "-v", "--remove-orphans", "--rmi", "local")
+
+	// --rmi local skips services that name an image explicitly (the workers and the
+	// vite sidecar all point at the app image), so remove the tags directly. Both
+	// spellings exist depending on how the image was built.
+	project := config.ProjectName(path)
+	docker.RemoveImages(w, []string{
+		fmt.Sprintf("frank-%s-laravel.test", project),
+		fmt.Sprintf("%s-laravel.test", project),
+	})
 
 	out, err := exec.Command("git", "worktree", "remove", "--force", path).CombinedOutput()
 	if err != nil {
@@ -78,7 +97,11 @@ func upContainers(path string, w io.Writer) error {
 		}
 	}
 
-	return runFrank(w, "up", "-d", "--dir", path)
+	if err := runFrank(w, "up", "-d", "--dir", path); err != nil {
+		return err
+	}
+
+	return seedDB(path, w)
 }
 
 func downContainers(path string, w io.Writer) error {
@@ -126,16 +149,76 @@ func tailLogs(path string) error {
 	return docker.New(path).Run("logs", "-f", "--tail", "50")
 }
 
-func CreateWorktree(repoDir, wtPath, branch string) error {
+// CreateWorktree adds a sibling worktree for branch. With seedDB set, the first
+// `up` clones repoDir's database into it instead of starting from an empty one.
+// Progress goes to w: checking out a large tree is slow enough that a silent
+// wait reads as a hang.
+func CreateWorktree(repoDir, wtPath, branch string, seedDB bool, w io.Writer) error {
+	fmt.Fprintf(w, "git worktree add %s\n", filepath.Base(wtPath))
+
+	start := time.Now()
+
+	var buf bytes.Buffer
+
+	// No --progress flag: `git worktree add` has no such option, and it reports
+	// progress only to a TTY anyway — which this never is, since output is piped
+	// into the TUI. The elapsed-time line below is what makes the wait legible.
 	cmd := exec.Command("git", "worktree", "add", wtPath, "-b", branch)
 	cmd.Dir = repoDir
+	cmd.Stdout = io.MultiWriter(w, &buf)
+	cmd.Stderr = cmd.Stdout
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git worktree add: %s", out)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git worktree add: %s", strings.TrimSpace(buf.String()))
 	}
 
+	fmt.Fprintf(w, "checkout done in %s\n", time.Since(start).Round(time.Second))
+
+	// .env is gitignored, so a fresh worktree has none and generate would build one
+	// from the Laravel template — dropping every project-specific key (API creds,
+	// SUPER_ADMIN_EMAIL, MEILI_SEARCH_KEY...) and minting a new APP_KEY, which makes
+	// any encrypted column in a cloned database unreadable. Copy the main checkout's
+	// instead; WriteEnv then patches only the frank-managed keys on top.
+	copyIfExists(repoDir, wtPath, ".env")
 	copyIfExists(repoDir, wtPath, "auth.json")
+
+	// vendor/ and node_modules/ are gitignored, so a fresh worktree has neither and
+	// laravel.migrate runs a full `composer install` (and the vite sidecar an `npm
+	// install`) on first up — minutes of wall-clock. Copying them is instant on any
+	// CoW filesystem and still far cheaper than reinstalling elsewhere.
+	for _, dir := range []string{"vendor", "node_modules"} {
+		if err := copyTree(filepath.Join(repoDir, dir), filepath.Join(wtPath, dir), w); err != nil {
+			fmt.Fprintf(w, "warning: could not copy %s (%v) — it will be reinstalled on first up\n", dir, err)
+		}
+	}
+
+	if seedDB {
+		if err := markSeedDB(wtPath, repoDir); err != nil {
+			return fmt.Errorf("mark database clone: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// copyTree copies src to dst, preferring a copy-on-write clone. --reflink=auto is
+// GNU-only and silently falls back to a real copy on filesystems without CoW; the
+// second attempt covers platforms whose cp does not know the flag at all.
+func copyTree(src, dst string, w io.Writer) error {
+	if _, err := os.Stat(src); err != nil {
+		return nil // nothing to copy
+	}
+
+	fmt.Fprintf(w, "copying %s\n", filepath.Base(src))
+
+	if err := exec.Command("cp", "-a", "--reflink=auto", src, dst).Run(); err == nil {
+		return nil
+	}
+
+	out, err := exec.Command("cp", "-a", src, dst).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
 
 	return nil
 }
@@ -169,8 +252,9 @@ type progressMsg struct{ line string }
 // the bubbletea program. Compose and output.Region redraw in place with \r, so
 // \r counts as a line break too. A nil send makes it a sink (tests).
 type lineWriter struct {
-	send func(tea.Msg)
-	buf  []byte
+	send   func(tea.Msg)
+	prefix string
+	buf    []byte
 }
 
 func (w *lineWriter) Write(p []byte) (int, error) {
@@ -186,7 +270,7 @@ func (w *lineWriter) Write(p []byte) (int, error) {
 		w.buf = w.buf[i+1:]
 
 		if line != "" && w.send != nil {
-			w.send(progressMsg{line: line})
+			w.send(progressMsg{line: w.prefix + line})
 		}
 	}
 

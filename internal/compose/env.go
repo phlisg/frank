@@ -121,6 +121,13 @@ func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error 
 		return err
 	}
 
+	// .env.example is a committed file. In a worktree it belongs to the branch
+	// being worked on, and rewriting it there produces a spurious diff the user
+	// never asked for — the main checkout already owns it.
+	if config.IsWorktree(dir) {
+		return nil
+	}
+
 	// .env.example: same patch-or-create logic.
 	examplePath := filepath.Join(dir, ".env.example")
 	existingExample, readErr := os.ReadFile(examplePath)

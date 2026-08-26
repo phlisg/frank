@@ -28,16 +28,19 @@ var logsTool = mcp.NewTool("frank_logs",
 )
 
 var worktreesTool = mcp.NewTool("frank_worktrees",
-	mcp.WithDescription("ALWAYS use this instead of raw git worktree commands — raw git worktree add/remove will break Frank's Docker setup. Frank worktrees handle sibling directory placement, ephemeral port allocation, and container teardown automatically. Action 'list' returns all linked worktrees with container status and ports. Action 'remove' tears down containers and removes a worktree+branch. Action 'create' creates a new worktree as sibling directory."),
+	mcp.WithDescription("ALWAYS use this instead of raw git worktree commands — raw git worktree add/remove will break Frank's Docker setup. Frank worktrees handle sibling directory placement, ephemeral port allocation, and container teardown automatically. Action 'list' returns all linked worktrees with container status and ports. Action 'remove' tears down containers and removes a worktree+branch. Action 'create' creates a new worktree as sibling directory, and by default marks it to receive a clone of the main project's database on its first `frank up` (main project must be running at that point); pass seedDatabase=false for a worktree that only needs code, not data. Action 'clone-db' clones the main project's database into an existing worktree on demand — use it for worktrees created before this flow existed, or to refresh stale data; both projects must be running."),
 	mcp.WithString("action",
 		mcp.Required(),
-		mcp.Description("Action: list, remove, or create"),
+		mcp.Description("Action: list, remove, create, or clone-db"),
 	),
 	mcp.WithString("path",
-		mcp.Description("Worktree path — required for 'remove'"),
+		mcp.Description("Worktree path — required for 'remove' and 'clone-db'"),
 	),
 	mcp.WithString("branch",
 		mcp.Description("Branch name — required for 'create'"),
+	),
+	mcp.WithBoolean("seedDatabase",
+		mcp.Description("For 'create': clone the main project's database into the worktree on its first up. Defaults to true. Set false for logic-only worktrees that don't need existing content."),
 	),
 )
 

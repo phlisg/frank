@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,7 @@ func branchForPath(porcelain, path string) string {
 func init() {
 	rootCmd.AddCommand(worktreeCmd)
 	worktreeCmd.AddCommand(worktreeCreateCmd)
+	worktreeCreateCmd.Flags().Bool("seed-db", true, "clone the main project's database into the worktree on its first up")
 	worktreeCmd.AddCommand(worktreeRemoveCmd)
 }
 
@@ -66,11 +68,15 @@ var worktreeCreateCmd = &cobra.Command{
 		parentDir := filepath.Dir(dir)
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
 
-		if err := worktreelist.CreateWorktree(dir, wtPath, branch); err != nil {
+		seed, _ := cmd.Flags().GetBool("seed-db")
+		if err := worktreelist.CreateWorktree(dir, wtPath, branch, seed, os.Stderr); err != nil {
 			return err
 		}
 
 		output.Group("Worktree created", wtPath)
+		if seed {
+			output.Detail("database will be cloned from the main project on first up")
+		}
 		output.NextSteps([]string{
 			fmt.Sprintf("cd %s", wtPath),
 			"frank up",
