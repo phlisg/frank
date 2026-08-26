@@ -187,6 +187,21 @@ Lifecycle owned by compose: `frank up` starts it, `frank down` stops it — no p
 daemonize/orphan infra (unlike `internal/watch`). New golden fixture `frankenphp-pgsql-no-dev`
 covers the disabled path; `internal/compose/vite_test.go` asserts the port follows `vitePort`.
 
+## Build Context
+
+`laravel.test` and `nginx` build with `context: .frank` and a `dockerfile:` path
+relative to it — **not** `context: .`. The thin runtime Dockerfiles only `FROM` the
+base image and `COPY` one config file (Caddyfile / nginx.conf); the application
+itself is bind-mounted at runtime and never enters the image. Pointing the context
+at the project root meant tarring vendor/ + node_modules/ + public/ and shipping
+them to the daemon on every build — ~290MB and minutes of wall-clock on a real
+project, versus ~38KB from `.frank/`. This is the same reasoning as
+`baseimage.buildBase`, which feeds its Dockerfile on stdin with an empty context.
+
+Consequence: a `COPY` in a runtime Dockerfile template can only reference files
+inside `.frank/`. Anything that must reach the image has to be generated there
+first.
+
 ## Sail Interop Notes
 
 `vendor/bin/sail` is a **bash script** (not PHP) — `./vendor/bin/sail <cmd>` works without a local PHP install. Keep this in mind when writing user-facing messages or docs that reference Sail commands.
@@ -244,3 +259,105 @@ Invariants, all load-bearing:
 - Nothing on this path is fatal. A stale pointer warns, clears, and the `up` proceeds.
 
 No flag, no env var to opt out. `frank compose down` deliberately has no hook — the resulting stale pointer costs one idempotent no-op `down`.
+
+## Worktree Database Seeding
+
+Worktrees start with an empty database. Two paths fill it from the main checkout,
+both funnelling through `internal/worktreelist/seed.go`:
+
+- **On create.** `CreateWorktree(..., seedDB bool)` writes `.frank/.seed-db`
+  containing the main checkout's absolute path. `upContainers` calls `seedDB()`
+  after `frank up -d` succeeds, and deletes the marker only on success — a failed
+  clone is retried by the next `up` instead of leaving a half-populated database.
+  TUI: `c` creates with the marker, `C` without. CLI: `frank worktree create
+  --seed-db` (default true). MCP: `create` + `seedDatabase` (default true).
+- **On demand.** `CloneDB(wtPath, mainDir, w)` = write marker + seed immediately,
+  for worktrees that predate the feature or need refreshing. TUI: `s`. MCP:
+  action `clone-db` + `path`.
+
+Mechanics: `pg_dump | psql` (or `mysqldump | mysql`) streamed through an
+`io.Pipe` between the two projects' db containers via `docker.Client.ExecPipe`
+(`exec -T`, no `--user sail` — db images have no sail user). Credentials travel
+as env vars (`PGPASSWORD`/`MYSQL_PWD`) so they stay out of the container process
+list. MySQL/MariaDB connect as **root** (both images set root's password to
+`DB_PASSWORD`): the app user cannot read the `mysql.*` tables mysqldump touches
+and lacks the privileges the dump's session-variable statements need on restore.
+MySQL also passes `--set-gtid-purged=OFF` — the `GTID_PURGED` statement is
+meaningless on another server and is what raises `ERROR 1227` on restore.
+MariaDB uses the `mariadb-dump`/`mariadb` client names, not the dropped `mysql*` ones. sqlite is a plain file copy of `database/database.sqlite`. Afterwards
+`artisan migrate --force` applies the branch's own migrations on top.
+
+The main project must be running for the dump to work. Dump/restore is used over
+a volume-level copy deliberately: it tolerates version skew and does not require
+either database to be stopped.
+
+`CreateWorktree` also copies `vendor/` and `node_modules/` from the main checkout
+via `cp -a --reflink=auto` (falling back to a plain `cp -a`). Both are gitignored,
+so without this a fresh worktree runs a full `composer install` inside
+`laravel.migrate` and an `npm install` in the vite sidecar on first up — minutes of
+wall-clock. On a CoW filesystem the copy is instant and costs no extra disk.
+
+Search indexes are **not** cloned. Meilisearch keeps its data in its own named
+volume rather than in the SQL database, so a seeded worktree starts with empty
+indexes; `seedDB` prints a reminder to run `artisan scout:import`. Frank cannot do
+it automatically — Scout has no "import everything" command and the searchable
+model classes are not derivable from `frank.yaml`.
+
+`CreateWorktree` copies the main checkout's `.env` into the new worktree (next to
+`auth.json`). `.env` is gitignored, so without this a worktree generates one from
+the bare Laravel template — dropping every project-specific key (API credentials,
+`MEILI_SEARCH_KEY`, `SUPER_ADMIN_EMAIL`…) and minting a fresh `APP_KEY`, which
+makes every encrypted column in a cloned database undecryptable. Adapting the copy
+needs no new code: `WriteEnv`'s existing `patchManagedKeys` rewrites `APP_NAME`,
+`APP_URL` and every service-template key while leaving everything else alone.
+`seedDB` warns (does not overwrite) when `APP_KEY` differs, for worktrees that
+predate this.
+
+Container-network values like `MEILISEARCH_HOST=http://meilisearch:7700` and
+`DB_HOST=mysql` are correct as-is in a worktree — those are ports *inside* the
+frank network. Ephemeral host-port allocation only affects what the host connects
+to, which is discovered from `docker compose ps`, never written into `.env`.
+
+`.env.example` is **not** written in worktrees (`WriteEnv` returns early on
+`config.IsWorktree`) — it is a committed file and rewriting it there produces a
+diff the user never asked for. `.env` is still written; it is gitignored and
+holds per-worktree ports.
+
+## Worktree Removal Is a Full Clean
+
+`RemoveWorktree` deletes everything the worktree owns, not just its containers:
+
+1. `frank down --dir <path>` — routed through frank so ad-hoc workers (which live
+   outside compose.yaml and survive a plain `compose down`) get cleaned up.
+2. `compose down -v --remove-orphans --rmi local` — named volumes, orphans, images.
+3. `docker rmi -f frank-<project>-laravel.test` and `<project>-laravel.test` —
+   `--rmi local` skips services that name an image explicitly, and the workers and
+   vite sidecar all do.
+4. `git worktree remove --force` + `git branch -D`.
+
+All of it is scoped to the worktree's own compose project, so once the directory
+and branch are gone nothing can address any of it again. This is deliberately far
+more destructive than `frank down`, which must preserve data — before the database
+seeding feature it merely wasted disk; now it strands full copies of the main
+project's data. The TUI confirm prompt names what is deleted.
+
+## Worktree TUI Concurrency
+
+Actions (`u`/`d`/`g`/`s`/`r`/`c`) run in parallel across worktrees. `shared.busy`
+is a `map[path]bool`, not a single index — `Model.start(item)` refuses a second
+action on the *same* worktree (two `up`s would fight over one compose project)
+but lets different ones run at once. Safe because each worktree is its own
+compose project on ephemeral ports; the only contention is the buildkit cache,
+which docker serializes itself.
+
+`ItemDelegate.Busy` is keyed by path for the same reason — a list re-sort would
+invalidate an index. The map is touched only from Update and Render, both on the
+UI goroutine, so it needs no lock.
+
+`refresh()` runs `Discover` inside the Cmd goroutine and returns the items in
+`refreshMsg`. It used to call `Discover` inline in `Update`, which blocked the
+whole UI for one `docker compose ps` per worktree.
+
+`ctrl+c`/`ctrl+d` are handled at the top of the `KeyMsg` branch, before the
+create/filter/confirm mode checks, so they always escape. `q` quits from the
+normal list only (in filter mode it is a character).
