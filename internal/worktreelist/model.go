@@ -26,7 +26,9 @@ type PostQuitAction struct {
 // shared holds state that the ItemDelegate needs to read during Render.
 // Allocated on the heap so pointers survive bubbletea's value-copy of Model.
 type shared struct {
-	busyIdx      int
+	// busy is keyed by worktree path: several worktrees may run actions at once.
+	// Only ever touched from the UI goroutine (Update and Render), so no lock.
+	busy         map[string]bool
 	spinnerFrame int
 	// send delivers messages from action goroutines back into the program.
 	// Set by Run once the program exists; nil in tests.
@@ -39,6 +41,7 @@ type Model struct {
 	dir           string
 	confirmRemove bool
 	creating      bool
+	createSeed    bool
 	branchInput   textinput.Model
 	statusMsg     string
 	progress      []string
@@ -50,10 +53,15 @@ type Model struct {
 }
 
 type actionDoneMsg struct {
-	err error
+	path   string
+	branch string
+	err    error
 }
 
-type refreshMsg struct{}
+type refreshMsg struct {
+	items []WorktreeItem
+	err   error
+}
 
 type spinnerTickMsg struct{}
 
@@ -81,7 +89,7 @@ func BranchToKebab(branch string) string {
 
 // New creates a Model from discovered worktree items.
 func New(items []WorktreeItem, dir string) Model {
-	s := &shared{busyIdx: -1}
+	s := &shared{busy: map[string]bool{}}
 
 	ti := textinput.New()
 	ti.Placeholder = "feature/my-branch"
@@ -96,7 +104,7 @@ func New(items []WorktreeItem, dir string) Model {
 	}
 
 	delegate := ItemDelegate{
-		BusyIdx:      &s.busyIdx,
+		Busy:         s.busy,
 		SpinnerFrame: &s.spinnerFrame,
 	}
 	l := list.New(listItems, delegate, 80, 24)
@@ -111,9 +119,11 @@ func New(items []WorktreeItem, dir string) Model {
 			newKeyBinding("u", "up"),
 			newKeyBinding("d", "down"),
 			newKeyBinding("c", "create"),
+			newKeyBinding("C", "create (empty db)"),
 			newKeyBinding("r", "remove"),
 			newKeyBinding("l", "logs"),
 			newKeyBinding("g", "generate"),
+			newKeyBinding("s", "sync db"),
 			newKeyBinding("e", "editor"),
 		}
 	}
@@ -136,6 +146,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Checked before every mode branch: ctrl+c/ctrl+d must escape the filter,
+		// the create prompt and a running action alike.
+		if k := msg.String(); k == "ctrl+c" || k == "ctrl+d" {
+			m.quitting = true
+			return m, tea.Quit
+		}
+
 		if m.creating {
 			return m.handleCreateKey(msg)
 		}
@@ -154,19 +171,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case actionDoneMsg:
-		m.shared.busyIdx = -1
-		m.progress = nil
-		m.applySize()
+		delete(m.shared.busy, msg.path)
+
+		// Progress lines belong to whichever actions are still running; clearing
+		// them only once the last one finishes keeps the region from flickering.
+		if len(m.shared.busy) == 0 {
+			m.progress = nil
+			m.applySize()
+		}
+
 		if msg.err != nil {
-			m.statusMsg = fmt.Sprintf("error: %v", msg.err)
+			m.statusMsg = fmt.Sprintf("%s: %v", msg.branch, msg.err)
 		} else {
-			m.statusMsg = "done"
+			m.statusMsg = msg.branch + ": done"
 		}
 
 		return m, m.refresh()
 
 	case refreshMsg:
-		return m.doRefresh()
+		return m.applyRefresh(msg)
 
 	case progressMsg:
 		// Lines are truncated and the list is shrunk by the region's height, so
@@ -182,7 +205,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinnerTickMsg:
-		if m.shared.busyIdx >= 0 {
+		if len(m.shared.busy) > 0 {
 			m.shared.spinnerFrame++
 			return m, spinnerTick()
 		}
@@ -199,6 +222,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // progressLines is how many trailing output lines the action region shows.
 const progressLines = 5
 
+// progressRegion is the running-action block at the bottom of the screen.
+// Hex rather than a 256-palette index so it degrades to a visible colour instead
+// of plain black on terminals that only report ANSI16.
+var progressRegion = lipgloss.NewStyle().
+	Background(lipgloss.Color("#2b2440")).
+	Foreground(lipgloss.Color("#cfc7e8"))
+
 // applySize re-sizes the list to whatever the progress region leaves over.
 func (m *Model) applySize() {
 	if m.height == 0 {
@@ -213,8 +243,8 @@ func (m Model) progressHeight() int {
 		return 0
 	}
 
-	// Fixed height + blank separator. Growing the region line by line would
-	// shift the list under the cursor on every write.
+	// Fixed height + the separating newline. Growing the region line by line
+	// would shift the list under the cursor on every write.
 	return progressLines + 1
 }
 
@@ -228,13 +258,17 @@ func truncate(s string, max int) string {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.shared.busyIdx >= 0 {
-		return m, nil
-	}
-
 	switch msg.String() {
-	case "c":
+	case "q":
+		m.quitting = true
+
+		return m, tea.Quit
+
+	case "c", "C":
 		m.creating = true
+		// Lowercase clones the main project's database on first up; uppercase
+		// leaves the worktree with an empty one.
+		m.createSeed = msg.String() == "c"
 		m.branchInput.Reset()
 		m.branchInput.Focus()
 		m.statusMsg = ""
@@ -261,38 +295,39 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		m.confirmRemove = true
-		m.statusMsg = fmt.Sprintf("remove %s? (y/n)", item.Branch)
+		m.statusMsg = fmt.Sprintf("remove %s — deletes branch, containers and database volumes. (y/n)", item.Branch)
 
 		return m, nil
 
 	case "u":
 		item, ok := m.selectedItem()
-		if !ok {
+		if !ok || !m.start(item) {
 			break
 		}
 
-		m.shared.busyIdx = m.list.Index()
 		if needsGenerate(item.Path) {
-			m.statusMsg = "generating + starting containers..."
+			m.statusMsg = item.Branch + ": generating + starting containers..."
 		} else {
-			m.statusMsg = "starting containers..."
+			m.statusMsg = item.Branch + ": starting containers..."
 		}
 
-		return m, tea.Batch(m.runAction(func() error {
-			return upContainers(item.Path, m.progressWriter())
+		w := m.progressWriter(item)
+
+		return m, tea.Batch(m.runAction(item, func() error {
+			return upContainers(item.Path, w)
 		}), spinnerTick())
 
 	case "d":
 		item, ok := m.selectedItem()
-		if !ok {
+		if !ok || !m.start(item) {
 			break
 		}
 
-		m.shared.busyIdx = m.list.Index()
-		m.statusMsg = "stopping containers..."
+		m.statusMsg = item.Branch + ": stopping containers..."
+		w := m.progressWriter(item)
 
-		return m, tea.Batch(m.runAction(func() error {
-			return downContainers(item.Path, m.progressWriter())
+		return m, tea.Batch(m.runAction(item, func() error {
+			return downContainers(item.Path, w)
 		}), spinnerTick())
 
 	case "l":
@@ -308,15 +343,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "g":
 		item, ok := m.selectedItem()
-		if !ok {
+		if !ok || !m.start(item) {
 			break
 		}
 
-		m.shared.busyIdx = m.list.Index()
-		m.statusMsg = "regenerating..."
+		m.statusMsg = item.Branch + ": regenerating..."
+		w := m.progressWriter(item)
 
-		return m, tea.Batch(m.runAction(func() error {
-			return regenerate(item.Path, m.progressWriter())
+		return m, tea.Batch(m.runAction(item, func() error {
+			return regenerate(item.Path, w)
+		}), spinnerTick())
+
+	case "s":
+		item, ok := m.selectedItem()
+		if !ok || !m.start(item) {
+			break
+		}
+
+		m.statusMsg = item.Branch + ": cloning database from main project..."
+
+		mainDir := m.dir
+		w := m.progressWriter(item)
+
+		return m, tea.Batch(m.runAction(item, func() error {
+			return CloneDB(item.Path, mainDir, w)
 		}), spinnerTick())
 
 	case "e":
@@ -355,10 +405,19 @@ func (m Model) handleCreateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		parentDir := filepath.Dir(m.dir)
 		wtPath := filepath.Join(parentDir, projectName+"-"+kebab)
 
-		m.statusMsg = fmt.Sprintf("creating %s...", kebab)
+		seed := m.createSeed
+		repoDir := m.dir
 
-		return m, tea.Batch(m.runAction(func() error {
-			return CreateWorktree(m.dir, wtPath, branch)
+		// The worktree does not exist yet, so stand in for it until the refresh
+		// picks up the real entry — same path, so the busy key already matches.
+		item := WorktreeItem{Path: wtPath, Branch: branch}
+		m.start(item)
+
+		m.statusMsg = fmt.Sprintf("creating %s...", kebab)
+		w := m.progressWriter(item)
+
+		return m, tea.Batch(m.runAction(item, func() error {
+			return CreateWorktree(repoDir, wtPath, branch, seed, w)
 		}), spinnerTick())
 
 	case tea.KeyEsc:
@@ -384,11 +443,15 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.shared.busyIdx = m.list.Index()
-		m.statusMsg = "removing worktree..."
+		if !m.start(item) {
+			return m, nil
+		}
 
-		return m, tea.Batch(m.runAction(func() error {
-			return RemoveWorktree(item.Path, item.Branch, m.progressWriter())
+		m.statusMsg = item.Branch + ": removing worktree..."
+		w := m.progressWriter(item)
+
+		return m, tea.Batch(m.runAction(item, func() error {
+			return RemoveWorktree(item.Path, item.Branch, w)
 		}), spinnerTick())
 
 	default:
@@ -399,34 +462,52 @@ func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// start marks item busy, returning false when an action is already running on it.
+// Different worktrees may run in parallel — they are separate compose projects on
+// ephemeral ports — but two actions on the same one would fight over one project.
+func (m Model) start(item WorktreeItem) bool {
+	if m.shared.busy[item.Path] {
+		return false
+	}
+
+	m.shared.busy[item.Path] = true
+
+	return true
+}
+
 // progressWriter returns the io.Writer that streams an action's output into the
-// status line. Actions run off the UI goroutine, so they must not print to the
-// terminal directly — that scribbles over the alt-screen.
-func (m Model) progressWriter() io.Writer {
-	return &lineWriter{send: m.shared.send}
+// progress region. Actions run off the UI goroutine, so they must not print to
+// the terminal directly — that scribbles over the alt-screen. Lines are tagged
+// with the branch because several actions can be writing into the region at once.
+func (m Model) progressWriter(item WorktreeItem) io.Writer {
+	return &lineWriter{send: m.shared.send, prefix: item.Branch + " | "}
 }
 
-func (m Model) runAction(fn func() error) tea.Cmd {
+func (m Model) runAction(item WorktreeItem, fn func() error) tea.Cmd {
 	return func() tea.Msg {
-		return actionDoneMsg{err: fn()}
+		return actionDoneMsg{path: item.Path, branch: item.Branch, err: fn()}
 	}
 }
 
+// refresh re-discovers worktrees inside the Cmd goroutine. Doing the docker
+// probes inline in Update would block the UI for as long as they take.
 func (m Model) refresh() tea.Cmd {
+	dir := m.dir
+
 	return func() tea.Msg {
-		return refreshMsg{}
+		items, err := Discover(dir)
+		return refreshMsg{items: items, err: err}
 	}
 }
 
-func (m Model) doRefresh() (tea.Model, tea.Cmd) {
-	items, err := Discover(m.dir)
-	if err != nil {
-		m.statusMsg = fmt.Sprintf("refresh: %v", err)
+func (m Model) applyRefresh(msg refreshMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusMsg = fmt.Sprintf("refresh: %v", msg.err)
 		return m, nil
 	}
 
-	listItems := make([]list.Item, len(items))
-	for i, item := range items {
+	listItems := make([]list.Item, len(msg.items))
+	for i, item := range msg.items {
 		listItems[i] = item
 	}
 
@@ -452,7 +533,12 @@ func (m Model) View() string {
 	}
 
 	if m.creating {
-		return m.list.View() + "\n\n  Branch name: " + m.branchInput.View()
+		label := "  Branch name: "
+		if !m.createSeed {
+			label = "  Branch name (empty db): "
+		}
+
+		return m.list.View() + "\n\n" + label + m.branchInput.View()
 	}
 
 	if m.statusMsg != "" {
@@ -464,11 +550,13 @@ func (m Model) View() string {
 		return m.list.View()
 	}
 
-	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	lines := make([]string, progressLines)
 	copy(lines[progressLines-len(m.progress):], m.progress)
 
-	return m.list.View() + "\n\n" + dim.Render(strings.Join(lines, "\n"))
+	// Width() pads every line to the full terminal width, so the background paints
+	// a solid block — the point being that "something is running" reads at a glance
+	// even through a translucent terminal.
+	return m.list.View() + "\n" + progressRegion.Width(m.width).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) PostQuit() *PostQuitAction {

@@ -42,8 +42,10 @@ var (
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // ItemDelegate renders WorktreeItem entries as 3-line blocks with 1-line spacing.
+// Busy state is keyed by worktree path rather than list index so that several
+// worktrees can run actions at once and keep their spinners through a re-sort.
 type ItemDelegate struct {
-	BusyIdx      *int
+	Busy         map[string]bool
 	SpinnerFrame *int
 }
 
@@ -60,7 +62,7 @@ func (d ItemDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	selected := index == m.Index()
-	busy := d.BusyIdx != nil && *d.BusyIdx == index
+	busy := d.Busy[wt.Path]
 
 	// Line 1: branch name
 	title := wt.Branch
