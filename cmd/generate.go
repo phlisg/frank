@@ -158,7 +158,10 @@ func generate(cfg *config.Config, dir, version string) error {
 	}
 
 	output.Detail("wrote .env")
-	output.Detail("wrote .env.example")
+
+	if !config.IsWorktree(dir) {
+		output.Detail("wrote .env.example")
+	}
 
 	data := dockerfileData(cfg, projectName)
 

@@ -610,3 +610,52 @@ func extractKeys(env string) []string {
 
 	return keys
 }
+
+// A worktree starts from a copy of the main project's .env; WriteEnv must patch
+// the frank-managed keys onto it without dropping project-specific ones.
+func TestWriteEnv_PreservesCustomKeysPatchesManaged(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := config.New()
+	cfg.Services = []string{"meilisearch"}
+
+	dir := t.TempDir()
+	copied := strings.Join([]string{
+		"APP_NAME=old-name",
+		"APP_KEY=base64:mainprojectkey",
+		"MEILISEARCH_HOST=http://stale:1234",
+		"MEILI_SEARCH_KEY=secret",
+		"MUSEUMPLUS_BASIC_AUTH_USER=someone",
+		"",
+	}, "\n")
+
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(copied), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := g.WriteEnv(cfg, "wt-project", dir); err != nil {
+		t.Fatalf("WriteEnv: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := string(data)
+
+	// Custom keys survive — losing these is what breaks a worktree.
+	for _, want := range []string{"MEILI_SEARCH_KEY=secret", "MUSEUMPLUS_BASIC_AUTH_USER=someone", "APP_KEY=base64:mainprojectkey"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q to be preserved", want)
+		}
+	}
+
+	// Managed keys get rewritten.
+	if !strings.Contains(out, "APP_NAME=wt-project") {
+		t.Error("APP_NAME should be patched to the worktree project name")
+	}
+
+	if strings.Contains(out, "http://stale:1234") {
+		t.Error("MEILISEARCH_HOST should be patched by the service template")
+	}
+}
