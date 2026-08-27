@@ -16,9 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Note: pdo_sqlite, sqlite3, readline, and mbstring are already statically compiled into the
 # FrankenPHP binary — omitting them here avoids a mid-run source tree cleanup that breaks
 # subsequent extensions.
+# The second line mirrors what ondrej's php8.x-common ships on the fpm runtime, so
+# both runtimes expose the same extension set. All of them build with no extra libs.
 RUN docker-php-ext-install \
         soap ldap \
-        pdo_mysql pdo_pgsql pgsql exif pcntl bcmath gd intl zip
+        pdo_mysql pdo_pgsql pgsql exif pcntl bcmath gd intl zip \
+        sockets ftp calendar shmop sysvmsg sysvsem sysvshm
 
 # PECL extensions — install igbinary/msgpack first as other extensions can link against them
 RUN pecl install igbinary \
