@@ -87,6 +87,16 @@ func TestCreateWorktreeAgainstRealRepo(t *testing.T) {
 		t.Skip("git not installed")
 	}
 
+	// Under a git hook (lefthook pre-commit), git exports GIT_DIR/GIT_INDEX_FILE
+	// as paths relative to the hooked repo. They would be inherited by every git
+	// process this test spawns in its temp repo and resolve to nonsense there.
+	for _, k := range []string{"GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"} {
+		if v, ok := os.LookupEnv(k); ok {
+			os.Unsetenv(k)
+			t.Cleanup(func() { os.Setenv(k, v) })
+		}
+	}
+
 	root := t.TempDir()
 	repo := filepath.Join(root, "main")
 
