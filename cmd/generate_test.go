@@ -119,6 +119,34 @@ var integrationFixtures = []integrationFixture{
 		},
 		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
 	},
+	{
+		// extra_services: image + published port + named volume + dot_env key.
+		// dot_env is stripped from compose.yaml and lands in .env instead;
+		// the named volume is auto-declared under top-level volumes.
+		name: "frankenphp-pgsql-extra",
+		cfg: &config.Config{
+			PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+			Laravel:  config.Laravel{Version: "13.x"},
+			Services: []string{"pgsql", "mailpit"},
+			ExtraServices: map[string]map[string]any{
+				"minio": {
+					"image":   "minio/minio:latest",
+					"command": "server /data --console-address :8900",
+					"ports":   []any{"9000:9000", "8900:8900"},
+					"volumes": []any{"minio_data:/data"},
+					"environment": map[string]any{
+						"MINIO_ROOT_USER":     "sail",
+						"MINIO_ROOT_PASSWORD": "password",
+					},
+					"dot_env": map[string]any{
+						"AWS_ENDPOINT":                "http://minio:9000",
+						"AWS_USE_PATH_STYLE_ENDPOINT": true,
+					},
+				},
+			},
+		},
+		files: []string{".frank/compose.yaml", ".env", ".env.example", ".frank/Dockerfile", ".frank/base.Dockerfile", ".frank/Caddyfile", ".frank/vite-server.js", ".mcp.json"},
+	},
 }
 
 func TestGenerate_Integration(t *testing.T) {
