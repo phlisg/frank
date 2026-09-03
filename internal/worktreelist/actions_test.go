@@ -9,7 +9,7 @@ import (
 func TestWebPort_HTTPS(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":32771 :32770 :5173", Publishers: []Publisher{
+			{Name: "laravel.test", State: "running", Publishers: []Publisher{
 				{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
 				{TargetPort: 443, PublishedPort: 32770, Protocol: "udp"},
 				{TargetPort: 5173, PublishedPort: 5173, Protocol: "tcp"},
@@ -24,7 +24,7 @@ func TestWebPort_HTTPS(t *testing.T) {
 func TestWebPort_HTTP(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":8080", Publishers: []Publisher{
+			{Name: "laravel.test", State: "running", Publishers: []Publisher{
 				{TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
 			}},
 		},
@@ -37,7 +37,7 @@ func TestWebPort_HTTP(t *testing.T) {
 func TestWebPort_PrefersHTTPS(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":32771 :8080", Publishers: []Publisher{
+			{Name: "laravel.test", State: "running", Publishers: []Publisher{
 				{TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
 				{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
 			}},
@@ -51,7 +51,7 @@ func TestWebPort_PrefersHTTPS(t *testing.T) {
 func TestWebPort_SkipsUDP(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":32770", Publishers: []Publisher{
+			{Name: "laravel.test", State: "running", Publishers: []Publisher{
 				{TargetPort: 443, PublishedPort: 32770, Protocol: "udp"},
 			}},
 		},
@@ -64,7 +64,7 @@ func TestWebPort_SkipsUDP(t *testing.T) {
 func TestWebPort_NoLaravelTest(t *testing.T) {
 	item := WorktreeItem{
 		Services: []ServiceInfo{
-			{Name: "pgsql", State: "running", Ports: ":5432"},
+			{Name: "pgsql", State: "running"},
 		},
 	}
 	if got := item.WebPort(); got != 0 {
@@ -131,18 +131,89 @@ func TestStatusLabel(t *testing.T) {
 }
 
 func TestPortSummary(t *testing.T) {
-	item := WorktreeItem{
-		Services: []ServiceInfo{
-			{Name: "laravel.test", State: "running", Ports: ":443 :5173"},
-			{Name: "pgsql", State: "running", Ports: ":5432"},
-			{Name: "redis", State: "exited", Ports: ":6379"},
+	tests := []struct {
+		name string
+		item WorktreeItem
+		want string
+	}{
+		{
+			"labels and skips non-running",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "laravel.test", State: "running", Publishers: []Publisher{
+					{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+				}},
+				{Name: "pgsql", State: "running", Publishers: []Publisher{
+					{TargetPort: 5432, PublishedPort: 32768, Protocol: "tcp"},
+				}},
+				{Name: "redis", State: "exited", Publishers: []Publisher{
+					{TargetPort: 6379, PublishedPort: 6379, Protocol: "tcp"},
+				}},
+			}},
+			"web:32771  pgsql:32768",
+		},
+		{
+			"skips udp publishers",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "laravel.test", State: "running", Publishers: []Publisher{
+					{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+					{TargetPort: 443, PublishedPort: 32770, Protocol: "udp"},
+				}},
+			}},
+			"web:32771",
+		},
+		{
+			"collapses multiple ports",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "laravel.test", State: "running", Publishers: []Publisher{
+					{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+					{TargetPort: 80, PublishedPort: 32770, Protocol: "tcp"},
+				}},
+			}},
+			"web:32771,32770",
+		},
+		{
+			"orders web, vite, then alphabetical",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "gotenberg", State: "running", Publishers: []Publisher{
+					{TargetPort: 3000, PublishedPort: 32790, Protocol: "tcp"},
+				}},
+				{Name: "pgsql", State: "running", Publishers: []Publisher{
+					{TargetPort: 5432, PublishedPort: 32768, Protocol: "tcp"},
+				}},
+				{Name: "laravel.vite", State: "running", Publishers: []Publisher{
+					{TargetPort: 5173, PublishedPort: 32773, Protocol: "tcp"},
+				}},
+				{Name: "laravel.test", State: "running", Publishers: []Publisher{
+					{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+				}},
+			}},
+			"web:32771  vite:32773  gotenberg:32790  pgsql:32768",
+		},
+		{
+			"omits services with no published ports",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "laravel.test", State: "running", Publishers: []Publisher{
+					{TargetPort: 443, PublishedPort: 32771, Protocol: "tcp"},
+				}},
+				{Name: "memcached", State: "running"},
+			}},
+			"web:32771",
+		},
+		{
+			"no published ports at all",
+			WorktreeItem{Services: []ServiceInfo{
+				{Name: "laravel.test", State: "running"},
+			}},
+			"",
 		},
 	}
-	got := item.PortSummary()
-	want := ":443 :5173 :5432"
 
-	if got != want {
-		t.Errorf("PortSummary() = %q, want %q", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.item.PortSummary(); got != tt.want {
+				t.Errorf("PortSummary() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
