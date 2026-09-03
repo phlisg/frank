@@ -23,7 +23,7 @@ internal/
 templates/
   runtimes/       frankenphp/, fpm/ — each has compose.fragment.tmpl + Dockerfile.tmpl
   services/       one dir per service — compose.fragment.tmpl + env.tmpl
-  workers/        schedule.fragment.tmpl, queue.fragment.tmpl, init.fragment.tmpl (laravel.migrate)
+  workers/        schedule.fragment.tmpl, queue.fragment.tmpl, init.fragment.tmpl (migrate)
 ```
 
 ## Critical Invariant
@@ -50,7 +50,22 @@ Only one database allowed. Defaults: `pgsql` + `mailpit`.
 Healthchecks present (use `service_healthy`): pgsql, mysql, mariadb, redis, meilisearch, mailpit  
 No healthcheck (use `service_started`): memcached
 
-The `serviceDepends(cfg)` helper in `internal/compose/compose.go` owns the `depends_on` map construction. Reused for both `laravel.test` and the workers' `laravel.migrate` init service — if you add another service type, update that helper rather than duplicating.
+The `serviceDepends(cfg)` helper in `internal/compose/compose.go` owns the `depends_on` map construction. Reused for both `laravel.test` and the workers' `migrate` init service — if you add another service type, update that helper rather than duplicating.
+
+## Extra Services
+
+`extra_services` in frank.yaml — raw compose service blocks merged verbatim into `.frank/compose.yaml` by `emitExtraServices` (`internal/compose/compose.go`), sorted by name.
+
+- Passthrough: unknown keys inside a block are the point, so no unknown-key warning (unlike `dev`/`workers`).
+- `dot_env` is the only Frank-owned key inside a block — stripped before compose, written into Laravel's `.env` (`extraEnvBlock`/`extraEnvKeys` in `internal/compose/env.go`). `environment:` is compose's and sets vars inside the custom container.
+- `patchManagedKeys` takes the `dot_env` key set explicitly — no prefix in `isServiceKey` matches a custom key, so without it an existing `.env` never gets updated.
+- No `depends_on` injected in either direction — uncritical is the premise.
+- Block is deep-copied before mutation: `Generate()` runs twice per invocation against the same `*config.Config`.
+- `networks` defaults to `[frank]` only when absent.
+- Worktree mode (`ephemeralPorts`): every published host port is stripped (short form keeps container port + proto suffix; long form loses `published`).
+- Named volumes (source not starting `.`/`/`/`~`/`$`) auto-declared `{driver: local}` — compose errors on an undeclared one, and frank.yaml has no top-level compose passthrough.
+- Validation (`validateExtraServices`, `internal/config/config.go`): name shape, collision with `validServices` + `frankComposeServices` + `generatedQueueNames`, `image` or `build` required, `dot_env` key shape + scalar values, named volume vs `frankVolumes`.
+- Known gap, documented in `docs/config.md`: `redactSensitive` covers a fixed key set, so a secret in `dot_env` lands verbatim in the committed `.env.example`.
 
 ## Output Verbosity
 
@@ -91,20 +106,22 @@ See `docs/superpowers/specs/2026-04-18-workers-schedule-queue-design.md` for the
 
 Config: `workers.schedule` (bool) + `workers.queue[]` (list of pools). Defaulting in `internal/config/config.go` applies `queues: ["default"]` first, then derives `name` from `queues[0]`. Unknown keys warn but do not error. Pool names match `[a-z0-9_-]+` and must be unique.
 
+Generated compose service names are `migrate`, `schedule`, `queue.<pool>.<n>` — no `laravel.` prefix (see `cmd/testdata/frankenphp-pgsql-workers/.frank/compose.yaml`).
+
 Generator in `internal/compose/compose.go` `emitWorkers`:
-1. Render `templates/workers/init.fragment.tmpl` once → `laravel.migrate` (one-shot: composer install when vendor/ missing, then artisan migrate, then exits).
-2. If `workers.schedule`: render `schedule.fragment.tmpl` → `laravel.schedule`.
-3. For each pool × count: render `queue.fragment.tmpl` → `laravel.queue.<pool>.<i>`.
+1. Render `templates/workers/init.fragment.tmpl` once → `migrate` (one-shot: composer install when vendor/ missing, then artisan migrate, then exits).
+2. If `workers.schedule`: render `schedule.fragment.tmpl` → `schedule`.
+3. For each pool × count: render `queue.fragment.tmpl` → `queue.<pool>.<n>`.
 4. Post-merge injections (all of which stay in Go, not templates, so fragments remain runtime-agnostic):
-   - Copy `laravel.test`'s `build:` block onto `laravel.migrate` and every worker so compose builds the image once via tag-dedup — without this, compose tries to pull `frank-<project>-laravel.test` from docker.io.
-   - Inject db `depends_on` onto `laravel.migrate` (via `serviceDepends`).
+   - Copy `laravel.test`'s `build:` block onto `migrate` and every worker so compose builds the image once via tag-dedup — without this, compose tries to pull `frank-<project>-laravel.test` from docker.io.
+   - Inject db `depends_on` onto `migrate` (via `serviceDepends`).
    - UID remap for workers handled by entrypoint, not compose `user:` directive. Both runtimes' entrypoints run as root → `usermod -u $WWWUSER sail` → `chown storage/` → then FrankenPHP uses `exec gosu sail "$@"`, FPM detects `php-fpm*` → `exec "$@"` (stays root for master), else `exec gosu sail "$@"` (CLI commands like queue:work/migrate drop to sail). No `user: sail` injected in compose — broke when container started as sail (PID 1), preventing usermod/chown.
 
 Worker fragment invariants (in the templates themselves):
 - No `container_name:` — compose's `<project>-<svc>-1` names are what keep two worktrees of the same repo from colliding on a daemon-global name.
 - `environment: WWWUSER=${UID:-1000}` — required so the entrypoint's `usermod -u $WWWUSER sail` aligns the sail UID with the host user. Without this, workers race `laravel.test`'s chown on `/var/www/html/storage` and trigger Permission denied on `storage/logs/laravel.log`.
 - `healthcheck: disable: true` — workers reuse the laravel.test image but never start Caddy/nginx, so the inherited healthcheck always fails otherwise.
-- `depends_on: { laravel.test: service_started, laravel.migrate: service_completed_successfully }` — the migrate dependency is load-bearing: queue:work checks the queue:restart signal via the cache store on startup, and Laravel 11+'s default database cache driver crash-loops without the `cache` table.
+- `depends_on: { laravel.test: service_started, migrate: service_completed_successfully }` — the migrate dependency is load-bearing: queue:work checks the queue:restart signal via the cache store on startup, and Laravel 11+'s default database cache driver crash-loops without the `cache` table.
 
 Ad-hoc workers (from `frank worker queue|schedule`) are launched via `docker compose run -d --no-deps --restart=unless-stopped --name <name> --label frank.worker=adhoc laravel.test …`. They survive code restarts and host reboots. They are **not** in compose.yaml, so `frank down` must clean them explicitly (`docker.Client.AdhocWorkerNames` → `StopContainers`). That cleanup lives in `cmd/down.go`; do not move it back into compose.
 
@@ -125,7 +142,7 @@ File responsibilities:
 
 TUI supports restart (`r` = all declared, `R` = focused only) but never creates or removes containers. Discovery empty-set exits early with a hint (exit 0, not error).
 
-Worker fragment invariant for this feature: `tty: true` on `queue.fragment.tmpl` + `schedule.fragment.tmpl` (NOT `init.fragment.tmpl` — that's the one-shot laravel.migrate). Needed so Laravel's `queue:work`/`schedule:work` emit ANSI color, which the TUI passes through unchanged.
+Worker fragment invariant for this feature: `tty: true` on `queue.fragment.tmpl` + `schedule.fragment.tmpl` (NOT `init.fragment.tmpl` — that's the one-shot migrate). Needed so Laravel's `queue:work`/`schedule:work` emit ANSI color, which the TUI passes through unchanged.
 
 `docker.Client` additions for this feature (in `internal/docker/docker.go`):
 - `InspectContainer(name) (status, exitCode, id string, err)` — returns raw status string (avoids workertop→docker package import cycle on `PaneState`).
@@ -294,7 +311,7 @@ either database to be stopped.
 `CreateWorktree` also copies `vendor/` and `node_modules/` from the main checkout
 via `cp -a --reflink=auto` (falling back to a plain `cp -a`). Both are gitignored,
 so without this a fresh worktree runs a full `composer install` inside
-`laravel.migrate` and an `npm install` in the vite sidecar on first up — minutes of
+`migrate` and an `npm install` in the vite sidecar on first up — minutes of
 wall-clock. On a CoW filesystem the copy is instant and costs no extra disk.
 
 Search indexes are **not** cloned. Meilisearch keeps its data in its own named
