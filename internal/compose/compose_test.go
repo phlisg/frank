@@ -187,6 +187,10 @@ func TestHostPortKey(t *testing.T) {
 		{"1025:1025", "1025/tcp"},
 		{"5432", ""},
 		{"443/udp", ""},
+		{"3000:3000", "3000/tcp"},
+		{"127.0.0.1:8080:3000", "8080/tcp"},
+		{"127.0.0.1:8080:3000/udp", "8080/udp"},
+		{"3000", ""},
 	}
 	for _, c := range cases {
 		got := hostPortKey(c.in)
@@ -207,6 +211,96 @@ func TestValidatePorts_Conflict(t *testing.T) {
 	}
 	if err := validatePorts(services); err == nil {
 		t.Error("expected port conflict error")
+	}
+}
+
+func TestValidatePorts_LongFormConflict(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{"8080:80"},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{
+				map[string]interface{}{"target": 3000, "published": 8080},
+			},
+		},
+	}
+	err := validatePorts(services)
+	if err == nil {
+		t.Fatal("expected port conflict error")
+	}
+	// Map iteration order decides which service is named first, so only the
+	// port key is asserted.
+	if !strings.Contains(err.Error(), "8080/tcp") {
+		t.Errorf("expected error to mention 8080/tcp, got %v", err)
+	}
+}
+
+func TestValidatePorts_LongFormStringPublished(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{
+				map[string]interface{}{"target": 80, "published": "8080"},
+			},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{
+				map[string]interface{}{"target": 3000, "published": "8080"},
+			},
+		},
+	}
+	if err := validatePorts(services); err == nil {
+		t.Error("expected port conflict error")
+	}
+}
+
+func TestValidatePorts_LongFormNoPublished(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{
+				map[string]interface{}{"target": 3000},
+			},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{
+				map[string]interface{}{"target": 3000},
+			},
+		},
+	}
+	if err := validatePorts(services); err != nil {
+		t.Errorf("container-only long form should not conflict, got %v", err)
+	}
+}
+
+func TestValidatePorts_BareIntNoConflict(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{3000},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{3000, float64(3000)},
+		},
+	}
+	if err := validatePorts(services); err != nil {
+		t.Errorf("bare container ports should not conflict, got %v", err)
+	}
+}
+
+func TestValidatePorts_HostIPConflict(t *testing.T) {
+	services := map[string]interface{}{
+		"svc1": map[string]interface{}{
+			"ports": []interface{}{"127.0.0.1:8080:3000"},
+		},
+		"svc2": map[string]interface{}{
+			"ports": []interface{}{"8080:80"},
+		},
+	}
+	err := validatePorts(services)
+	if err == nil {
+		t.Fatal("expected port conflict error")
+	}
+	if !strings.Contains(err.Error(), "8080/tcp") {
+		t.Errorf("expected error to mention 8080/tcp, got %v", err)
 	}
 }
 

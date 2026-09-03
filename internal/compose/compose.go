@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -368,12 +369,36 @@ func validatePorts(services map[string]interface{}) error {
 		}
 
 		for _, portEntry := range ports {
-			portStr, ok := portEntry.(string)
-			if !ok {
+			var key string
+
+			switch entry := portEntry.(type) {
+			case string:
+				key = hostPortKey(entry)
+			case map[string]interface{}:
+				// Long form: {target: 3000, published: 8080, protocol: tcp}.
+				var host string
+				switch published := entry["published"].(type) {
+				case string:
+					host = published
+				case int:
+					host = strconv.Itoa(published)
+				case float64:
+					host = strconv.Itoa(int(published))
+				}
+				if host == "" {
+					continue
+				}
+
+				proto := "tcp"
+				if p, ok := entry["protocol"].(string); ok && p != "" {
+					proto = p
+				}
+				key = host + "/" + proto
+			default:
+				// Bare int/float: a container-only port, nothing to conflict.
 				continue
 			}
 
-			key := hostPortKey(portStr)
 			if key == "" {
 				continue
 			}
@@ -390,7 +415,8 @@ func validatePorts(services map[string]interface{}) error {
 }
 
 // hostPortKey returns "hostPort/proto" for a Docker port mapping string.
-// e.g. "5432:5432" → "5432/tcp", "443:443/udp" → "443/udp"
+// e.g. "5432:5432" → "5432/tcp", "443:443/udp" → "443/udp",
+// "127.0.0.1:8080:3000" → "8080/tcp". Container-only ports return "".
 func hostPortKey(mapping string) string {
 	proto := "tcp"
 	if idx := strings.Index(mapping, "/"); idx != -1 {
@@ -398,11 +424,19 @@ func hostPortKey(mapping string) string {
 		mapping = mapping[:idx]
 	}
 
-	if !strings.Contains(mapping, ":") {
+	// "host:container" → host is first, "ip:host:container" → host is middle,
+	// bare "container" → container-only, nothing to conflict on.
+	parts := strings.Split(mapping, ":")
+
+	var host string
+	switch len(parts) {
+	case 2:
+		host = parts[0]
+	case 3:
+		host = parts[1]
+	default:
 		return ""
 	}
-
-	host := strings.SplitN(mapping, ":", 2)[0]
 
 	return host + "/" + proto
 }
