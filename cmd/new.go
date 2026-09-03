@@ -782,8 +782,11 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		Workers  *config.Workers                 `yaml:"workers,omitempty"`
 		Server   *config.Server                  `yaml:"server,omitempty"`
 		Node     *config.Node                    `yaml:"node,omitempty"`
+		Dev      *config.Dev                     `yaml:"dev,omitempty"`
 		Tools    []string                        `yaml:"tools,omitempty"`
 		Aliases  map[string]config.Alias         `yaml:"aliases,omitempty"`
+
+		ExtraServices map[string]map[string]any `yaml:"extra_services,omitempty"`
 	}
 
 	out := configOutput{
@@ -809,12 +812,21 @@ func marshalConfig(cfg *config.Config) (string, error) {
 		out.Node = &n
 	}
 
+	if cfg.Dev.Enabled != nil || cfg.Dev.Command != "" {
+		d := cfg.Dev
+		out.Dev = &d
+	}
+
 	if len(cfg.Tools) > 0 {
 		out.Tools = cfg.Tools
 	}
 
 	if len(cfg.Aliases) > 0 {
 		out.Aliases = cfg.Aliases
+	}
+
+	if len(cfg.ExtraServices) > 0 {
+		out.ExtraServices = cfg.ExtraServices
 	}
 
 	b, err := yaml.Marshal(out)
