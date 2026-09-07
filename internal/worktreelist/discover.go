@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
@@ -24,7 +26,6 @@ type WorktreeItem struct {
 type ServiceInfo struct {
 	Name       string
 	State      string
-	Ports      string
 	Publishers []Publisher
 }
 
@@ -66,17 +67,73 @@ func (w WorktreeItem) StatusLabel() string {
 	return fmt.Sprintf("partial (%d/%d)", running, total)
 }
 
-// PortSummary returns a compact port listing from running services.
+// PortSummary returns a labelled port listing from running services, e.g.
+// "web:32771  vite:32773  pgsql:32768". TCP publishers only; services with no
+// published TCP port are omitted.
 func (w WorktreeItem) PortSummary() string {
-	var ports []string
+	var entries []string
 
 	for _, s := range w.Services {
-		if s.Ports != "" && s.State == "running" {
-			ports = append(ports, s.Ports)
+		if s.State != "running" {
+			continue
 		}
+
+		seen := make(map[int]bool)
+
+		var ports []string
+
+		for _, p := range s.Publishers {
+			if p.Protocol != "tcp" || p.PublishedPort <= 0 || seen[p.PublishedPort] {
+				continue
+			}
+
+			seen[p.PublishedPort] = true
+
+			ports = append(ports, strconv.Itoa(p.PublishedPort))
+		}
+
+		if len(ports) == 0 {
+			continue
+		}
+
+		entries = append(entries, fmt.Sprintf("%s:%s", portLabel(s.Name), strings.Join(ports, ",")))
 	}
 
-	return strings.Join(ports, " ")
+	sort.SliceStable(entries, func(i, j int) bool {
+		ri, rj := labelRank(entries[i]), labelRank(entries[j])
+		if ri != rj {
+			return ri < rj
+		}
+
+		return entries[i] < entries[j]
+	})
+
+	return strings.Join(entries, "  ")
+}
+
+// portLabel renames the two app containers; every other service keeps its
+// compose name.
+func portLabel(service string) string {
+	switch service {
+	case "laravel.test":
+		return "web"
+	case "laravel.vite":
+		return "vite"
+	default:
+		return service
+	}
+}
+
+// labelRank orders web first, vite second, everything else alphabetically.
+func labelRank(entry string) int {
+	switch {
+	case strings.HasPrefix(entry, "web:"):
+		return 0
+	case strings.HasPrefix(entry, "vite:"):
+		return 1
+	default:
+		return 2
+	}
 }
 
 // IsRunning returns true if at least one service is running.
@@ -256,28 +313,11 @@ func probeServices(worktreePath string) []ServiceInfo {
 		services = append(services, ServiceInfo{
 			Name:       entry.Service,
 			State:      entry.State,
-			Ports:      formatPorts(entry),
 			Publishers: pubs,
 		})
 	}
 
 	return services
-}
-
-func formatPorts(entry composePSEntry) string {
-	seen := make(map[int]bool)
-
-	var parts []string
-
-	for _, p := range entry.Publishers {
-		if p.PublishedPort > 0 && !seen[p.PublishedPort] {
-			seen[p.PublishedPort] = true
-
-			parts = append(parts, fmt.Sprintf(":%d", p.PublishedPort))
-		}
-	}
-
-	return strings.Join(parts, " ")
 }
 
 // WebPort returns the published TCP port for the web server (443 or 80)

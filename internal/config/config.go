@@ -91,6 +91,38 @@ var shellBuiltins = map[string]bool{
 
 var workerPoolNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
+var extraServiceNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]*$`)
+
+var dotEnvKeyRe = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+
+// frankComposeServices are the compose service names Frank generates itself,
+// beyond the built-in services in validServices. Worker queue pools
+// (queue.<pool>.<n>) are derived per-config in validateExtraServices.
+//
+// Reserved unconditionally, even though several are emitted only for some
+// configs (nginx for fpm, laravel.vite when dev is enabled, migrate/schedule
+// when workers are). Reserving only what the current frank.yaml generates
+// would let a user name a service "schedule", then enable workers.schedule
+// and have it silently overwritten. One unusable name is the cheaper trade.
+var frankComposeServices = map[string]bool{
+	"laravel.test": true,
+	"laravel.vite": true,
+	"nginx":        true,
+	"migrate":      true,
+	"schedule":     true,
+}
+
+// frankVolumes mirrors volumeServices in internal/compose/compose.go — the
+// named volumes Frank declares for built-in services. Duplicated rather than
+// imported to keep config free of a dependency on compose.
+var frankVolumes = map[string]bool{
+	"pgsql_data":       true,
+	"mysql_data":       true,
+	"mariadb_data":     true,
+	"redis_data":       true,
+	"meilisearch_data": true,
+}
+
 var knownServerKeys = map[string]bool{
 	"https": true,
 	"port":  true,
@@ -124,6 +156,11 @@ type Config struct {
 	Dev      Dev                      `yaml:"dev,omitempty"`
 	Tools    []string                 `yaml:"tools,omitempty"`
 	Aliases  map[string]Alias         `yaml:"aliases,omitempty"`
+
+	// ExtraServices holds raw compose service blocks merged verbatim into
+	// .frank/compose.yaml. omitempty is load-bearing: without it a nil map
+	// marshals as "extra_services: {}" into every regenerated frank.yaml.
+	ExtraServices map[string]map[string]any `yaml:"extra_services,omitempty"`
 }
 
 type Server struct {
@@ -461,6 +498,134 @@ func validate(cfg *Config, explicitEmptyQueues []bool) error {
 
 	if err := validateAliases(cfg.Aliases); err != nil {
 		return err
+	}
+
+	if err := validateExtraServices(cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateExtraServices checks custom compose service blocks. Unknown keys
+// inside a block are deliberately not warned about — passthrough is the point.
+func validateExtraServices(cfg *Config) error {
+	names := make([]string, 0, len(cfg.ExtraServices))
+	for name := range cfg.ExtraServices {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		block := cfg.ExtraServices[name]
+
+		if !extraServiceNameRe.MatchString(name) {
+			return fmt.Errorf("extra_services.%s: invalid service name — must match [a-z0-9][a-z0-9_.-]*", name)
+		}
+
+		if validServices[name] || frankComposeServices[name] || generatedQueueNames(cfg)[name] {
+			return fmt.Errorf("extra_services.%s: name collides with a service Frank generates", name)
+		}
+
+		if _, ok := block["image"]; !ok {
+			if _, ok := block["build"]; !ok {
+				return fmt.Errorf("extra_services.%s: must set image or build", name)
+			}
+		}
+
+		if err := validateDotEnv(name, block["dot_env"]); err != nil {
+			return err
+		}
+
+		if err := validateExtraVolumes(name, block["volumes"]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generatedQueueNames returns the compose service names Frank emits for the
+// configured queue pools: queue.<pool>.<n>, n from 1..count.
+func generatedQueueNames(cfg *Config) map[string]bool {
+	names := map[string]bool{}
+
+	for _, p := range cfg.Workers.Queue {
+		for i := 1; i <= p.Count; i++ {
+			names[fmt.Sprintf("queue.%s.%d", p.Name, i)] = true
+		}
+	}
+
+	return names
+}
+
+func validateDotEnv(name string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	dotEnv, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("extra_services.%s: dot_env must be a mapping", name)
+	}
+
+	keys := make([]string, 0, len(dotEnv))
+	for k := range dotEnv {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if !dotEnvKeyRe.MatchString(k) {
+			return fmt.Errorf("extra_services.%s: invalid dot_env key %q — must match [A-Z][A-Z0-9_]*", name, k)
+		}
+
+		switch dotEnv[k].(type) {
+		case string, bool, int, float64, nil:
+		default:
+			return fmt.Errorf("extra_services.%s: dot_env key %q must be a string, number or boolean", name, k)
+		}
+	}
+
+	return nil
+}
+
+// validateExtraVolumes rejects named volumes colliding with Frank-owned ones.
+// A named volume is a source that is not a host path (., /, ~, $).
+func validateExtraVolumes(name string, raw any) error {
+	vols, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+
+	for _, v := range vols {
+		var src string
+
+		switch entry := v.(type) {
+		case string:
+			parts := strings.Split(entry, ":")
+			if len(parts) < 2 {
+				continue
+			}
+
+			src = parts[0]
+		case map[string]any:
+			if t, _ := entry["type"].(string); t != "volume" {
+				continue
+			}
+
+			src, _ = entry["source"].(string)
+		}
+
+		if src == "" || strings.ContainsAny(src[:1], "./~$") {
+			continue
+		}
+
+		if frankVolumes[src] {
+			return fmt.Errorf("extra_services.%s: volume %q collides with a volume Frank owns", name, src)
+		}
 	}
 
 	return nil

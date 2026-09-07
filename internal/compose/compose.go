@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -111,6 +113,9 @@ func (g *Generator) Generate(cfg *config.Config, projectName, mainProjectName st
 	// 4b. Emit the dev server sidecar (laravel.vite) when enabled. It publishes
 	//     the Vite port that laravel.test used to own (port move).
 	emitVite(services, cfg, projectName, vitePort)
+
+	// 4c. Merge raw extra_services blocks verbatim (minus Frank-owned keys).
+	emitExtraServices(services, volumes, cfg, ephemeralPorts)
 
 	// 5. Validate host port uniqueness.
 	if err := validatePorts(services); err != nil {
@@ -368,12 +373,36 @@ func validatePorts(services map[string]interface{}) error {
 		}
 
 		for _, portEntry := range ports {
-			portStr, ok := portEntry.(string)
-			if !ok {
+			var key string
+
+			switch entry := portEntry.(type) {
+			case string:
+				key = hostPortKey(entry)
+			case map[string]interface{}:
+				// Long form: {target: 3000, published: 8080, protocol: tcp}.
+				var host string
+				switch published := entry["published"].(type) {
+				case string:
+					host = published
+				case int:
+					host = strconv.Itoa(published)
+				case float64:
+					host = strconv.Itoa(int(published))
+				}
+				if host == "" {
+					continue
+				}
+
+				proto := "tcp"
+				if p, ok := entry["protocol"].(string); ok && p != "" {
+					proto = p
+				}
+				key = host + "/" + proto
+			default:
+				// Bare int/float: a container-only port, nothing to conflict.
 				continue
 			}
 
-			key := hostPortKey(portStr)
 			if key == "" {
 				continue
 			}
@@ -390,7 +419,8 @@ func validatePorts(services map[string]interface{}) error {
 }
 
 // hostPortKey returns "hostPort/proto" for a Docker port mapping string.
-// e.g. "5432:5432" → "5432/tcp", "443:443/udp" → "443/udp"
+// e.g. "5432:5432" → "5432/tcp", "443:443/udp" → "443/udp",
+// "127.0.0.1:8080:3000" → "8080/tcp". Container-only ports return "".
 func hostPortKey(mapping string) string {
 	proto := "tcp"
 	if idx := strings.Index(mapping, "/"); idx != -1 {
@@ -398,11 +428,171 @@ func hostPortKey(mapping string) string {
 		mapping = mapping[:idx]
 	}
 
-	if !strings.Contains(mapping, ":") {
+	// "host:container" → host is first, "ip:host:container" → host is middle,
+	// bare "container" → container-only, nothing to conflict on.
+	parts := strings.Split(mapping, ":")
+
+	var host string
+	switch len(parts) {
+	case 2:
+		host = parts[0]
+	case 3:
+		host = parts[1]
+	default:
 		return ""
 	}
 
-	host := strings.SplitN(mapping, ":", 2)[0]
-
 	return host + "/" + proto
+}
+
+// emitExtraServices merges the raw compose blocks under extra_services into
+// the services map, in sorted name order. Each block is deep-copied first:
+// Generate() runs more than once per invocation against the same
+// *config.Config (frank new writes, then installLaravel regenerates), so
+// mutating cfg's map would corrupt the second pass.
+//
+// Frank owns exactly one key inside a block, dot_env, which is stripped here
+// (it feeds Laravel's .env, not compose). Everything else passes through:
+// networks defaults to [frank] only when absent, published host ports are
+// dropped in worktree mode so sibling worktrees don't collide, and named
+// volumes are auto-declared because compose errors on an undeclared one. No
+// depends_on is injected in either direction — extra services are uncritical
+// by design.
+func emitExtraServices(services, volumes map[string]interface{}, cfg *config.Config, ephemeralPorts bool) {
+	names := make([]string, 0, len(cfg.ExtraServices))
+	for name := range cfg.ExtraServices {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		block, _ := deepCopyValue(cfg.ExtraServices[name]).(map[string]interface{})
+		if block == nil {
+			block = map[string]interface{}{}
+		}
+
+		delete(block, "dot_env")
+
+		// An explicit networks: is a deliberate act; only fill in the default.
+		if _, ok := block["networks"]; !ok {
+			block["networks"] = []interface{}{"frank"}
+		}
+
+		if ephemeralPorts {
+			stripPublishedPorts(block)
+		}
+
+		declareNamedVolumes(volumes, block)
+
+		services[name] = block
+	}
+}
+
+// deepCopyValue recursively copies the two container types yaml.v3 produces
+// when decoding into any — map[string]interface{} and []interface{}. Scalars
+// are returned as-is.
+func deepCopyValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, item := range val {
+			out[k] = deepCopyValue(item)
+		}
+
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, item := range val {
+			out[i] = deepCopyValue(item)
+		}
+
+		return out
+	default:
+		return v
+	}
+}
+
+// stripPublishedPorts rewrites a service block's ports so nothing binds a host
+// port. Short form keeps the container port and its protocol suffix
+// ("127.0.0.1:8080:3000/udp" → "3000/udp"); long form drops published.
+func stripPublishedPorts(block map[string]interface{}) {
+	ports, ok := block["ports"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for i, entry := range ports {
+		switch e := entry.(type) {
+		case string:
+			ports[i] = containerPortOnly(e)
+		case map[string]interface{}:
+			delete(e, "published")
+		}
+	}
+}
+
+// containerPortOnly returns the container side of a short-form port mapping,
+// preserving any /tcp or /udp suffix. A bare container port is unchanged.
+func containerPortOnly(mapping string) string {
+	proto := ""
+	if idx := strings.Index(mapping, "/"); idx != -1 {
+		proto = mapping[idx:]
+		mapping = mapping[:idx]
+	}
+
+	parts := strings.Split(mapping, ":")
+
+	return parts[len(parts)-1] + proto
+}
+
+// declareNamedVolumes adds {driver: local} to the top-level volumes map for
+// every named volume a block mounts. Bind mounts (sources starting with .
+// / ~ or $) are not volumes and are skipped.
+func declareNamedVolumes(volumes map[string]interface{}, block map[string]interface{}) {
+	mounts, ok := block["volumes"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, mount := range mounts {
+		var source string
+
+		switch m := mount.(type) {
+		case string:
+			parts := strings.Split(m, ":")
+			if len(parts) < 2 {
+				continue // anonymous volume, nothing to declare
+			}
+
+			source = parts[0]
+		case map[string]interface{}:
+			if t, _ := m["type"].(string); t != "volume" {
+				continue
+			}
+
+			source, _ = m["source"].(string)
+		}
+
+		if !isNamedVolume(source) {
+			continue
+		}
+
+		volumes[source] = map[string]interface{}{"driver": "local"}
+	}
+}
+
+// isNamedVolume reports whether a mount source names a docker volume rather
+// than a host path or an env-var expansion.
+func isNamedVolume(source string) bool {
+	if source == "" {
+		return false
+	}
+
+	switch source[0] {
+	case '.', '/', '~', '$':
+		return false
+	}
+
+	return true
 }

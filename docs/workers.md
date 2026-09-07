@@ -4,7 +4,7 @@
 
 Frank can run Laravel's scheduler and queue workers as dedicated long-running containers alongside `laravel.test`. Both are opt-in and declared in `frank.yaml`.
 
-**`workers.schedule`** — when `true`, Frank generates a `laravel.schedule` container running `php artisan schedule:work`. Replaces the traditional cron entry; stays alive across `frank up`/`frank down` cycles.
+**`workers.schedule`** — when `true`, Frank generates a `schedule` container running `php artisan schedule:work`. Replaces the traditional cron entry; stays alive across `frank up`/`frank down` cycles.
 
 **`workers.queue`** — a list of worker *pools*. Each pool maps one or more queues to a fixed number of `queue:work` containers. Pools are useful when you want to isolate workload — e.g. one pool chewing on slow image-processing jobs, another draining a fast `notifications` queue.
 
@@ -52,7 +52,7 @@ frank worker queue -- --once                 # pass extra artisan flags after `-
 frank worker schedule                        # ad-hoc schedule:work
 frank worker ps                              # show declared + ad-hoc workers
 frank worker logs                            # tail all workers
-frank worker logs laravel.queue.default.1    # tail a single worker
+frank worker logs queue.default.1            # tail a single worker
 frank worker stop                            # stop ad-hoc workers
 frank worker stop --all                      # stop declared workers too
 ```

@@ -659,3 +659,109 @@ func TestWriteEnv_PreservesCustomKeysPatchesManaged(t *testing.T) {
 		t.Error("MEILISEARCH_HOST should be patched by the service template")
 	}
 }
+
+func extraServicesConfig(url string) *config.Config {
+	return &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql"},
+		ExtraServices: map[string]map[string]any{
+			"gotenberg": {
+				"image": "gotenberg/gotenberg:8",
+				"dot_env": map[string]any{
+					"GOTENBERG_URL": url,
+				},
+			},
+		},
+	}
+}
+
+func TestGenerateEnv_ExtraServiceDotEnv(t *testing.T) {
+	g := newTestGenerator(t)
+
+	out, err := g.GenerateEnv(extraServicesConfig("http://gotenberg:3000"), "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+
+	if !strings.Contains(out, "GOTENBERG_URL=http://gotenberg:3000") {
+		t.Errorf("expected GOTENBERG_URL in fresh .env, got:\n%s", out)
+	}
+}
+
+// Regression: a dot_env key matches neither managedKeys nor isServiceKey, so
+// without an explicit frank-owned key set patchManagedKeys would never write
+// it into an existing .env — which is every case but a brand-new project.
+func TestWriteEnv_ExtraServiceDotEnvPatchesExisting(t *testing.T) {
+	g := newTestGenerator(t)
+	dir := t.TempDir()
+
+	existing := "APP_KEY=base64:testkey==\nAPP_ENV=local\nMY_CUSTOM=keepme\n"
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(existing), 0644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	if err := g.WriteEnv(extraServicesConfig("http://gotenberg:3000"), "myapp", dir); err != nil {
+		t.Fatalf("WriteEnv error: %v", err)
+	}
+
+	env, err := os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		t.Fatalf("read .env: %v", err)
+	}
+
+	if !strings.Contains(string(env), "GOTENBERG_URL=http://gotenberg:3000") {
+		t.Errorf("expected GOTENBERG_URL patched into existing .env, got:\n%s", string(env))
+	}
+
+	if !strings.Contains(string(env), "MY_CUSTOM=keepme") {
+		t.Errorf("user key must be preserved, got:\n%s", string(env))
+	}
+
+	// Second pass with a changed value must overwrite, not duplicate.
+	if err := g.WriteEnv(extraServicesConfig("http://gotenberg:4000"), "myapp", dir); err != nil {
+		t.Fatalf("WriteEnv second pass: %v", err)
+	}
+
+	env, err = os.ReadFile(filepath.Join(dir, ".env"))
+	if err != nil {
+		t.Fatalf("read .env: %v", err)
+	}
+
+	if !strings.Contains(string(env), "GOTENBERG_URL=http://gotenberg:4000") {
+		t.Errorf("expected updated GOTENBERG_URL, got:\n%s", string(env))
+	}
+
+	if strings.Count(string(env), "GOTENBERG_URL=") != 1 {
+		t.Errorf("GOTENBERG_URL must appear once, got:\n%s", string(env))
+	}
+}
+
+func TestGenerateEnv_ExtraServiceDotEnvScalarTypes(t *testing.T) {
+	g := newTestGenerator(t)
+	cfg := &config.Config{
+		PHP:      config.PHP{Version: "8.5", Runtime: "frankenphp"},
+		Laravel:  config.Laravel{Version: "13.x"},
+		Services: []string{"pgsql"},
+		ExtraServices: map[string]map[string]any{
+			"typesense": {
+				"image": "typesense/typesense:27.0",
+				"dot_env": map[string]any{
+					"TYPESENSE_PORT":  8108,
+					"TYPESENSE_HTTPS": false,
+				},
+			},
+		},
+	}
+
+	out, err := g.GenerateEnv(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateEnv error: %v", err)
+	}
+
+	for _, want := range []string{"TYPESENSE_PORT=8108", "TYPESENSE_HTTPS=false"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in .env output, got:\n%s", want, out)
+		}
+	}
+}

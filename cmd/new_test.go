@@ -238,3 +238,60 @@ func TestMarshalConfigEmitsWorkers(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalConfigRoundTripsExtraServicesAndDev(t *testing.T) {
+	cfg := config.New()
+	enabled := false
+	cfg.Dev = config.Dev{Enabled: &enabled, Command: "npm run watch"}
+	cfg.ExtraServices = map[string]map[string]any{
+		"minio": {
+			"image": "minio/minio:latest",
+			"ports": []any{"9000:9000"},
+		},
+	}
+
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+
+	var got config.Config
+	if err := yaml.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if got.Dev.Enabled == nil || *got.Dev.Enabled {
+		t.Errorf("Dev.Enabled = %v, want false", got.Dev.Enabled)
+	}
+
+	if got.Dev.Command != "npm run watch" {
+		t.Errorf("Dev.Command = %q, want %q", got.Dev.Command, "npm run watch")
+	}
+
+	minio, ok := got.ExtraServices["minio"]
+	if !ok {
+		t.Fatalf("extra_services missing minio, got:\n%s", out)
+	}
+
+	if minio["image"] != "minio/minio:latest" {
+		t.Errorf("minio image = %v, want minio/minio:latest", minio["image"])
+	}
+}
+
+func TestMarshalConfigOmitsEmptyExtraServicesAndDev(t *testing.T) {
+	cfg := config.New() // Dev zero-valued, ExtraServices nil
+
+	out, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("marshalConfig: %v", err)
+	}
+
+	active := stripComments(out)
+	if strings.Contains(active, "extra_services:") {
+		t.Errorf("expected no extra_services key, got:\n%s", out)
+	}
+
+	if strings.Contains(active, "dev:") {
+		t.Errorf("expected no dev key, got:\n%s", out)
+	}
+}

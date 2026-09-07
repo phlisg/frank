@@ -80,7 +80,7 @@ gitignored things across at creation so the worktree is usable immediately:
 |--------|-----|
 | `.env` | Holds every project-specific key (API credentials, `MEILI_SEARCH_KEY`, `SUPER_ADMIN_EMAIL`…) and the `APP_KEY`. Generating a fresh one would mint a new `APP_KEY`, making every encrypted column in a cloned database undecryptable. Frank then patches only the keys it manages (`APP_NAME`, `APP_URL`, service hosts/ports) on top. |
 | `auth.json` | Composer credentials for private packages. |
-| `vendor/` | Otherwise `laravel.migrate` runs a full `composer install` on first up. |
+| `vendor/` | Otherwise `migrate` runs a full `composer install` on first up. |
 | `node_modules/` | Otherwise the Vite sidecar runs a full `npm install` on first up. |
 
 The two dependency trees are copied with `cp -a --reflink=auto`, so on a

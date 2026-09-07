@@ -73,10 +73,17 @@ Example response from `list`:
     "branch": "feature/auth",
     "hasFrank": true,
     "status": "running (3/3)",
-    "ports": ":32771 :32768 :5191"
+    "ports": "web:32771  vite:32773  pgsql:32768"
   }
 ]
 ```
+
+`ports` is a labelled listing of the worktree's published host ports, built from
+its running services only: `web` is `laravel.test`, `vite` is `laravel.vite`, and
+every other service — including any declared under `extra_services` — keeps its
+Compose service name. TCP publishers only; a service publishing several ports
+collapses into one entry (`web:32771,32770`), and a service with no published
+port is omitted. Ordering is `web`, `vite`, then alphabetical.
 
 This lets AI assistants create isolated worktrees, start/stop their containers, and clean them up when done — without shelling out to git or docker.
 

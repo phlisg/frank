@@ -812,3 +812,113 @@ func TestIsWorktree(t *testing.T) {
 		t.Error("non-git dir reported as worktree")
 	}
 }
+
+func TestExtraServicesRejections(t *testing.T) {
+	cases := map[string]struct {
+		yamlBody string
+		want     string
+	}{
+		"bad name": {`
+version: 1
+extra_services:
+  Gotenberg:
+    image: gotenberg/gotenberg:8
+`, "invalid service name"},
+		"collides with builtin": {`
+version: 1
+extra_services:
+  redis:
+    image: redis:alpine
+`, "collides with a service Frank generates"},
+		"collides with queue worker": {`
+version: 1
+extra_services:
+  queue.default.1:
+    image: alpine
+`, "collides with a service Frank generates"},
+		"collides with migrate": {`
+version: 1
+extra_services:
+  migrate:
+    image: alpine
+`, "collides with a service Frank generates"},
+		"no image or build": {`
+version: 1
+extra_services:
+  gotenberg:
+    ports: ["3000:3000"]
+`, "must set image or build"},
+		"lowercase dot_env key": {`
+version: 1
+extra_services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    dot_env:
+      gotenberg_url: http://gotenberg:3000
+`, "invalid dot_env key"},
+		"non-scalar dot_env value": {`
+version: 1
+extra_services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    dot_env:
+      GOTENBERG_URL: [a, b]
+`, "must be a string, number or boolean"},
+		"volume collides with frank volume": {`
+version: 1
+extra_services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    volumes:
+      - pgsql_data:/data
+`, "collides with a volume Frank owns"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, tc.yamlBody)
+
+			_, err := Load(dir)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error = %q, want it to contain %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestExtraServicesValid(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `
+version: 1
+extra_services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports: ["3000:3000"]
+    volumes:
+      - gotenberg_tmp:/tmp
+      - ./local:/mnt
+    dot_env:
+      GOTENBERG_URL: http://gotenberg:3000
+      GOTENBERG_TIMEOUT: 30
+      GOTENBERG_DEBUG: false
+`)
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+
+	block, ok := cfg.ExtraServices["gotenberg"]
+	if !ok {
+		t.Fatalf("ExtraServices = %v, want a gotenberg entry", cfg.ExtraServices)
+	}
+
+	if block["image"] != "gotenberg/gotenberg:8" {
+		t.Errorf("image = %v, want gotenberg/gotenberg:8", block["image"])
+	}
+}

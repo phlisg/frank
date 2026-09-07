@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/phlisg/frank/internal/config"
@@ -57,11 +58,63 @@ func (g *Generator) buildEnvLines(cfg *config.Config, projectName string, isExam
 		lines = mergeEnvBlock(lines, svc, block)
 	}
 
+	for _, name := range sortedExtraServices(cfg) {
+		lines = mergeEnvBlock(lines, name, extraEnvBlock(cfg.ExtraServices[name]))
+	}
+
 	if isExample {
 		lines = redactSensitive(lines)
 	}
 
 	return lines, nil
+}
+
+// sortedExtraServices returns extra service names in deterministic order.
+func sortedExtraServices(cfg *config.Config) []string {
+	names := make([]string, 0, len(cfg.ExtraServices))
+	for name := range cfg.ExtraServices {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	return names
+}
+
+// extraEnvBlock builds env lines from an extra service's dot_env map,
+// in sorted key order. Values are scalars (validated in internal/config).
+func extraEnvBlock(block map[string]any) []envLine {
+	raw, ok := block["dot_env"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	keys := make([]string, 0, len(raw))
+	for k := range raw {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	out := make([]envLine, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, kv(k, fmt.Sprint(raw[k])))
+	}
+
+	return out
+}
+
+// extraEnvKeys returns the set of env keys frank owns via extra_services dot_env.
+func extraEnvKeys(cfg *config.Config) map[string]bool {
+	keys := map[string]bool{}
+
+	for _, name := range sortedExtraServices(cfg) {
+		for _, line := range extraEnvBlock(cfg.ExtraServices[name]) {
+			keys[line.key] = true
+		}
+	}
+
+	return keys
 }
 
 // GenerateEnv produces a .env string for the given config and project name.
@@ -106,7 +159,7 @@ func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error 
 			return err
 		}
 
-		envLines = patchManagedKeys(envLines, frankLines)
+		envLines = patchManagedKeys(envLines, frankLines, extraEnvKeys(cfg))
 	} else {
 		// No .env — generate from scratch.
 		var err error
@@ -140,7 +193,7 @@ func (g *Generator) WriteEnv(cfg *config.Config, projectName, dir string) error 
 	var exampleLines []envLine
 	if readErr == nil {
 		exampleLines = parseFullEnvFile(string(existingExample))
-		exampleLines = patchManagedKeys(exampleLines, frankExample)
+		exampleLines = patchManagedKeys(exampleLines, frankExample, extraEnvKeys(cfg))
 	} else {
 		exampleLines = frankExample
 	}
@@ -160,9 +213,10 @@ var managedKeys = map[string]bool{
 // patchManagedKeys merges frank-generated keys into an existing .env.
 // Only keys present in frankLines that are either in managedKeys or were
 // injected by a service template (i.e. not in the base Laravel template)
-// are updated. All other existing keys/comments/ordering are preserved.
-// Keys in frankLines not found in existing are appended.
-func patchManagedKeys(existing, frankLines []envLine) []envLine {
+// are updated, plus any key in extraKeys (dot_env keys from extra_services,
+// which match no fixed prefix). All other existing keys/comments/ordering are
+// preserved. Keys in frankLines not found in existing are appended.
+func patchManagedKeys(existing, frankLines []envLine, extraKeys map[string]bool) []envLine {
 	// Build set of frank-managed keys: explicitly managed + all service keys.
 	frankKeys := make(map[string]string)
 
@@ -198,7 +252,7 @@ func patchManagedKeys(existing, frankLines []envLine) []envLine {
 			continue
 		}
 
-		if !managedKeys[fl.key] && !isServiceKey(fl.key) {
+		if !managedKeys[fl.key] && !isServiceKey(fl.key) && !extraKeys[fl.key] {
 			continue
 		}
 
